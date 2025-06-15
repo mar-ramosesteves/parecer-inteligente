@@ -1,10 +1,9 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-CORS(app, supports_credentials=True, origins="*")
-
 
 app = Flask(__name__)
-CORS(app, origins=["https://gestor.thehrkey.tech"])
+CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
+
 
 @app.route("/")
 def index():
