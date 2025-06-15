@@ -1,75 +1,59 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
-
-@app.route("/")
-def index():
-    return "API no ar! 🚀"
-
-if __name__ == "__main__":
-    app.run()
-
-from flask import Flask, request, jsonify
 from fpdf import FPDF
 from datetime import datetime
 import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
-import openai
+from openai import OpenAI
 
-@app.route("/emitir-parecer-inteligente", methods=["POST"])
+# Inicializa o app Flask
+app = Flask(__name__)
+CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
+
+# Rota de teste
+@app.route("/")
+def index():
+    return "API no ar! 🚀"
+
+# Rota para emissão do parecer inteligente
+@app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
-    import os
-    import io
-    import json
-    import textwrap
-    from fpdf import FPDF
-    from datetime import datetime
-    from googleapiclient.http import MediaIoBaseUpload
-    from openai import OpenAI
+    if request.method == "OPTIONS":
+        return '', 200  # Preflight CORS OK
 
-    dados = request.json
-    empresa = dados["empresa"].lower()
-    codrodada = dados["codrodada"].lower()
-    emailLider = dados["emailLider"].lower()
+    try:
+        dados = request.json
+        empresa = dados["empresa"].lower()
+        codrodada = dados["codrodada"].lower()
+        emailLider = dados["emailLider"].lower()
 
-    # Localizar pastas no Google Drive
-    id_empresa = buscar_id(PASTA_RAIZ, empresa)
-    id_rodada = buscar_id(id_empresa, codrodada)
-    id_lider = buscar_id(id_rodada, emailLider)
+        # Localizar pastas no Google Drive
+        id_empresa = buscar_id(PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(id_empresa, codrodada)
+        id_lider = buscar_id(id_rodada, emailLider)
 
-    # Listar arquivos na pasta do líder
-    arquivos = drive.ListFile({"q": f"'{id_lider}' in parents and trashed=false"}).GetList()
+        # Listar arquivos na pasta do líder
+        arquivos = drive.ListFile({"q": f"'{id_lider}' in parents and trashed=false"}).GetList()
 
-    def encontrar(nome_parcial, extensao=None):
-        for arq in arquivos:
-            nome = arq["title"].lower()
-            if nome_parcial in nome and (extensao is None or nome.endswith(extensao)):
-                return arq
-        return None
+        def encontrar(nome_parcial, extensao=None):
+            for arq in arquivos:
+                nome = arq["title"].lower()
+                if nome_parcial in nome and (extensao is None or nome.endswith(extensao)):
+                    return arq
+            return None
 
-    # Localizar arquivos-chave
-    arquivo_json = encontrar("relatorio_microambiente", ".json")
-    guia_arquetipos = encontrar("guia de entendimento - arquétipos", ".pdf")
-    guia_micro = encontrar("guia de entendimento - micro ambiente", ".pdf")
-    relatorio_arquetipos = encontrar("relatorio_analitico_arquetipos", ".pdf")
-    relatorio_microambiente = encontrar("relatorio_analitico_microambiente", ".pdf")
-    grafico_waterfall = encontrar("waterfall", ".pdf")
-    grafico_termometro = encontrar("termometro", ".pdf")
-    logo = encontrar("logo", ".jpg")
+        # Localizar arquivos-chave
+        arquivo_json = encontrar("relatorio_microambiente", ".json")
+        if not arquivo_json:
+            return jsonify({"erro": "Arquivo JSON de microambiente não encontrado."}), 400
 
-    if not arquivo_json:
-        return jsonify({"erro": "Arquivo JSON de microambiente não encontrado."}), 400
+        conteudo_json = io.BytesIO()
+        drive.CreateFile({'id': arquivo_json['id']}).GetContentFile("temp.json")
+        with open("temp.json", "r", encoding="utf-8") as f:
+            resumo_json = json.load(f)
 
-    # Baixar conteúdo do JSON
-    conteudo_json = io.BytesIO()
-    drive.CreateFile({'id': arquivo_json['id']}).GetContentFile("temp.json")
-    with open("temp.json", "r", encoding="utf-8") as f:
-        resumo_json = json.load(f)
-
-    # Montar o prompt
-    prompt = f"""
+        # Prompt para a IA
+        prompt = f"""
 Você é um consultor organizacional com profundo conhecimento em liderança, clima organizacional e inteligência emocional, especialmente com base nas teorias de Daniel Goleman.
 
 Utilize os seguintes insumos:
@@ -94,37 +78,42 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
-    # Chamar a API da OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    resposta = client.chat.completions.create(
-        model="gpt-4",
-        temperature=0.6,
-        messages=[{"role": "system", "content": prompt}]
-    )
-    parecer = resposta.choices[0].message.content.strip()
+        # Chamada à API da OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        resposta = client.chat.completions.create(
+            model="gpt-4",
+            temperature=0.6,
+            messages=[{"role": "system", "content": prompt}]
+        )
+        parecer = resposta.choices[0].message.content.strip()
 
-    # Gerar PDF simples com FPDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "RELATÓRIO DE LIDERANÇA - PROGRAMA DE ALTA PERFORMANCE", ln=True, align="C")
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(10)
+        # Gerar PDF com o parecer
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(0, 10, "RELATÓRIO DE LIDERANÇA - PROGRAMA DE ALTA PERFORMANCE", ln=True, align="C")
+        pdf.set_font("Arial", "", 12)
+        pdf.ln(10)
+        for linha in textwrap.wrap(parecer, 100):
+            pdf.cell(0, 10, linha, ln=True)
 
-    for linha in textwrap.wrap(parecer, 100):
-        pdf.cell(0, 10, linha, ln=True)
+        output = io.BytesIO()
+        pdf.output(output)
+        output.seek(0)
 
-    output = io.BytesIO()
-    pdf.output(output)
-    output.seek(0)
+        nome_pdf = f"parecer_inteligente_{emailLider}_{codrodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        drive_pdf = drive.CreateFile({
+            "title": nome_pdf,
+            "parents": [{"id": id_lider}]
+        })
+        drive_pdf.SetContentString(output.read().decode("latin1"))
+        drive_pdf.Upload()
 
-    nome_pdf = f"parecer_inteligente_{emailLider}_{codrodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return jsonify({"mensagem": "✅ Parecer emitido com sucesso!", "arquivo": nome_pdf})
 
-    drive_pdf = drive.CreateFile({
-        "title": nome_pdf,
-        "parents": [{"id": id_lider}]
-    })
-    drive_pdf.SetContentString(output.read().decode("latin1"))
-    drive_pdf.Upload()
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
-    return jsonify({"mensagem": "✅ Parecer emitido com sucesso!", "arquivo": nome_pdf})
+# Executa o app
+if __name__ == "__main__":
+    app.run(debug=True)
