@@ -4,7 +4,6 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
 
-
 @app.route("/")
 def index():
     return "API no ar! 🚀"
