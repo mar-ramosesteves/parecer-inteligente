@@ -6,3 +6,4 @@ python-docx
 matplotlib
 numpy
 gunicorn
+fpdf==1.7.2
