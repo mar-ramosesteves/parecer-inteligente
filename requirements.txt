@@ -1,1 +1,7 @@
 
+flask
+flask-cors
+openai
+python-docx
+matplotlib
+numpy
