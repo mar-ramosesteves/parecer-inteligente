@@ -7,3 +7,4 @@ matplotlib
 numpy
 gunicorn
 fpdf==1.7.2
+google-api-python-client
