@@ -7,7 +7,8 @@ from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
+
 
 @app.after_request
 def aplicar_cors(response):
