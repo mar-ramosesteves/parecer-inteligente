@@ -8,12 +8,22 @@ from openai import OpenAI
 
 # Inicializa o app Flask
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
+CORS(app)
+
+# Correção robusta para CORS no Render
+@app.after_request
+def aplicar_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # Rota de teste
 @app.route("/")
 def index():
     return "API no ar! 🚀"
+
 
 # Rota para emissão do parecer inteligente
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
