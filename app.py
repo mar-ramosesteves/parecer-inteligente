@@ -1,43 +1,34 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from fpdf import FPDF
 from datetime import datetime
 import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
+# === CONFIGURAÇÃO FLASK E CORS ===
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}}, supports_credentials=True)
 
+@app.after_request
+def aplicar_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
-
-
-# Rota de teste
+# === ROTA DE TESTE ===
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
-
-
-# Rota para emissão do parecer inteligente
-
-
-from flask_cors import cross_origin
-
+# === ROTA PARA EMITIR PARECER INTELIGENTE ===
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 @cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
         return '', 200
-   
-
-    
-        response.headers.add("Access-Control-Allow-Origin", "https://gestor.thehrkey.tech")
-        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response, 200
-
 
     try:
         dados = request.json
@@ -45,12 +36,11 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Localizar pastas no Google Drive
+        # Buscar pastas no Drive (supondo funções e constantes já definidas)
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
 
-        # Listar arquivos na pasta do líder
         arquivos = drive.ListFile({"q": f"'{id_lider}' in parents and trashed=false"}).GetList()
 
         def encontrar(nome_parcial, extensao=None):
@@ -60,26 +50,20 @@ def emitir_parecer_inteligente():
                     return arq
             return None
 
-        # Localizar arquivos-chave
         arquivo_json = encontrar("relatorio_microambiente", ".json")
         if not arquivo_json:
             return jsonify({"erro": "Arquivo JSON de microambiente não encontrado."}), 400
 
-        conteudo_json = io.BytesIO()
         drive.CreateFile({'id': arquivo_json['id']}).GetContentFile("temp.json")
         with open("temp.json", "r", encoding="utf-8") as f:
             resumo_json = json.load(f)
 
-        # Prompt para a IA
+        # === PROMPT DE INTELIGÊNCIA ===
         prompt = f"""
 Você é um consultor organizacional com profundo conhecimento em liderança, clima organizacional e inteligência emocional, especialmente com base nas teorias de Daniel Goleman.
 
 Utilize os seguintes insumos:
 - Resumo estatístico do Microambiente (JSON): {json.dumps(resumo_json, ensure_ascii=False)}
-- Relatório analítico de Microambiente
-- Relatório de Arquétipos de Gestão (auto x equipe)
-- Gráficos de termômetro, waterfall e autoavaliação
-- Guias técnicos fornecidos
 
 Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líder {emailLider}, incluindo:
 1. Introdução e objetivo do relatório
@@ -96,7 +80,6 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
-        # Chamada à API da OpenAI
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         resposta = client.chat.completions.create(
             model="gpt-4",
@@ -105,7 +88,7 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
         )
         parecer = resposta.choices[0].message.content.strip()
 
-        # Gerar PDF com o parecer
+        # === GERAR PDF ===
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
@@ -132,6 +115,6 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# Executa o app
+# === EXECUTAR LOCALMENTE (IGNORADO PELO RENDER) ===
 if __name__ == "__main__":
     app.run(debug=True)
