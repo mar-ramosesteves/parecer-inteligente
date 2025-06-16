@@ -6,11 +6,10 @@ import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
-# Inicializa o app Flask
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}}, supports_credentials=True)
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
-# Liberação geral de CORS para todas as rotas
+# Aplicação de headers CORS após cada resposta
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -19,19 +18,15 @@ def aplicar_cors(response):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
-# Rota de teste
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
-# ================================
-# 🔁 ROTA DE EMISSÃO DE PARECER
-# ================================
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
+    # Resposta automática para requisição preflight do navegador
     if request.method == "OPTIONS":
-        # Resposta da requisição preflight
-        return '', 200
+        return jsonify({"status": "CORS OK"}), 200
 
     try:
         dados = request.json
@@ -39,7 +34,7 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Buscar pastas (supondo que você já tenha definido essas funções)
+        # Localizar pastas
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
@@ -88,7 +83,7 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
         )
         parecer = resposta.choices[0].message.content.strip()
 
-        # Gerar PDF com FPDF
+        # Gerar PDF
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
@@ -115,6 +110,6 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# Executa localmente (ignorado no Render)
+# Apenas para rodar localmente
 if __name__ == "__main__":
     app.run(debug=True)
