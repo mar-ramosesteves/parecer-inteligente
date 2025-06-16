@@ -26,9 +26,14 @@ def index():
 # 📤 Rota para emissão do parecer
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
-    # ✅ Responde ao preflight do navegador
+    # ✅ Responde corretamente à preflight OPTIONS
     if request.method == "OPTIONS":
-        return '', 200
+        response = app.make_response("")
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response, 200
 
     try:
         dados = request.json
