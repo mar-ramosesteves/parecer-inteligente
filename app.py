@@ -126,7 +126,10 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
         return jsonify({"mensagem": f"✅ Parecer para {emailLider} gerado com sucesso!", "arquivo": nome_pdf})
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run()
