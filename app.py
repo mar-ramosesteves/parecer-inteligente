@@ -7,16 +7,10 @@ from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
+CORS(app, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}}, supports_credentials=True)
 
 
-@app.after_request
-def aplicar_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
+
 
 # Rota de teste
 @app.route("/")
@@ -27,15 +21,15 @@ def index():
 
 # Rota para emissão do parecer inteligente
 
-from flask_cors import cross_origin
 
 from flask_cors import cross_origin
 
-@cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
+@cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
-        return jsonify({"status": "OK"}), 200
+        return '', 200
+   
 
     
         response.headers.add("Access-Control-Allow-Origin", "https://gestor.thehrkey.tech")
