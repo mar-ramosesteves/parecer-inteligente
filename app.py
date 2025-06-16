@@ -6,11 +6,9 @@ import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
-# Inicializa o app Flask
 app = Flask(__name__)
 CORS(app)
 
-# Correção robusta para CORS no Render
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
