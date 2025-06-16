@@ -9,7 +9,7 @@ from openai import OpenAI
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
 
-# Middleware CORS para garantir resposta a OPTIONS
+# Middleware CORS robusto
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -25,11 +25,10 @@ def index():
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
-        # ✅ resposta manual 200 OK com todos os headers esperados
         response = make_response()
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.headers["Access-Control-Allow-Credentials"] = "true"
         return response, 200
 
@@ -39,7 +38,6 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Localizar pastas no Google Drive
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
@@ -57,7 +55,6 @@ def emitir_parecer_inteligente():
         if not arquivo_json:
             return jsonify({"erro": "Arquivo JSON de microambiente não encontrado."}), 400
 
-        conteudo_json = io.BytesIO()
         drive.CreateFile({'id': arquivo_json['id']}).GetContentFile("temp.json")
         with open("temp.json", "r", encoding="utf-8") as f:
             resumo_json = json.load(f)
