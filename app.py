@@ -6,27 +6,27 @@ import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
-# Inicializa o app Flask
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-# Middleware global para liberar CORS corretamente
+# 🔐 Libera CORS após toda requisição
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
-# Rota de teste
+# 🛠️ Rota base
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
-# === ROTA DE EMISSÃO DO PARECER INTELIGENTE ===
+# 📤 Rota para emissão do parecer
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
+    # ✅ Responde ao preflight do navegador
     if request.method == "OPTIONS":
         return '', 200
 
@@ -36,7 +36,6 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Localizar pastas no Google Drive
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
@@ -79,8 +78,6 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 8. Sugerir 3 planos de ação
 9. Conclusão com chamada à ação
 10. Tom consultivo e encorajador
-
-Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -117,6 +114,6 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# Rodar local (ignorado no Render)
+# 🟢 Executa local
 if __name__ == "__main__":
     app.run(debug=True)
