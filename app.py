@@ -5,12 +5,37 @@ from datetime import datetime
 import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
-# Inicialização
+# === AUTENTICAÇÃO GOOGLE DRIVE ===
+PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
+
+gauth = GoogleAuth()
+gauth.LoadCredentialsFile("mycreds.txt")
+if gauth.credentials is None:
+    gauth.LocalWebserverAuth()
+elif gauth.access_token_expired:
+    gauth.Refresh()
+else:
+    gauth.Authorize()
+gauth.SaveCredentialsFile("mycreds.txt")
+
+drive = GoogleDrive(gauth)
+
+def buscar_id(pasta_pai_id, nome_pasta):
+    lista = drive.ListFile({
+        "q": f"'{pasta_pai_id}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'"
+    }).GetList()
+    for item in lista:
+        if item['title'].lower() == nome_pasta:
+            return item['id']
+    raise Exception(f"Pasta '{nome_pasta}' não encontrada.")
+
+# === FLASK APP ===
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
-# CORS Middleware
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -19,12 +44,10 @@ def aplicar_cors(response):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
-# Rota básica
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
-# Rota principal
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
@@ -42,12 +65,12 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Busca de pastas
+        # Localizar pastas
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
 
-        # Busca JSON
+        # Encontrar JSON
         arquivos = drive.ListFile({"q": f"'{id_lider}' in parents and trashed=false"}).GetList()
         def encontrar(nome_parcial, extensao=None):
             for arq in arquivos:
@@ -64,7 +87,7 @@ def emitir_parecer_inteligente():
         with open("temp.json", "r", encoding="utf-8") as f:
             resumo_json = json.load(f)
 
-        # Prompt para o ChatGPT
+        # Prompt IA
         prompt = f"""
 Você é um consultor organizacional com profundo conhecimento em liderança, clima organizacional e inteligência emocional, especialmente com base nas teorias de Daniel Goleman.
 
@@ -90,7 +113,7 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
-        # Chamada à API OpenAI
+        # IA - Geração do parecer
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         resposta = client.chat.completions.create(
             model="gpt-4",
@@ -99,7 +122,7 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
         )
         parecer = resposta.choices[0].message.content.strip()
 
-        # Gerar PDF
+        # Geração PDF
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
@@ -114,7 +137,7 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
         pdf.output(output)
         output.seek(0)
 
-        # Upload no Google Drive
+        # Upload no Drive
         nome_pdf = f"parecer_inteligente_{emailLider}_{codrodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         drive_pdf = drive.CreateFile({
             "title": nome_pdf,
@@ -129,7 +152,6 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
         import traceback
         traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run()
