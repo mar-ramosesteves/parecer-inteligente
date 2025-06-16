@@ -28,11 +28,15 @@ def index():
 
 from flask_cors import cross_origin
 
-@app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
+from flask_cors import cross_origin
+
 @cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
+@app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
-        response = jsonify({"status": "OK"})
+        return jsonify({"status": "OK"}), 200
+
+    
         response.headers.add("Access-Control-Allow-Origin", "https://gestor.thehrkey.tech")
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
