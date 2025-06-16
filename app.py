@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 from fpdf import FPDF
 from datetime import datetime
 import io, os, textwrap, json
@@ -8,9 +8,9 @@ from openai import OpenAI
 
 # Inicializa o app Flask
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-# Middleware global para CORS
+# Middleware global para liberar CORS corretamente
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -24,12 +24,11 @@ def aplicar_cors(response):
 def index():
     return "API no ar! 🚀"
 
-# Rota para emissão do parecer inteligente
+# === ROTA DE EMISSÃO DO PARECER INTELIGENTE ===
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
-@cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
-        return '', 200  # Preflight response
+        return '', 200
 
     try:
         dados = request.json
@@ -118,6 +117,6 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# Executa a aplicação
+# Rodar local (ignorado no Render)
 if __name__ == "__main__":
     app.run(debug=True)
