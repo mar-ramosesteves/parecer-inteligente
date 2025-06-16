@@ -26,10 +26,16 @@ def index():
 
 
 # Rota para emissão do parecer inteligente
+# Rota para emissão do parecer inteligente
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
-        return '', 200  # Preflight CORS OK
+        response = jsonify({"status": "OK"})
+        response.headers.add("Access-Control-Allow-Origin", "https://gestor.thehrkey.tech")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
 
     try:
         dados = request.json
