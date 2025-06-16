@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from fpdf import FPDF
 from datetime import datetime
@@ -7,28 +7,26 @@ from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=["https://gestor.thehrkey.tech"])
 
-# 🔐 Libera CORS após toda requisição
+# Middleware CORS para garantir resposta a OPTIONS
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
-# 🛠️ Rota base
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
-# 📤 Rota para emissão do parecer
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
 def emitir_parecer_inteligente():
-    # ✅ Responde corretamente à preflight OPTIONS
     if request.method == "OPTIONS":
-        response = app.make_response("")
+        # ✅ resposta manual 200 OK com todos os headers esperados
+        response = make_response()
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
@@ -41,6 +39,7 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
+        # Localizar pastas no Google Drive
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
@@ -58,6 +57,7 @@ def emitir_parecer_inteligente():
         if not arquivo_json:
             return jsonify({"erro": "Arquivo JSON de microambiente não encontrado."}), 400
 
+        conteudo_json = io.BytesIO()
         drive.CreateFile({'id': arquivo_json['id']}).GetContentFile("temp.json")
         with open("temp.json", "r", encoding="utf-8") as f:
             resumo_json = json.load(f)
@@ -83,6 +83,8 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 8. Sugerir 3 planos de ação
 9. Conclusão com chamada à ação
 10. Tom consultivo e encorajador
+
+Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -119,6 +121,5 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# 🟢 Executa local
 if __name__ == "__main__":
     app.run(debug=True)
