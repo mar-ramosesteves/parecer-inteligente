@@ -1,15 +1,16 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from fpdf import FPDF
 from datetime import datetime
 import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
+# Inicializa o app Flask
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
+CORS(app, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}}, supports_credentials=True)
 
-# Aplicação de headers CORS após cada resposta
+# Middleware global para CORS
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -18,15 +19,17 @@ def aplicar_cors(response):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
+# Rota de teste
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
+# Rota para emissão do parecer inteligente
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
+@cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 def emitir_parecer_inteligente():
-    # Resposta automática para requisição preflight do navegador
     if request.method == "OPTIONS":
-        return jsonify({"status": "CORS OK"}), 200
+        return '', 200  # Preflight response
 
     try:
         dados = request.json
@@ -34,7 +37,7 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Localizar pastas
+        # Localizar pastas no Google Drive
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
@@ -61,6 +64,10 @@ Você é um consultor organizacional com profundo conhecimento em liderança, cl
 
 Utilize os seguintes insumos:
 - Resumo estatístico do Microambiente (JSON): {json.dumps(resumo_json, ensure_ascii=False)}
+- Relatório analítico de Microambiente
+- Relatório de Arquétipos de Gestão (auto x equipe)
+- Gráficos de termômetro, waterfall e autoavaliação
+- Guias técnicos fornecidos
 
 Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líder {emailLider}, incluindo:
 1. Introdução e objetivo do relatório
@@ -73,6 +80,8 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 8. Sugerir 3 planos de ação
 9. Conclusão com chamada à ação
 10. Tom consultivo e encorajador
+
+Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -83,7 +92,6 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
         )
         parecer = resposta.choices[0].message.content.strip()
 
-        # Gerar PDF
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
@@ -110,6 +118,6 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# Apenas para rodar localmente
+# Executa a aplicação
 if __name__ == "__main__":
     app.run(debug=True)
