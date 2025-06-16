@@ -1,15 +1,16 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 from fpdf import FPDF
 from datetime import datetime
 import io, os, textwrap, json
 from googleapiclient.http import MediaIoBaseUpload
 from openai import OpenAI
 
-# === CONFIGURAÇÃO FLASK E CORS ===
+# Inicializa o app Flask
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}}, supports_credentials=True)
 
+# Liberação geral de CORS para todas as rotas
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -18,16 +19,18 @@ def aplicar_cors(response):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
-# === ROTA DE TESTE ===
+# Rota de teste
 @app.route("/")
 def index():
     return "API no ar! 🚀"
 
-# === ROTA PARA EMITIR PARECER INTELIGENTE ===
+# ================================
+# 🔁 ROTA DE EMISSÃO DE PARECER
+# ================================
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
-@cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
+        # Resposta da requisição preflight
         return '', 200
 
     try:
@@ -36,7 +39,7 @@ def emitir_parecer_inteligente():
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # Buscar pastas no Drive (supondo funções e constantes já definidas)
+        # Buscar pastas (supondo que você já tenha definido essas funções)
         id_empresa = buscar_id(PASTA_RAIZ, empresa)
         id_rodada = buscar_id(id_empresa, codrodada)
         id_lider = buscar_id(id_rodada, emailLider)
@@ -58,7 +61,6 @@ def emitir_parecer_inteligente():
         with open("temp.json", "r", encoding="utf-8") as f:
             resumo_json = json.load(f)
 
-        # === PROMPT DE INTELIGÊNCIA ===
         prompt = f"""
 Você é um consultor organizacional com profundo conhecimento em liderança, clima organizacional e inteligência emocional, especialmente com base nas teorias de Daniel Goleman.
 
@@ -76,8 +78,6 @@ Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líde
 8. Sugerir 3 planos de ação
 9. Conclusão com chamada à ação
 10. Tom consultivo e encorajador
-
-Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
 """
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -88,7 +88,7 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
         )
         parecer = resposta.choices[0].message.content.strip()
 
-        # === GERAR PDF ===
+        # Gerar PDF com FPDF
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
@@ -115,6 +115,6 @@ Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissio
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-# === EXECUTAR LOCALMENTE (IGNORADO PELO RENDER) ===
+# Executa localmente (ignorado no Render)
 if __name__ == "__main__":
     app.run(debug=True)
