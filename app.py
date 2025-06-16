@@ -25,9 +25,13 @@ def index():
     return "API no ar! 🚀"
 
 
+
 # Rota para emissão do parecer inteligente
-# Rota para emissão do parecer inteligente
+
+from flask_cors import cross_origin
+
 @app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
+@cross_origin(origins="https://gestor.thehrkey.tech", supports_credentials=True)
 def emitir_parecer_inteligente():
     if request.method == "OPTIONS":
         response = jsonify({"status": "OK"})
@@ -36,6 +40,7 @@ def emitir_parecer_inteligente():
         response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
+
 
     try:
         dados = request.json
