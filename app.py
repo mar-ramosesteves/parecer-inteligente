@@ -11,7 +11,8 @@ from busca_arquivos_drive import buscar_id
 import json
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
+CORS(app, origins="https://gestor.thehrkey.tech", supports_credentials=True)
+
 
 @app.after_request
 def aplicar_cors(response):
