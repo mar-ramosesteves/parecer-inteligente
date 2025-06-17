@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import openai
 import os
@@ -11,7 +11,7 @@ from busca_arquivos_drive import buscar_id
 import json
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": ["https://gestor.thehrkey.tech"]}})
 
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
@@ -27,7 +27,6 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Passo 1: Geração do texto com IA estruturado em 15 seções
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
@@ -62,20 +61,25 @@ def emitir_parecer():
         )
 
         conteudo_json = resposta.choices[0].message.content.strip()
-        parecer = eval(conteudo_json)  # assume estrutura correta
+        parecer = eval(conteudo_json)
 
-        # Passo 2: Criar PDF com FPDF (mais compatível com Render)
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.multi_cell(0, 10, f"PARECER INTELIGENTE\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
-        for paragrafo in parecer_gerado.split("\n"):
-            pdf.multi_cell(0, 10, paragrafo)
+
+        for secao in parecer["secoes"]:
+            titulo = secao.get("titulo", "")
+            texto = secao.get("texto", "")
+            pdf.set_font("Arial", "B", 12)
+            pdf.multi_cell(0, 10, f"\n{titulo}")
+            pdf.set_font("Arial", "", 12)
+            pdf.multi_cell(0, 10, texto)
+
         pdf.output(caminho_local)
 
-        # Passo 3: Autenticar no Google Drive com conta de serviço
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
@@ -83,7 +87,6 @@ def emitir_parecer():
 
         service = build("drive", "v3", credentials=creds)
 
-        # Passo 4: Criar estrutura de pastas e subir PDF
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
@@ -97,11 +100,3 @@ def emitir_parecer():
     except Exception as e:
         print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
-
-@app.after_request
-def aplicar_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
