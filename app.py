@@ -60,8 +60,11 @@ def emitir_parecer():
             temperature=0.7
         )
 
+        import ast
+
         conteudo_json = resposta.choices[0].message.content.strip()
-        parecer = eval(conteudo_json)
+        parecer = ast.literal_eval(conteudo_json)
+
 
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
