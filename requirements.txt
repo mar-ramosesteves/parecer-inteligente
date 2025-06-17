@@ -11,3 +11,5 @@ google-api-python-client
 PyDrive
 oauth2client
 pdfkit
+google-auth
+google-auth-oauthlib
