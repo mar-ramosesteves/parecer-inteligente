@@ -14,7 +14,8 @@ PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 gauth = GoogleAuth()
 gauth.LoadCredentialsFile("mycreds.txt")
 if gauth.credentials is None:
-    gauth.LocalWebserverAuth()
+    gauth.CommandLineAuth()
+
 elif gauth.access_token_expired:
     gauth.Refresh()
 else:
