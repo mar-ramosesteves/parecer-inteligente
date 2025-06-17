@@ -8,6 +8,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
+import json
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -63,8 +64,6 @@ def emitir_parecer():
         conteudo_json = resposta.choices[0].message.content.strip()
         parecer = eval(conteudo_json)  # assume estrutura correta
 
-        
-
         # Passo 2: Criar PDF com FPDF (mais compatível com Render)
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
@@ -77,8 +76,6 @@ def emitir_parecer():
         pdf.output(caminho_local)
 
         # Passo 3: Autenticar no Google Drive com conta de serviço
-        import json
-
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
@@ -101,7 +98,6 @@ def emitir_parecer():
         print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
 
-
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -109,4 +105,3 @@ def aplicar_cors(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
-
