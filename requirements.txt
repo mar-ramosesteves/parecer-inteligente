@@ -13,3 +13,4 @@ oauth2client
 pdfkit
 google-auth
 google-auth-oauthlib
+xhtml2pdf
