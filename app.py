@@ -31,14 +31,18 @@ def emitir_parecer():
         Gere um parecer consultivo estruturado sobre o estilo de liderança e o microambiente do líder {email_lider}, com base nos dados das avaliações disponíveis para a rodada {rodada} da empresa {empresa}.
         O parecer deve conter 10 seções e apresentar uma análise clara, consultiva e profissional.
         """
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        resposta = openai.ChatCompletion.create(
+        from openai import OpenAI
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        resposta = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=3000
         )
         parecer_gerado = resposta.choices[0].message.content
+
 
         # Passo 2: Criar PDF com FPDF (mais compatível com Render)
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
