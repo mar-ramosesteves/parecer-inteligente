@@ -71,4 +71,6 @@ def emitir_parecer():
         return jsonify({"mensagem": f"✅ Parecer salvo com sucesso no Drive: {nome_pdf}"})
 
     except Exception as e:
+        print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
+
