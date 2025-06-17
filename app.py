@@ -9,22 +9,19 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
 import json
+import io
+from xhtml2pdf import pisa
 
 app = Flask(__name__)
-CORS(app, origins="https://gestor.thehrkey.tech", supports_credentials=True)
-
+CORS(app)  # Ativa CORS globalmente
 
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
-
-
-
-
 
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
@@ -77,7 +74,7 @@ Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve ter "tit
         )
 
         parecer_gerado = resposta.choices[0].message.content
-        parecer = eval(parecer_gerado)  # Garantido por estrutura padronizada
+        parecer = eval(parecer_gerado)  # Estrutura garantida
 
         # Passo 2: Preencher HTML
         html = render_template("parecer.html",
@@ -91,7 +88,6 @@ Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve ter "tit
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
 
-        from xhtml2pdf import pisa
         with open(caminho_local, "w+b") as f:
             pisa.CreatePDF(io.StringIO(html), dest=f)
 
