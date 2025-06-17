@@ -57,11 +57,13 @@ def emitir_parecer():
         pdf.output(caminho_local)
 
         # Passo 3: Autenticar no Google Drive com conta de serviço
-        SERVICE_ACCOUNT_FILE = "47ecdfa7-1ebd-48ed-97b1-e0d80f37d51f.json"
+        import json
+
         SCOPES = ['https://www.googleapis.com/auth/drive']
-        creds = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, scopes=SCOPES
-        )
+        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        info = json.loads(json_str)
+        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+
         service = build("drive", "v3", credentials=creds)
 
         # Passo 4: Criar estrutura de pastas e subir PDF
