@@ -61,7 +61,6 @@ def emitir_parecer():
         )
 
         conteudo_json = resposta.choices[0].message.content.strip()
-
         if conteudo_json.startswith("```json"):
             conteudo_json = conteudo_json.replace("```json", "").replace("```", "").strip()
 
