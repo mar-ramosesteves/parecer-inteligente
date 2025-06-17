@@ -21,7 +21,7 @@ def index():
 
 @app.route("/emitir-parecer-inteligente", methods=["POST"])
 def emitir_parecer():
-    try:
+        try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
