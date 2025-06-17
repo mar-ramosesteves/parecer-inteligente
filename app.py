@@ -28,7 +28,7 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Passo 1: Geração do texto com IA (GPT-4 + estrutura JSON)
+        # Passo 1: Geração do texto com IA ( GPT4 + estrutura JSON)
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
@@ -57,7 +57,7 @@ def emitir_parecer():
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         resposta = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
