@@ -16,10 +16,13 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 @app.after_request
 def aplicar_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
+
+
+
 
 
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
