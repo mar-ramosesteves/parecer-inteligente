@@ -1,1 +1,40 @@
 
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Parecer Inteligente</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        h1, h2, h3 { color: #2c3e50; }
+        .secao { page-break-after: always; }
+        .grafico { margin: 20px 0; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="secao">
+        <h1>Parecer Inteligente de Liderança</h1>
+        <p><strong>Empresa:</strong> {{ empresa }}</p>
+        <p><strong>Líder:</strong> {{ emailLider }}</p>
+        <p><strong>Rodada:</strong> {{ rodada }}</p>
+        <p><strong>Data:</strong> {{ data }}</p>
+        <p>Este relatório visa oferecer um parecer aprofundado sobre o estilo de liderança e o microambiente do(a) líder, com base nas avaliações coletadas e análise cruzada de dados.</p>
+    </div>
+
+    {% for secao in parecer.secoes %}
+        <div class="secao">
+            <h2>{{ secao.titulo }}</h2>
+            {% for paragrafo in secao.texto.split('\n') %}
+                <p>{{ paragrafo }}</p>
+            {% endfor %}
+            {% if secao.grafico %}
+                <div class="grafico">
+                    <img src="data:image/png;base64,{{ secao.grafico }}" width="500">
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+
+</body>
+</html>
