@@ -9,7 +9,6 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
 import json
-import ast
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": ["https://gestor.thehrkey.tech"]}})
@@ -54,6 +53,7 @@ def emitir_parecer():
 
         from openai import OpenAI
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
         resposta = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -62,11 +62,10 @@ def emitir_parecer():
 
         conteudo_json = resposta.choices[0].message.content.strip()
 
-        try:
-            parecer = ast.literal_eval(conteudo_json)
-        except Exception as err:
-            print("⚠️ ERRO AO LER RESPOSTA DA IA:\n", conteudo_json)
-            raise ValueError("❌ A resposta da IA não veio como JSON válido.")
+        if conteudo_json.startswith("```json"):
+            conteudo_json = conteudo_json.replace("```json", "").replace("```", "").strip()
+
+        parecer = json.loads(conteudo_json)
 
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
@@ -89,6 +88,7 @@ def emitir_parecer():
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+
         service = build("drive", "v3", credentials=creds)
 
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
@@ -104,11 +104,3 @@ def emitir_parecer():
     except Exception as e:
         print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
-
-@app.after_request
-def aplicar_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
