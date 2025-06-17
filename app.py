@@ -26,22 +26,42 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Passo 1: Geração do texto com IA
+        # Passo 1: Geração do texto com IA estruturado em 15 seções
         prompt = f"""
-        Gere um parecer consultivo estruturado sobre o estilo de liderança e o microambiente do líder {email_lider}, com base nos dados das avaliações disponíveis para a rodada {rodada} da empresa {empresa}.
-        O parecer deve conter 10 seções e apresentar uma análise clara, consultiva e profissional.
-        """
-        from openai import OpenAI
+        Você é um consultor sênior em liderança e cultura organizacional.
 
+        Com base nos dados da empresa {empresa}, rodada {rodada} e líder {email_lider}, elabore um parecer profissional com 15 seções:
+
+        1. Introdução ao diagnóstico
+        2. Visão geral cruzada entre arquétipos e microambiente
+        3. Análise completa do arquétipo dominante
+        4. Análise do arquétipo secundário
+        5. Estilos ausentes e riscos associados
+        6. Questões-chave por arquétipo
+        7. Perfil geral do microambiente
+        8. Dimensão por dimensão
+        9. Subdimensões com maior GAP
+        10. Questões críticas de microambiente
+        11. Comparativo entre estilo do líder e ambiente percebido
+        12. Correlações entre estilo de gestão e GAPs
+        13. Recomendações para desenvolver microambiente
+        14. Recomendações para desenvolver estilos de gestão
+        15. Conclusão e próximos passos
+
+        Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve conter "titulo" e "texto".
+        """
+
+        from openai import OpenAI
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         resposta = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=3000
+            temperature=0.7
         )
-        parecer_gerado = resposta.choices[0].message.content
+
+        conteudo_json = resposta.choices[0].message.content.strip()
+        parecer = eval(conteudo_json)  # assume estrutura correta
 
         
 
