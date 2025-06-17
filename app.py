@@ -103,3 +103,7 @@ def emitir_parecer():
     except Exception as e:
         print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
+
+
+    print("deploy manual")
+
