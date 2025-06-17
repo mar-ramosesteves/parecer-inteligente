@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import openai
-import pdfkit
 import os
-import io
+from fpdf import FPDF
 from datetime import datetime
-from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
@@ -41,24 +40,26 @@ def emitir_parecer():
         )
         parecer_gerado = resposta.choices[0].message.content
 
-        # Passo 2: Preencher HTML
-        html = render_template("parecer.html", 
-            empresa=empresa, 
-            rodada=rodada, 
-            emailLider=email_lider,
-            parecer=parecer_gerado,
-            data=datetime.now().strftime("%d/%m/%Y")
-        )
-
-        # Passo 3: Gerar PDF
+        # Passo 2: Criar PDF com FPDF (mais compatível com Render)
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
-        pdfkit.from_string(html, caminho_local)
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, f"PARECER INTELIGENTE\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
+        for paragrafo in parecer_gerado.split("\n"):
+            pdf.multi_cell(0, 10, paragrafo)
+        pdf.output(caminho_local)
 
-        # Passo 4: Upload para o Google Drive
-        creds = Credentials.from_authorized_user_file("mycreds.txt", ["https://www.googleapis.com/auth/drive"])
+        # Passo 3: Autenticar no Google Drive com conta de serviço
+        SERVICE_ACCOUNT_FILE = "47ecdfa7-1ebd-48ed-97b1-e0d80f37d51f.json"
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        creds = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES
+        )
         service = build("drive", "v3", credentials=creds)
 
+        # Passo 4: Criar estrutura de pastas e subir PDF
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
