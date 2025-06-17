@@ -8,6 +8,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
+import json
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -27,7 +28,7 @@ def emitir_parecer():
         email_lider = dados["emailLider"].lower()
 
         # Passo 1: Geração do texto com IA estruturado em 15 seções
-prompt = f"""
+        prompt = f"""
 Você é um consultor sênior em liderança e cultura organizacional.
 
 Com base nos dados da empresa {empresa}, rodada {rodada} e líder {email_lider}, elabore um parecer profissional com 15 seções:
@@ -51,22 +52,18 @@ Com base nos dados da empresa {empresa}, rodada {rodada} e líder {email_lider},
 Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve conter "titulo" e "texto".
 """
 
-from openai import OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        resposta = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
 
-resposta = client.chat.completions.create(
-    model="gpt-4",
-    messages=[{"role": "user", "content": prompt}],
-    temperature=0.7
-)
+        conteudo_json = resposta.choices[0].message.content.strip()
+        parecer = eval(conteudo_json)  # assume estrutura correta
 
-conteudo_json = resposta.choices[0].message.content.strip()
-parecer = eval(conteudo_json)  # assume estrutura correta
-
-
-        
-
-        # Passo 2: Criar PDF com FPDF (mais compatível com Render)
+        # Passo 2: Criar PDF com FPDF
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
@@ -82,16 +79,13 @@ parecer = eval(conteudo_json)  # assume estrutura correta
             pdf.set_font("Arial", "", 12)
             pdf.multi_cell(0, 10, texto)
 
-            pdf.output(caminho_local)
+        pdf.output(caminho_local)
 
         # Passo 3: Autenticar no Google Drive com conta de serviço
-        import json
-
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
-
         service = build("drive", "v3", credentials=creds)
 
         # Passo 4: Criar estrutura de pastas e subir PDF
