@@ -1,158 +1,73 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from fpdf import FPDF
+import openai
+import pdfkit
+import os
+import io
 from datetime import datetime
-import io, os, textwrap, json
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-from openai import OpenAI
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
+from busca_arquivos_drive import buscar_id
 
-# === AUTENTICAÇÃO GOOGLE DRIVE ===
-PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
-
-gauth = GoogleAuth()
-gauth.LoadCredentialsFile("mycreds.txt")
-if gauth.credentials is None:
-    gauth.CommandLineAuth()
-
-elif gauth.access_token_expired:
-    gauth.Refresh()
-else:
-    gauth.Authorize()
-gauth.SaveCredentialsFile("mycreds.txt")
-
-drive = GoogleDrive(gauth)
-
-def buscar_id(pasta_pai_id, nome_pasta):
-    lista = drive.ListFile({
-        "q": f"'{pasta_pai_id}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'"
-    }).GetList()
-    for item in lista:
-        if item['title'].lower() == nome_pasta:
-            return item['id']
-    raise Exception(f"Pasta '{nome_pasta}' não encontrada.")
-
-# === FLASK APP ===
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
-@app.after_request
-def aplicar_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
+PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
 @app.route("/")
 def index():
-    return "API no ar! 🚀"
+    return "API no ar! ✅"
 
-@app.route("/emitir-parecer-inteligente", methods=["POST", "OPTIONS"])
-def emitir_parecer_inteligente():
-    if request.method == "OPTIONS":
-        response = make_response()
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        return response, 200
-
+@app.route("/emitir-parecer-inteligente", methods=["POST"])
+def emitir_parecer():
     try:
-        # Entrada
-        dados = request.json
+        dados = request.get_json()
         empresa = dados["empresa"].lower()
-        codrodada = dados["codrodada"].lower()
-        emailLider = dados["emailLider"].lower()
+        rodada = dados["codrodada"].lower()
+        email_lider = dados["emailLider"].lower()
 
-        # Localizar pastas
-        id_empresa = buscar_id(PASTA_RAIZ, empresa)
-        id_rodada = buscar_id(id_empresa, codrodada)
-        id_lider = buscar_id(id_rodada, emailLider)
-
-        # Encontrar JSON
-        arquivos = drive.ListFile({"q": f"'{id_lider}' in parents and trashed=false"}).GetList()
-        def encontrar(nome_parcial, extensao=None):
-            for arq in arquivos:
-                nome = arq["title"].lower()
-                if nome_parcial in nome and (extensao is None or nome.endswith(extensao)):
-                    return arq
-            return None
-
-        arquivo_json = encontrar("relatorio_microambiente", ".json")
-        if not arquivo_json:
-            return jsonify({"erro": "Arquivo JSON de microambiente não encontrado."}), 400
-
-        drive.CreateFile({'id': arquivo_json['id']}).GetContentFile("temp.json")
-        with open("temp.json", "r", encoding="utf-8") as f:
-            resumo_json = json.load(f)
-
-        # Prompt IA
+        # Passo 1: Geração do texto com IA
         prompt = f"""
-Você é um consultor organizacional com profundo conhecimento em liderança, clima organizacional e inteligência emocional, especialmente com base nas teorias de Daniel Goleman.
-
-Utilize os seguintes insumos:
-- Resumo estatístico do Microambiente (JSON): {json.dumps(resumo_json, ensure_ascii=False)}
-- Relatório analítico de Microambiente
-- Relatório de Arquétipos de Gestão (auto x equipe)
-- Gráficos de termômetro, waterfall e autoavaliação
-- Guias técnicos fornecidos
-
-Objetivo: Emitir um parecer completo e detalhado (10 a 15 páginas) para a líder {emailLider}, incluindo:
-1. Introdução e objetivo do relatório
-2. Leitura do Clima da Equipe (com base nos gráficos)
-3. Quantidade e tipo de GAPs
-4. Classificação do microambiente
-5. Cruzamento com estilos de liderança (Arquétipos)
-6. Potenciais causas dos problemas
-7. Recomendações por estilo de atuação
-8. Sugerir 3 planos de ação
-9. Conclusão com chamada à ação
-10. Tom consultivo e encorajador
-
-Evite generalizações. Seja objetivo e profundo. Use linguagem clara, profissional e acessível.
-"""
-
-        # IA - Geração do parecer
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        resposta = client.chat.completions.create(
+        Gere um parecer consultivo estruturado sobre o estilo de liderança e o microambiente do líder {email_lider}, com base nos dados das avaliações disponíveis para a rodada {rodada} da empresa {empresa}.
+        O parecer deve conter 10 seções e apresentar uma análise clara, consultiva e profissional.
+        """
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        resposta = openai.ChatCompletion.create(
             model="gpt-4",
-            temperature=0.6,
-            messages=[{"role": "system", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=3000
         )
-        parecer = resposta.choices[0].message.content.strip()
+        parecer_gerado = resposta.choices[0].message.content
 
-        # Geração PDF
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, "RELATÓRIO DE LIDERANÇA - PROGRAMA DE ALTA PERFORMANCE", ln=True, align="C")
-        pdf.set_font("Arial", "", 12)
-        pdf.ln(10)
-        for linha in textwrap.wrap(parecer, 100):
-            pdf.cell(0, 10, linha, ln=True)
+        # Passo 2: Preencher HTML
+        html = render_template("parecer.html", 
+            empresa=empresa, 
+            rodada=rodada, 
+            emailLider=email_lider,
+            parecer=parecer_gerado,
+            data=datetime.now().strftime("%d/%m/%Y")
+        )
 
-        # Salvar em memória
-        output = io.BytesIO()
-        pdf.output(output)
-        output.seek(0)
+        # Passo 3: Gerar PDF
+        nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        caminho_local = f"/tmp/{nome_pdf}"
+        pdfkit.from_string(html, caminho_local)
 
-        # Upload no Drive
-        nome_pdf = f"parecer_inteligente_{emailLider}_{codrodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        drive_pdf = drive.CreateFile({
-            "title": nome_pdf,
-            "parents": [{"id": id_lider}]
-        })
-        drive_pdf.SetContentString(output.read().decode("latin1"))
-        drive_pdf.Upload()
+        # Passo 4: Upload para o Google Drive
+        creds = Credentials.from_authorized_user_file("mycreds.txt", ["https://www.googleapis.com/auth/drive"])
+        service = build("drive", "v3", credentials=creds)
 
-        return jsonify({"mensagem": f"✅ Parecer para {emailLider} gerado com sucesso!", "arquivo": nome_pdf})
+        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(service, id_empresa, rodada)
+        id_lider = buscar_id(service, id_rodada, email_lider)
+
+        file_metadata = {"name": nome_pdf, "parents": [id_lider]}
+        media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
+        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
+        return jsonify({"mensagem": f"✅ Parecer salvo com sucesso no Drive: {nome_pdf}"})
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run()
