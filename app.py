@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import openai
 import os
@@ -28,7 +28,7 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Passo 1: Geração do texto com IA estruturado em 15 seções
+        # Passo 1: Geração do texto com IA (GPT-4 + estrutura JSON)
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
@@ -50,8 +50,9 @@ def emitir_parecer():
         14. Recomendações para desenvolver estilos de gestão
         15. Conclusão e próximos passos
 
-        Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve conter "titulo" e "texto".
+        Responda no formato JSON com uma lista chamada "secoes". Cada item deve conter "titulo" e "texto".
         """
+
         from openai import OpenAI
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -62,9 +63,9 @@ def emitir_parecer():
         )
 
         conteudo_json = resposta.choices[0].message.content.strip()
-        parecer = ast.literal_eval(conteudo_json)
+        parecer = ast.literal_eval(conteudo_json)  # converte para dicionário
 
-        # Passo 2: Criar PDF com FPDF
+        # Passo 2: Criar PDF com FPDF usando o JSON estruturado
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
@@ -82,7 +83,7 @@ def emitir_parecer():
 
         pdf.output(caminho_local)
 
-        # Passo 3: Autenticar no Google Drive com conta de serviço
+        # Passo 3: Autenticar no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
@@ -90,7 +91,7 @@ def emitir_parecer():
 
         service = build("drive", "v3", credentials=creds)
 
-        # Passo 4: Criar estrutura de pastas e subir PDF
+        # Passo 4: Criar pastas e subir PDF
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
