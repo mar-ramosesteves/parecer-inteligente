@@ -10,3 +10,4 @@ fpdf==1.7.2
 google-api-python-client
 PyDrive
 oauth2client
+pdfkit
