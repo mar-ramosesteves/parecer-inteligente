@@ -37,13 +37,13 @@ def emitir_parecer():
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
-,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=3000
         )
         parecer_gerado = resposta.choices[0].message.content
 
+        
 
         # Passo 2: Criar PDF com FPDF (mais compatível com Render)
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
