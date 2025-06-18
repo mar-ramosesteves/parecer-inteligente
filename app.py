@@ -167,53 +167,57 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
 @app.route("/extrair-pdfs-da-pasta", methods=["POST"])
-@cross_origin(origins=["https://gestor.thehrkey.tech"])
-def extrair_conteudo_pdfs():
+def extrair_pdfs_da_pasta():
     try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         codrodada = dados["codrodada"].lower()
         emailLider = dados["emailLider"].lower()
 
-        # ID da pasta raiz onde estão os dados
+        # Autenticar no Google Drive
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        info = json.loads(json_str)
+        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        service = build("drive", "v3", credentials=creds)
+
+        # Buscar IDs das pastas
         PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, codrodada)
         id_lider = buscar_id(service, id_rodada, emailLider)
 
+        # Buscar PDFs
+        resultados = service.files().list(
+            q=f"'{id_lider}' in parents and mimeType='application/pdf'",
+            fields="files(id, name)"
+        ).execute()
 
-        # Listar todos os arquivos .pdf na pasta do líder
-        arquivos = (
-            service.files()
-            .list(q=f"'{id_lider}' in parents and mimeType='application/pdf'",
-                  fields="files(name, id)")
-            .execute()
-        )
+        arquivos = resultados.get("files", [])
+        arquivos_extraidos = {}
 
-        pdfs = arquivos.get("files", [])
-        resultados = {}
+        for arquivo in arquivos:
+            file_id = arquivo["id"]
+            nome_arquivo = arquivo["name"]
 
-        for pdf in pdfs:
-            nome = pdf["name"]
-            file_id = pdf["id"]
+            request_drive = service.files().get_media(fileId=file_id)
+            arquivo_local = f"/tmp/{nome_arquivo}"
+            with open(arquivo_local, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request_drive)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
 
-            # Baixar o conteúdo do PDF
-            request_file = service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request_file)
-            done = False
-            while not done:
-                status, done = downloader.next_chunk()
-
-            # Ler o conteúdo usando PyMuPDF
-            texto = ""
-            with fitz.open(stream=fh.getvalue(), filetype="pdf") as doc:
+            # Extrair texto com PyMuPDF
+            texto_extraido = ""
+            with fitz.open(arquivo_local) as doc:
                 for pagina in doc:
-                    texto += pagina.get_text()
+                    texto_extraido += pagina.get_text()
 
-            resultados[nome] = texto.strip()
+            arquivos_extraidos[nome_arquivo] = texto_extraido.strip()
 
-        return jsonify({"mensagem": "✅ PDFs extraídos com sucesso", "conteudos": resultados})
+        return jsonify({"arquivos_extraidos": arquivos_extraidos})
 
     except Exception as e:
+        print(f"ERRO NA EXTRAÇÃO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
