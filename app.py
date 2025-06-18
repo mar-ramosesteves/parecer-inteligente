@@ -29,6 +29,11 @@ def emitir_parecer():
         email_lider = dados["emailLider"].lower()
 
         # Passo 1: Geração do texto com IA ( GPT4 + estrutura JSON)
+        from openai import OpenAI
+        import ast
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
@@ -50,20 +55,17 @@ def emitir_parecer():
         14. Recomendações para desenvolver estilos de gestão
         15. Conclusão e próximos passos
 
-        Responda no formato JSON com uma lista chamada "secoes". Cada item deve conter "titulo" e "texto".
+        Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve conter "titulo" e "texto".
         """
-
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
+            temperature=0.7,
         )
 
         conteudo_json = resposta.choices[0].message.content.strip()
-        parecer = ast.literal_eval(conteudo_json)  # converte para dicionário
+        parecer = ast.literal_eval(conteudo_json)
 
         # Passo 2: Criar PDF com FPDF usando o JSON estruturado
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
