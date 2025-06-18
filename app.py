@@ -151,6 +151,24 @@ Responda no formato JSON com uma lista chamada "secoes", onde cada item contém 
 import fitz  # PyMuPDF (certifique-se de incluir no requirements.txt: pymupdf)
 
 @app.route("/extrair-pdfs-da-pasta", methods=["POST"])
+# app.py (trecho completo e corrigido da rota /extrair-pdfs-da-pasta)
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from busca_arquivos_drive import buscar_id
+import os
+import json
+import fitz  # PyMuPDF
+
+app = Flask(__name__)
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
+
+PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
+
+@app.route("/extrair-pdfs-da-pasta", methods=["POST"])
 def extrair_pdfs_da_pasta():
     try:
         dados = request.get_json()
@@ -158,25 +176,26 @@ def extrair_pdfs_da_pasta():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
+        # Autenticar no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
+        # Localizar a pasta do líder
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
 
-        arquivos_extraidos = {}
-
-        # Buscar arquivos PDF na pasta
+        # Buscar PDFs na pasta do líder
         resultados = service.files().list(
             q=f"'{id_lider}' in parents and mimeType='application/pdf'",
             fields="files(id, name)"
         ).execute()
 
         arquivos = resultados.get("files", [])
+        arquivos_extraidos = {}
 
         for arquivo in arquivos:
             file_id = arquivo["id"]
@@ -187,7 +206,7 @@ def extrair_pdfs_da_pasta():
             with open(arquivo_local, "wb") as f:
                 downloader = MediaIoBaseDownload(f, request_drive)
                 done = False
-                while done is False:
+                while not done:
                     _, done = downloader.next_chunk()
 
             # Extrair texto com PyMuPDF
