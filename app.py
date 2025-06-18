@@ -34,10 +34,28 @@ def emitir_parecer():
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+        from docx import Document
+
+        def ler_guia(caminho):
+            doc = Document(caminho)
+            texto = "\n".join([p.text for p in doc.paragraphs if p.text.strip() != ""])
+            return texto
+
+        conteudo_arquétipos = ler_guia("GUIA_ENTENDIMENTO_ARQUETIPOS.docx")
+        conteudo_microambiente = ler_guia("GUIA_ENTENDIMENTO_MICROAMBIENTE.docx")
+
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
-        Com base nos dados da empresa {empresa}, rodada {rodada} e líder {email_lider}, elabore um parecer profissional com 15 seções:
+        Utilize as diretrizes abaixo como base obrigatória para emitir um parecer altamente consultivo e personalizado para o líder {email_lider} da empresa {empresa} na rodada {rodada}.
+
+        === GUIA DE ENTENDIMENTO - ARQUÉTIPOS DE GESTÃO ===
+        {conteudo_arquétipos}
+
+        === GUIA DE ENTENDIMENTO - MICROAMBIENTE DE EQUIPES ===
+        {conteudo_microambiente}
+
+        Com base nesses conteúdos e nos dados disponíveis, elabore um parecer completo com as seguintes 15 seções:
 
         1. Introdução ao diagnóstico
         2. Visão geral cruzada entre arquétipos e microambiente
@@ -55,8 +73,11 @@ def emitir_parecer():
         14. Recomendações para desenvolver estilos de gestão
         15. Conclusão e próximos passos
 
-        Responda no formato JSON com uma lista chamada 'secoes'. Cada item deve conter "titulo" e "texto".
+        Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
         """
+
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -67,6 +88,8 @@ def emitir_parecer():
         conteudo_json = resposta.choices[0].message.content.strip()
         parecer = ast.literal_eval(conteudo_json)
 
+
+        
         # Passo 2: Criar PDF com FPDF usando o JSON estruturado
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
