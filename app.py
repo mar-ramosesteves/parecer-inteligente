@@ -148,7 +148,7 @@ Responda no formato JSON com uma lista chamada "secoes", onde cada item contém 
 
 
 
-import fitz  # PyMuPDF (certifique-se de incluir no requirements.txt: pymupdf)
+
 
 @app.route("/extrair-pdfs-da-pasta", methods=["POST"])
 # app.py (trecho completo e corrigido da rota /extrair-pdfs-da-pasta)
@@ -168,7 +168,7 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
-@app.route("/extrair-pdfs-da-pasta", methods=["POST"])
+
 def extrair_pdfs_da_pasta():
     try:
         dados = request.get_json()
