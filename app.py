@@ -82,7 +82,15 @@ Responda no formato JSON com uma lista chamada "secoes", onde cada item contém 
         )
 
         conteudo_json = resposta.choices[0].message.content.strip()
-        parecer = ast.literal_eval(conteudo_json)
+
+        try:
+            parecer = ast.literal_eval(conteudo_json)
+        except Exception as erro_json:
+            print("❌ ERRO AO INTERPRETAR O JSON:", erro_json)
+            print("🔎 CONTEÚDO ORIGINAL DA IA:")
+            print(conteudo_json[:1000])  # imprime só os primeiros 1000 caracteres
+            return jsonify({"erro": "A IA respondeu em formato inválido. Verifique o console para analisar."}), 500
+
 
 
         
