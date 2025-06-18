@@ -141,3 +141,65 @@ Responda no formato JSON com uma lista chamada "secoes", onde cada item contém 
     except Exception as e:
         print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
+
+
+
+
+
+
+
+import fitz  # PyMuPDF (certifique-se de incluir no requirements.txt: pymupdf)
+
+@app.route("/extrair-pdfs-da-pasta", methods=["POST"])
+def extrair_pdfs_da_pasta():
+    try:
+        dados = request.get_json()
+        empresa = dados["empresa"].lower()
+        rodada = dados["codrodada"].lower()
+        email_lider = dados["emailLider"].lower()
+
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        info = json.loads(json_str)
+        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        service = build("drive", "v3", credentials=creds)
+
+        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(service, id_empresa, rodada)
+        id_lider = buscar_id(service, id_rodada, email_lider)
+
+        arquivos_extraidos = {}
+
+        # Buscar arquivos PDF na pasta
+        resultados = service.files().list(
+            q=f"'{id_lider}' in parents and mimeType='application/pdf'",
+            fields="files(id, name)"
+        ).execute()
+
+        arquivos = resultados.get("files", [])
+
+        for arquivo in arquivos:
+            file_id = arquivo["id"]
+            nome_arquivo = arquivo["name"]
+
+            request_drive = service.files().get_media(fileId=file_id)
+            arquivo_local = f"/tmp/{nome_arquivo}"
+            with open(arquivo_local, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request_drive)
+                done = False
+                while done is False:
+                    _, done = downloader.next_chunk()
+
+            # Extrair texto com PyMuPDF
+            texto_extraido = ""
+            with fitz.open(arquivo_local) as doc:
+                for pagina in doc:
+                    texto_extraido += pagina.get_text()
+
+            arquivos_extraidos[nome_arquivo] = texto_extraido.strip()
+
+        return jsonify({"arquivos_extraidos": arquivos_extraidos})
+
+    except Exception as e:
+        print(f"ERRO NA EXTRAÇÃO: {str(e)}")
+        return jsonify({"erro": str(e)}), 500
