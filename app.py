@@ -215,27 +215,3 @@ def extrair_conteudo_pdfs():
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
-✅ ETAPA: Chamada JavaScript (ajuste no botão)
-Na sua função JS que chama a rota:
-
-javascript
-Copiar
-Editar
-const empresa = document.querySelector('input[name="empresa"]').value;
-const codrodada = document.querySelector('input[name="codrodada"]').value;
-const emailLider = document.querySelector('input[name="emailLider"]').value;
-
-fetch("https://api-microambiente.onrender.com/extrair-conteudo-pdfs", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ empresa, codrodada, emailLider }),
-})
-.then(response => response.json())
-.then(data => {
-  if (data.mensagem) {
-    console.log(data.conteudos); // Aqui você pode usar os dados
-    alert("✅ PDFs extraídos com sucesso!");
-  } else {
-    alert("Erro: " + data.erro);
-  }
-});
