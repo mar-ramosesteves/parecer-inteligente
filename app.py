@@ -39,27 +39,17 @@ def emitir_parecer():
             with open(caminho, "r", encoding="utf-8") as f:
                 return f.read()
 
-        # Lê os textos dos guias divididos em partes
-        conteudo_arquetipos = ""
-        conteudo_microambiente = ""
+        conteudo_completo = ler_txt("guias_completos_unificados.txt")
 
-        for i in range(1, 3):  # partes 1 e 2
-            conteudo_arquetipos += ler_txt(f"guia_arquetipos_parte{i}.txt") + "\n"
-
-        for i in range(1, 4):  # partes 1, 2 e 3
-            conteudo_microambiente += ler_txt(f"guia_microambiente_parte{i}.txt") + "\n"
 
         # Monta o prompt com o conteúdo dos guias
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
-        Utilize as diretrizes abaixo como base obrigatória para emitir um parecer altamente consultivo e personalizado para o líder {email_lider} da empresa {empresa} na rodada {rodada}.
+        Utilize rigorosamente as diretrizes a seguir para emitir um parecer altamente consultivo e personalizado para o líder {email_lider} da empresa {empresa} na rodada {rodada}.
 
-        === GUIA DE ENTENDIMENTO - ARQUÉTIPOS DE GESTÃO ===
-        {conteudo_arquetipos}
-
-        === GUIA DE ENTENDIMENTO - MICROAMBIENTE DE EQUIPES ===
-        {conteudo_microambiente}
+        === GUIAS DE ENTENDIMENTO COMPLETOS (ARQUÉTIPOS + MICROAMBIENTE) ===
+        {conteudo_completo}
 
         Com base nesses conteúdos e nos dados disponíveis, elabore um parecer completo com as seguintes 15 seções:
 
@@ -81,6 +71,7 @@ def emitir_parecer():
 
         Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
         """
+
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
