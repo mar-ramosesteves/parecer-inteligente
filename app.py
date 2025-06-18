@@ -166,65 +166,76 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
 @app.route("/extrair-pdfs-da-pasta", methods=["POST"])
-def extrair_pdfs_da_pasta():
+@cross_origin(origins=["https://gestor.thehrkey.tech"])
+def extrair_conteudo_pdfs():
     try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
-        rodada = dados["codrodada"].lower()
-        email_lider = dados["emailLider"].lower()
+        codrodada = dados["codrodada"].lower()
+        emailLider = dados["emailLider"].lower()
 
-        SCOPES = ['https://www.googleapis.com/auth/drive']
-        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-        info = json.loads(json_str)
-        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
-        service = build("drive", "v3", credentials=creds)
+        # ID da pasta raiz onde estão os dados
+        PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
+        id_empresa = buscar_id(PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(id_empresa, codrodada)
+        id_lider = buscar_id(id_rodada, emailLider)
 
-        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
-        id_rodada = buscar_id(service, id_empresa, rodada)
-        id_lider = buscar_id(service, id_rodada, email_lider)
+        # Listar todos os arquivos .pdf na pasta do líder
+        arquivos = (
+            service.files()
+            .list(q=f"'{id_lider}' in parents and mimeType='application/pdf'",
+                  fields="files(name, id)")
+            .execute()
+        )
 
-        arquivos_extraidos = {}
+        pdfs = arquivos.get("files", [])
+        resultados = {}
 
-        # Busca todos os arquivos da pasta, sem filtrar MIME
-        resultados = service.files().list(
-            q=f"'{id_lider}' in parents",
-            fields="files(id, name, mimeType)"
-        ).execute()
+        for pdf in pdfs:
+            nome = pdf["name"]
+            file_id = pdf["id"]
 
-        arquivos = resultados.get("files", [])
+            # Baixar o conteúdo do PDF
+            request_file = service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request_file)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
 
-        for arquivo in arquivos:
-            file_id = arquivo["id"]
-            nome_arquivo = arquivo["name"]
-            mime = arquivo.get("mimeType", "")
+            # Ler o conteúdo usando PyMuPDF
+            texto = ""
+            with fitz.open(stream=fh.getvalue(), filetype="pdf") as doc:
+                for pagina in doc:
+                    texto += pagina.get_text()
 
-            if not nome_arquivo.lower().endswith(".pdf"):
-                continue  # Pula arquivos que não são PDF
+            resultados[nome] = texto.strip()
 
-            try:
-                print(f"⏳ Baixando: {nome_arquivo}")
-                request_drive = service.files().get_media(fileId=file_id)
-                arquivo_local = f"/tmp/{nome_arquivo}"
-                with open(arquivo_local, "wb") as f:
-                    downloader = MediaIoBaseDownload(f, request_drive)
-                    done = False
-                    while not done:
-                        _, done = downloader.next_chunk()
-
-                # Extrair texto com PyMuPDF
-                texto_extraido = ""
-                with fitz.open(arquivo_local) as doc:
-                    for pagina in doc:
-                        texto_extraido += pagina.get_text()
-
-                arquivos_extraidos[nome_arquivo] = texto_extraido.strip()
-
-            except Exception as erro_individual:
-                print(f"⚠️ Erro no arquivo {nome_arquivo}: {str(erro_individual)}")
-                continue
-
-        return jsonify({"arquivos_extraidos": arquivos_extraidos})
+        return jsonify({"mensagem": "✅ PDFs extraídos com sucesso", "conteudos": resultados})
 
     except Exception as e:
-        print(f"❌ ERRO GERAL NA EXTRAÇÃO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
+✅ ETAPA: Chamada JavaScript (ajuste no botão)
+Na sua função JS que chama a rota:
+
+javascript
+Copiar
+Editar
+const empresa = document.querySelector('input[name="empresa"]').value;
+const codrodada = document.querySelector('input[name="codrodada"]').value;
+const emailLider = document.querySelector('input[name="emailLider"]').value;
+
+fetch("https://api-microambiente.onrender.com/extrair-conteudo-pdfs", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ empresa, codrodada, emailLider }),
+})
+.then(response => response.json())
+.then(data => {
+  if (data.mensagem) {
+    console.log(data.conteudos); // Aqui você pode usar os dados
+    alert("✅ PDFs extraídos com sucesso!");
+  } else {
+    alert("Erro: " + data.erro);
+  }
+});
