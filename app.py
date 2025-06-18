@@ -83,15 +83,22 @@ Responda no formato JSON com uma lista chamada "secoes", onde cada item contém 
 
         conteudo_json = resposta.choices[0].message.content.strip()
 
+        # Remove marcação de bloco de código, se presente
+        if conteudo_json.startswith("```json"):
+            conteudo_json = conteudo_json[7:]
+        elif conteudo_json.startswith("```"):
+            conteudo_json = conteudo_json[3:]
+
+        if conteudo_json.endswith("```"):
+            conteudo_json = conteudo_json[:-3]
+
         try:
             parecer = ast.literal_eval(conteudo_json)
         except Exception as erro_json:
             print("❌ ERRO AO INTERPRETAR O JSON:", erro_json)
             print("🔎 CONTEÚDO ORIGINAL DA IA:")
-            print(conteudo_json[:1000])  # imprime só os primeiros 1000 caracteres
+            print(conteudo_json[:1000])
             return jsonify({"erro": "A IA respondeu em formato inválido. Verifique o console para analisar."}), 500
-
-
 
         
         # Passo 2: Criar PDF com FPDF usando o JSON estruturado
