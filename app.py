@@ -177,9 +177,10 @@ def extrair_conteudo_pdfs():
 
         # ID da pasta raiz onde estão os dados
         PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
-        id_empresa = buscar_id(PASTA_RAIZ, empresa)
-        id_rodada = buscar_id(id_empresa, codrodada)
-        id_lider = buscar_id(id_rodada, emailLider)
+        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(service, id_empresa, codrodada)
+        id_lider = buscar_id(service, id_rodada, emailLider)
+
 
         # Listar todos os arquivos .pdf na pasta do líder
         arquivos = (
