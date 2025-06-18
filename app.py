@@ -30,8 +30,8 @@ def emitir_parecer():
 
         # Passo 1: Geração do texto com IA (GPT-3.5 + guias em .txt)
 
-        from openai import OpenAI
         import ast
+        from openai import OpenAI
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -41,41 +41,43 @@ def emitir_parecer():
 
         conteudo_completo = ler_txt("guias_completos_unificados.txt")
 
+        mensagens = []
+        mensagens.append({
+            "role": "system",
+            "content": "Você é um consultor sênior em liderança e cultura organizacional. Irá receber guias teóricos e depois deverá gerar um parecer detalhado com base neles."
+        })
+        mensagens.append({
+            "role": "user",
+            "content": f"Esses são os guias de base obrigatória (arquétipos + microambiente):\n\n{conteudo_completo}"
+        })
+        mensagens.append({
+            "role": "user",
+            "content": f"""
+Agora, com base nesses conteúdos e nos dados da líder {email_lider} da empresa {empresa} na rodada {rodada}, elabore um parecer completo com as seguintes 15 seções:
 
-        # Monta o prompt com o conteúdo dos guias
-        prompt = f"""
-        Você é um consultor sênior em liderança e cultura organizacional.
+1. Introdução ao diagnóstico
+2. Visão geral cruzada entre arquétipos e microambiente
+3. Análise completa do arquétipo dominante
+4. Análise do arquétipo secundário
+5. Estilos ausentes e riscos associados
+6. Questões-chave por arquétipo
+7. Perfil geral do microambiente
+8. Dimensão por dimensão
+9. Subdimensões com maior GAP
+10. Questões críticas de microambiente
+11. Comparativo entre estilo do líder e ambiente percebido
+12. Correlações entre estilo de gestão e GAPs
+13. Recomendações para desenvolver microambiente
+14. Recomendações para desenvolver estilos de gestão
+15. Conclusão e próximos passos
 
-        Utilize rigorosamente as diretrizes a seguir para emitir um parecer altamente consultivo e personalizado para o líder {email_lider} da empresa {empresa} na rodada {rodada}.
-
-        === GUIAS DE ENTENDIMENTO COMPLETOS (ARQUÉTIPOS + MICROAMBIENTE) ===
-        {conteudo_completo}
-
-        Com base nesses conteúdos e nos dados disponíveis, elabore um parecer completo com as seguintes 15 seções:
-
-        1. Introdução ao diagnóstico
-        2. Visão geral cruzada entre arquétipos e microambiente
-        3. Análise completa do arquétipo dominante
-        4. Análise do arquétipo secundário
-        5. Estilos ausentes e riscos associados
-        6. Questões-chave por arquétipo
-        7. Perfil geral do microambiente
-        8. Dimensão por dimensão
-        9. Subdimensões com maior GAP
-        10. Questões críticas de microambiente
-        11. Comparativo entre estilo do líder e ambiente percebido
-        12. Correlações entre estilo de gestão e GAPs
-        13. Recomendações para desenvolver microambiente
-        14. Recomendações para desenvolver estilos de gestão
-        15. Conclusão e próximos passos
-
-        Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
-        """
-
+Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
+"""
+        })
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
+            messages=mensagens,
             temperature=0.7,
         )
 
