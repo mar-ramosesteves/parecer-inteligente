@@ -28,29 +28,35 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Passo 1: Geração do texto com IA ( GPT4 + estrutura JSON)
+        # Passo 1: Geração do texto com IA (GPT-3.5 + guias em .txt)
+
         from openai import OpenAI
         import ast
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-        from docx import Document
+        def ler_txt(caminho):
+            with open(caminho, "r", encoding="utf-8") as f:
+                return f.read()
 
-        def ler_guia(caminho):
-            doc = Document(caminho)
-            texto = "\n".join([p.text for p in doc.paragraphs if p.text.strip() != ""])
-            return texto
+        # Lê os textos dos guias divididos em partes
+        conteudo_arquetipos = ""
+        conteudo_microambiente = ""
 
-        conteudo_arquétipos = ler_guia("GUIA_ENTENDIMENTO_ARQUETIPOS.docx")
-        conteudo_microambiente = ler_guia("GUIA_ENTENDIMENTO_MICROAMBIENTE.docx")
+        for i in range(1, 3):  # partes 1 e 2
+            conteudo_arquetipos += ler_txt(f"guia_arquetipos_parte{i}.txt") + "\n"
 
+        for i in range(1, 4):  # partes 1, 2 e 3
+            conteudo_microambiente += ler_txt(f"guia_microambiente_parte{i}.txt") + "\n"
+
+        # Monta o prompt com o conteúdo dos guias
         prompt = f"""
         Você é um consultor sênior em liderança e cultura organizacional.
 
         Utilize as diretrizes abaixo como base obrigatória para emitir um parecer altamente consultivo e personalizado para o líder {email_lider} da empresa {empresa} na rodada {rodada}.
 
         === GUIA DE ENTENDIMENTO - ARQUÉTIPOS DE GESTÃO ===
-        {conteudo_arquétipos}
+        {conteudo_arquetipos}
 
         === GUIA DE ENTENDIMENTO - MICROAMBIENTE DE EQUIPES ===
         {conteudo_microambiente}
@@ -75,9 +81,6 @@ def emitir_parecer():
 
         Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
         """
-
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
