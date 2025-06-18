@@ -152,6 +152,7 @@ Responda no formato JSON com uma lista chamada "secoes", onde cada item contém 
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_cors import cross_origin
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
