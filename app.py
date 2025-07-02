@@ -61,6 +61,21 @@ def emitir_parecer():
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
+                # Listar arquivos JSON dentro da subpasta IA_JSON
+        resultados = service.files().list(
+            q=f"'{id_ia_json}' in parents and mimeType='application/json'",
+            spaces='drive',
+            fields='files(id, name)',
+        ).execute()
+        arquivos_json = resultados.get("files", [])
+
+        # Carregar conteúdo de todos os arquivos JSON
+        dados_json = []
+        for arq in arquivos_json:
+            conteudo = service.files().get_media(fileId=arq["id"]).execute()
+            dados_json.append(json.loads(conteudo.decode("utf-8")))
+
+
         # Listar arquivos .json dentro da pasta IA_JSON
         arquivos = service.files().list(q=f"'{id_ia_json}' in parents and name contains '.json'",
                                         spaces='drive',
