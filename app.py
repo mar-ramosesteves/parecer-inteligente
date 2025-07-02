@@ -77,34 +77,37 @@ def emitir_parecer_arquetipos():
 
         # Montar prompt
         mensagens = [
-            {"role": "system", "content": "Você é um consultor sênior em liderança e cultura organizacional."},
-            {"role": "user", "content": f"""
-Você receberá a seguir um guia completo de interpretação sobre Arquétipos de Gestão e Microambiente de Equipes.
-Sua tarefa agora é focar **apenas na parte de Arquétipos de Gestão**.
+    {
+        "role": "system",
+        "content": "Você é um consultor sênior em liderança e cultura organizacional."
+    },
+    {
+        "role": "user",
+        "content": f"""
+Você receberá a seguir o conteúdo completo do **guia de entendimento de Arquétipos de Gestão**.
 
-1. Preserve a linguagem consultiva e estruturada.
-2. Insira os dados reais da líder {email_lider}, empresa {empresa}, rodada {rodada}.
-3. Use os dados extraídos dos relatórios abaixo para análises personalizadas.
-4. Gere um parecer ELEGANTE com seções bem organizadas.
+Sua tarefa:
+- MANTER o conteúdo original do guia de forma integral.
+- INSERIR nos pontos apropriados os dados reais da líder {email_lider}, da empresa {empresa}, rodada {rodada}, com transições naturais.
+- GERAR UM TEXTO FINAL com aparência de **parecer técnico completo**, com linguagem estruturada, consultiva e elegante.
 
-📊 Dados da líder:
+Dados reais extraídos dos arquivos JSON:
 
 {resumo_dados}
 
-📚 Guia completo:
+Abaixo está o conteúdo integral do guia:
 
-{guia}
+{conteudo_completo}
+"""
+    }
+]
 
-Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
-"""}
-        ]
-
-        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        resposta = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=mensagens,
-            temperature=0.7
-        )
+client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+resposta = client.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=mensagens,
+    temperature=0.7
+)
 
         conteudo_json = resposta.choices[0].message.content.strip()
         if conteudo_json.startswith("```json"):
