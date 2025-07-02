@@ -1,14 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
 import os
+import openai
+import json
 from fpdf import FPDF
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
-import json
+import matplotlib.pyplot as plt
+import io
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -40,85 +42,75 @@ def emitir_parecer_arquetipos():
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Buscar apenas os JSONs de Arquétipos
+        # Buscar JSONs de arquétipos
         resultados = service.files().list(
             q=f"'{id_ia_json}' in parents and name contains 'arquetipos' and mimeType='application/json'",
             spaces='drive',
             fields='files(id, name)'
         ).execute()
-
         arquivos_json = resultados.get("files", [])
-        dados_json = []
+        jsons_arquetipos = []
         for arq in arquivos_json:
             conteudo = service.files().get_media(fileId=arq["id"]).execute()
-            dados_json.append(json.loads(conteudo.decode("utf-8")))
+            jsons_arquetipos.append(json.loads(conteudo.decode("utf-8")))
 
-        # Criar resumo dos dados para IA
-        resumo_dados = ""
-        for item in dados_json:
-            if isinstance(item, dict):
-                titulo = item.get("titulo", "Sem título")
-                resumo_dados += f"\n\n🔹 {titulo}\n"
-                for chave, valor in item.items():
-                    if chave != "titulo":
-                        if isinstance(valor, dict):
-                            for subchave, subvalor in valor.items():
-                                resumo_dados += f"- {subchave}: {subvalor}\n"
-                        elif isinstance(valor, list):
-                            for i, elemento in enumerate(valor, start=1):
-                                resumo_dados += f"{i}. {elemento}\n"
-                        else:
-                            resumo_dados += f"- {chave}: {valor}\n"
-
-        # Ler guia completo
+        # Extrair conteúdo do guia apenas de arquétipos
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             guia_completo = f.read()
+        inicio = guia_completo.lower().find("=== arquétipos de gestão ===")
+        fim = guia_completo.lower().find("=== microambiente de equipes ===")
+        guia_arquetipos = guia_completo[inicio:fim].strip() if inicio != -1 and fim != -1 else "❌ Guia de Arquétipos não encontrado."
 
-        # Prompt com o guia completo e instrução de incluir análise ao final
-        mensagens = [
-            {
-                "role": "system",
-                "content": "Você é um consultor sênior em liderança e cultura organizacional. Seu trabalho é combinar guias teóricos com análises personalizadas."
-            },
-            {
-                "role": "user",
-                "content": f"""
-Abaixo está o GUIA COMPLETO de Arquétipos de Gestão (não edite, não resuma):
-
-{guia_completo}
-
-Agora, com base nos dados reais da líder {email_lider}, da empresa {empresa}, rodada {rodada}, insira ao final do parecer uma seção chamada **Análise Personalizada**, com linguagem consultiva e elegante.
-
-📊 DADOS REAIS:
-
-{resumo_dados}
-"""
-            }
-        ]
-
-        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        resposta = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=mensagens,
-            temperature=0.7
-        )
-
-        texto_parecer = resposta.choices[0].message.content.strip()
-
+        # Criar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
-        pdf.multi_cell(0, 10, texto_parecer)
+
+        # Capa
+        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n", align="L")
+
+        # Conteúdo do guia
+        for linha in guia_arquetipos.split("\n"):
+            pdf.multi_cell(0, 8, linha)
+
+        # Gráficos
+        for json_grafico in jsons_arquetipos:
+            titulo = json_grafico.get("titulo", "Gráfico sem título")
+            dados = json_grafico.get("dados", {})
+            if not isinstance(dados, dict) or not dados:
+                continue
+
+            categorias = list(dados.keys())
+            valores = list(dados.values())
+
+            fig, ax = plt.subplots(figsize=(6, 3))
+            ax.barh(categorias, valores)
+            ax.set_title(titulo)
+            ax.invert_yaxis()
+            buf = io.BytesIO()
+            plt.tight_layout()
+            plt.savefig(buf, format="png")
+            plt.close(fig)
+            buf.seek(0)
+
+            # Inserir imagem no PDF
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, titulo, ln=True)
+            pdf.image(buf, x=10, y=30, w=180)
+            buf.close()
+
         pdf.output(caminho_local)
 
+        # Upload no Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        return jsonify({"mensagem": f"✅ Parecer de Arquétipos salvo com sucesso no Drive: {nome_pdf}"})
+        return jsonify({"mensagem": f"✅ Parecer de Arquétipos salvo no Drive: {nome_pdf}"})
 
     except Exception as e:
         print(f"❌ ERRO: {str(e)}")
