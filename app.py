@@ -9,16 +9,11 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
 import json
-import matplotlib.pyplot as plt
-import tempfile
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
-
-def remover_caracteres_invalidos(texto):
-    return ''.join(c for c in texto if ord(c) < 256)
 
 @app.route("/")
 def index():
@@ -32,20 +27,20 @@ def emitir_parecer_arquetipos():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Autenticar Google Drive
+        # Autenticar no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
-        # Localizar pasta do líder
+        # Acessar pasta IA_JSON do líder
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Coletar JSONs de arquétipos
+        # Coletar JSONs de ARQUETIPOS
         resultados = service.files().list(
             q=f"'{id_ia_json}' in parents and name contains 'arquetipos' and mimeType='application/json'",
             spaces='drive',
@@ -58,7 +53,7 @@ def emitir_parecer_arquetipos():
             conteudo = service.files().get_media(fileId=arq["id"]).execute()
             dados_json.append(json.loads(conteudo.decode("utf-8")))
 
-        # Extrair resumo de dados para IA
+        # Criar resumo para IA
         resumo_dados = ""
         for item in dados_json:
             if isinstance(item, dict):
@@ -75,61 +70,36 @@ def emitir_parecer_arquetipos():
                         else:
                             resumo_dados += f"- {chave}: {valor}\n"
 
-        # Extrair apenas o guia de Arquétipos
+        # Ler e extrair somente o conteúdo de Arquétipos
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            texto = f.read()
-        if "INÍCIO - ARQUÉTIPOS DE GESTÃO" in texto and "FIM - ARQUÉTIPOS DE GESTÃO" in texto:
-            guia_arquetipos = texto.split("INÍCIO - ARQUÉTIPOS DE GESTÃO")[1].split("FIM - ARQUÉTIPOS DE GESTÃO")[0].strip()
-        else:
-            guia_arquetipos = "❌ Guia de Arquétipos não encontrado no arquivo."
+            texto_guia = f.read()
 
-        # Montar nome e PDF
+        inicio = "INÍCIO GUIA ARQUÉTIPOS"
+        fim = "FIM GUIA ARQUÉTIPOS"
+        if inicio in texto_guia and fim in texto_guia:
+            conteudo_guia = texto_guia.split(inicio)[1].split(fim)[0].strip()
+        else:
+            conteudo_guia = "Guia de Arquétipos não encontrado no arquivo."
+
+        # Criar texto final com conteúdo original + dados
+        texto_final = f"{conteudo_guia}\n\n\n📊 Dados reais da líder {email_lider}, empresa {empresa}, rodada {rodada}:\n\n{resumo_dados}"
+
+        # Criar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-
-        # Cabeçalho
-        cabecalho = f"""
-PARECER DE ARQUÉTIPOS DE GESTÃO
-Empresa: {empresa}
-Rodada: {rodada}
-Líder: {email_lider}
-Data: {datetime.now().strftime('%d/%m/%Y')}
-
-"""
-        pdf.multi_cell(0, 10, remover_caracteres_invalidos(cabecalho), align="L")
-
-        # Conteúdo do guia
-        for linha in guia_arquetipos.split("\n"):
-            pdf.multi_cell(0, 8, remover_caracteres_invalidos(linha))
-
-        # Inserir gráficos a partir dos JSONs
-        for item in dados_json:
-            titulo = item.get("titulo", "Sem título")
-            dados = item.get("dados", {})
-            if isinstance(dados, dict) and all(isinstance(v, (int, float)) for v in dados.values()):
-                fig, ax = plt.subplots()
-                ax.bar(dados.keys(), dados.values())
-                ax.set_title(titulo)
-                ax.set_ylabel("Valor (%)")
-                plt.xticks(rotation=45)
-                fig.tight_layout()
-
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
-                    plt.savefig(tmp_img.name, bbox_inches='tight')
-                    pdf.add_page()
-                    pdf.image(tmp_img.name, x=10, y=20, w=180)
-                plt.close()
-
-        # Salvar PDF no Drive
+        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
+        pdf.multi_cell(0, 10, texto_final)
         pdf.output(caminho_local)
+
+        # Enviar ao Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        return jsonify({"mensagem": f"✅ Parecer de Arquétipos gerado com sucesso: {nome_pdf}"})
+        return jsonify({"mensagem": f"✅ Parecer de Arquétipos salvo com sucesso no Drive: {nome_pdf}"})
 
     except Exception as e:
         print(f"❌ ERRO: {str(e)}")
