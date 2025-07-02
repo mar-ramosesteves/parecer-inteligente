@@ -9,7 +9,6 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
 import json
-import ast
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -73,31 +72,32 @@ def emitir_parecer_arquetipos():
 
         # Ler guia completo
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            conteudo_completo = f.read()
+            guia_completo = f.read()
 
         # Prompt com foco no guia de Arquétipos
         mensagens = [
             {
                 "role": "system",
-                "content": "Você é um consultor sênior em liderança e cultura organizacional."
+                "content": "Você é um consultor sênior em liderança e cultura organizacional. Sua missão é gerar um parecer técnico com base no guia a seguir, inserindo de forma inteligente os dados reais da líder nos pontos relevantes."
             },
             {
                 "role": "user",
                 "content": f"""
-Você receberá a seguir o conteúdo completo do **guia de entendimento de Arquétipos de Gestão**.
+O conteúdo abaixo é o GUIA COMPLETO de interpretação dos Arquétipos de Gestão, que deve ser mantido integralmente no parecer.
 
 Sua tarefa:
-- MANTER o conteúdo original do guia de forma integral.
-- INSERIR nos pontos apropriados os dados reais da líder {email_lider}, da empresa {empresa}, rodada {rodada}, com transições naturais.
-- GERAR UM TEXTO FINAL com aparência de **parecer técnico completo**, com linguagem estruturada, consultiva e elegante.
+- MANTER o conteúdo integral do guia.
+- INSERIR os dados da líder {email_lider}, da empresa {empresa}, rodada {rodada}, nos pontos apropriados, de forma natural.
+- Utilizar os dados reais extraídos dos relatórios.
+- NÃO inventar conteúdo. NÃO resumir o guia.
 
-Dados reais extraídos dos arquivos JSON:
+📊 DADOS REAIS DA LÍDER:
 
 {resumo_dados}
 
-Abaixo está o conteúdo integral do guia:
+📘 GUIA COMPLETO:
 
-{conteudo_completo}
+{guia_completo}
 """
             }
         ]
@@ -111,6 +111,7 @@ Abaixo está o conteúdo integral do guia:
 
         texto_parecer = resposta.choices[0].message.content.strip()
 
+        # Gerar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
@@ -120,6 +121,7 @@ Abaixo está o conteúdo integral do guia:
         pdf.multi_cell(0, 10, texto_parecer)
         pdf.output(caminho_local)
 
+        # Enviar ao Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
