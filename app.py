@@ -74,30 +74,24 @@ def emitir_parecer_arquetipos():
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             guia_completo = f.read()
 
-        # Prompt com foco no guia de Arquétipos
+        # Prompt com o guia completo e instrução de incluir análise ao final
         mensagens = [
             {
                 "role": "system",
-                "content": "Você é um consultor sênior em liderança e cultura organizacional. Sua missão é gerar um parecer técnico com base no guia a seguir, inserindo de forma inteligente os dados reais da líder nos pontos relevantes."
+                "content": "Você é um consultor sênior em liderança e cultura organizacional. Seu trabalho é combinar guias teóricos com análises personalizadas."
             },
             {
                 "role": "user",
                 "content": f"""
-O conteúdo abaixo é o GUIA COMPLETO de interpretação dos Arquétipos de Gestão, que deve ser mantido integralmente no parecer.
-
-Sua tarefa:
-- MANTER o conteúdo integral do guia.
-- INSERIR os dados da líder {email_lider}, da empresa {empresa}, rodada {rodada}, nos pontos apropriados, de forma natural.
-- Utilizar os dados reais extraídos dos relatórios.
-- NÃO inventar conteúdo. NÃO resumir o guia.
-
-📊 DADOS REAIS DA LÍDER:
-
-{resumo_dados}
-
-📘 GUIA COMPLETO:
+Abaixo está o GUIA COMPLETO de Arquétipos de Gestão (não edite, não resuma):
 
 {guia_completo}
+
+Agora, com base nos dados reais da líder {email_lider}, da empresa {empresa}, rodada {rodada}, insira ao final do parecer uma seção chamada **Análise Personalizada**, com linguagem consultiva e elegante.
+
+📊 DADOS REAIS:
+
+{resumo_dados}
 """
             }
         ]
@@ -111,7 +105,6 @@ Sua tarefa:
 
         texto_parecer = resposta.choices[0].message.content.strip()
 
-        # Gerar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
@@ -121,7 +114,6 @@ Sua tarefa:
         pdf.multi_cell(0, 10, texto_parecer)
         pdf.output(caminho_local)
 
-        # Enviar ao Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
