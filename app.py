@@ -20,33 +20,6 @@ PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 def index():
     return "API no ar! ✅"
 
-
-def ler_jsons_da_pasta_ia(service, id_lider):
-    try:
-        id_pasta_ia = buscar_id(service, id_lider, "IA_JSON")
-        resultados = service.files().list(
-            q=f"'{id_pasta_ia}' in parents and mimeType='application/json'",
-            fields="files(id, name)"
-        ).execute()
-
-        arquivos = resultados.get("files", [])
-        dados_extraidos = {}
-
-        for arquivo in arquivos:
-            conteudo = service.files().get_media(fileId=arquivo["id"]).execute()
-            texto = conteudo.decode("utf-8")
-            try:
-                dados = json.loads(texto)
-                dados_extraidos[arquivo["name"]] = dados
-            except Exception as e:
-                print(f"Erro ao ler {arquivo['name']}: {str(e)}")
-
-        return dados_extraidos
-
-    except Exception as e:
-        print(f"Erro ao acessar pasta IA_JSON: {str(e)}")
-        return {}
-
 @app.route("/emitir-parecer-inteligente", methods=["POST"])
 def emitir_parecer():
     try:
@@ -55,13 +28,20 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Buscar a subpasta IA_JSON dentro da pasta do líder
+        # Inicializar credenciais e service do Google Drive
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        info = json.loads(json_str)
+        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        service = build("drive", "v3", credentials=creds)
+
+        # Buscar subpastas
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-                # Listar arquivos JSON dentro da subpasta IA_JSON
+        # Listar arquivos JSON dentro da subpasta IA_JSON
         resultados = service.files().list(
             q=f"'{id_ia_json}' in parents and mimeType='application/json'",
             spaces='drive',
@@ -75,48 +55,25 @@ def emitir_parecer():
             conteudo = service.files().get_media(fileId=arq["id"]).execute()
             dados_json.append(json.loads(conteudo.decode("utf-8")))
 
-                    # Montar resumo interpretável para IA
-            resumo_dados = ""
-            for item in dados_json:
-                if isinstance(item, dict):
-                    titulo = item.get("titulo", "Sem título")
-                    resumo_dados += f"\n\n🔹 {titulo}\n"
-                    for chave, valor in item.items():
-                        if chave != "titulo":
-                            if isinstance(valor, dict):
-                                for subchave, subvalor in valor.items():
-                                    resumo_dados += f"- {subchave}: {subvalor}\n"
-                            elif isinstance(valor, list):
-                                for i, elemento in enumerate(valor, start=1):
-                                    resumo_dados += f"{i}. {elemento}\n"
-                            else:
-                                resumo_dados += f"- {chave}: {valor}\n"
+        # Montar resumo interpretável para IA
+        resumo_dados = ""
+        for item in dados_json:
+            if isinstance(item, dict):
+                titulo = item.get("titulo", "Sem título")
+                resumo_dados += f"\n\n🔹 {titulo}\n"
+                for chave, valor in item.items():
+                    if chave != "titulo":
+                        if isinstance(valor, dict):
+                            for subchave, subvalor in valor.items():
+                                resumo_dados += f"- {subchave}: {subvalor}\n"
+                        elif isinstance(valor, list):
+                            for i, elemento in enumerate(valor, start=1):
+                                resumo_dados += f"{i}. {elemento}\n"
+                        else:
+                            resumo_dados += f"- {chave}: {valor}\n"
 
-
-        
-
-
-        # Listar arquivos .json dentro da pasta IA_JSON
-        arquivos = service.files().list(q=f"'{id_ia_json}' in parents and name contains '.json'",
-                                        spaces='drive',
-                                        fields='files(id, name)').execute().get("files", [])
-
-        # Ler conteúdos dos arquivos JSON
-        dados_json = []
-        for arquivo in arquivos:
-            conteudo = service.files().get_media(fileId=arquivo["id"]).execute()
-            texto = conteudo.decode("utf-8")
-            try:
-                dados_json.append(json.loads(texto))
-            except Exception as e:
-                print(f"❌ Erro ao interpretar JSON: {arquivo['name']}: {e}")
-
-
-        
-
-        import ast
+        # Preparar mensagens para a IA
         from openai import OpenAI
-
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         def ler_txt(caminho):
@@ -125,14 +82,14 @@ def emitir_parecer():
 
         conteudo_completo = ler_txt("guias_completos_unificados.txt")
 
-        mensagens = []
-        mensagens.append({
-            "role": "system",
-            "content": "Você é um consultor sênior em liderança e cultura organizacional."
-        })
-        mensagens.append({
-            "role": "user",
-            "content": f"""
+        mensagens = [
+            {
+                "role": "system",
+                "content": "Você é um consultor sênior em liderança e cultura organizacional."
+            },
+            {
+                "role": "user",
+                "content": f"""
 Você receberá a seguir um guia completo de interpretação sobre Arquétipos de Gestão e Microambiente de Equipes. Este guia servirá como BASE FIXA do parecer.
 
 A sua tarefa será:
@@ -146,10 +103,10 @@ Guia completo abaixo:
 
 {conteudo_completo}
 """
-        })
-        mensagens.append({
-    "role": "user",
-    "content": f"""
+            },
+            {
+                "role": "user",
+                "content": f"""
 Agora, com base nesse conteúdo, elabore um parecer inteligente da líder {email_lider} da empresa {empresa}, na rodada {rodada}.
 
 Os dados reais extraídos dos relatórios são os seguintes:
@@ -160,7 +117,8 @@ Insira essas informações nos trechos mais adequados do texto, com linguagem co
 
 Responda no formato JSON com uma lista chamada \"secoes\", onde cada item contém \"titulo\" e \"texto\".
 """
-})
+            }
+        ]
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -174,7 +132,6 @@ Responda no formato JSON com uma lista chamada \"secoes\", onde cada item conté
             conteudo_json = conteudo_json[7:]
         elif conteudo_json.startswith("```"):
             conteudo_json = conteudo_json[3:]
-
         if conteudo_json.endswith("```"):
             conteudo_json = conteudo_json[:-3]
 
@@ -188,6 +145,7 @@ Responda no formato JSON com uma lista chamada \"secoes\", onde cada item conté
 
         nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
+
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
@@ -203,16 +161,6 @@ Responda no formato JSON com uma lista chamada \"secoes\", onde cada item conté
 
         pdf.output(caminho_local)
 
-        SCOPES = ['https://www.googleapis.com/auth/drive']
-        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-        info = json.loads(json_str)
-        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
-        service = build("drive", "v3", credentials=creds)
-
-        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
-        id_rodada = buscar_id(service, id_empresa, rodada)
-        id_lider = buscar_id(service, id_rodada, email_lider)
-
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
@@ -222,3 +170,4 @@ Responda no formato JSON com uma lista chamada \"secoes\", onde cada item conté
     except Exception as e:
         print(f"ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
+
