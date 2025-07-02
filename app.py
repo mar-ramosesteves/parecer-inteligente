@@ -27,38 +27,38 @@ def emitir_parecer_arquetipos():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Autenticar no Google Drive
+        # Autenticação com o Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
-        # Acessar pasta IA_JSON do líder
+        # Caminho até a pasta IA_JSON do líder
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Coletar JSONs de ARQUETIPOS
+        # Buscar todos os arquivos JSON de arquétipos
         resultados = service.files().list(
             q=f"'{id_ia_json}' in parents and name contains 'arquetipos' and mimeType='application/json'",
             spaces='drive',
             fields='files(id, name)'
         ).execute()
-
         arquivos_json = resultados.get("files", [])
+
         dados_json = []
         for arq in arquivos_json:
             conteudo = service.files().get_media(fileId=arq["id"]).execute()
             dados_json.append(json.loads(conteudo.decode("utf-8")))
 
-        # Criar resumo para IA
+        # Criar resumo dos dados
         resumo_dados = ""
         for item in dados_json:
             if isinstance(item, dict):
                 titulo = item.get("titulo", "Sem título")
-                resumo_dados += f"\n\n🔹 {titulo}\n"
+                resumo_dados += f"\n\n{titulo}\n"
                 for chave, valor in item.items():
                     if chave != "titulo":
                         if isinstance(valor, dict):
@@ -70,31 +70,40 @@ def emitir_parecer_arquetipos():
                         else:
                             resumo_dados += f"- {chave}: {valor}\n"
 
-        # Ler e extrair somente o conteúdo de Arquétipos
+        # Ler guia completo e extrair apenas a parte de Arquétipos
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            texto_guia = f.read()
+            conteudo = f.read()
+        inicio = conteudo.find("[INICIO_ARQUETIPOS]")
+        fim = conteudo.find("[FIM_ARQUETIPOS]")
+        guia_arquétipos = conteudo[inicio+len("[INICIO_ARQUETIPOS]"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado no arquivo."
 
-        inicio = "INÍCIO GUIA ARQUÉTIPOS"
-        fim = "FIM GUIA ARQUÉTIPOS"
-        if inicio in texto_guia and fim in texto_guia:
-            conteudo_guia = texto_guia.split(inicio)[1].split(fim)[0].strip()
-        else:
-            conteudo_guia = "Guia de Arquétipos não encontrado no arquivo."
+        # Montar conteúdo do parecer
+        texto_final = f"""
+PARECER DE ARQUÉTIPOS DE GESTÃO
+Empresa: {empresa}
+Rodada: {rodada}
+Líder: {email_lider}
+Data: {datetime.now().strftime('%d/%m/%Y')}
 
-        # Criar texto final com conteúdo original + dados
-        texto_final = f"{conteudo_guia}\n\n\n📊 Dados reais da líder {email_lider}, empresa {empresa}, rodada {rodada}:\n\n{resumo_dados}"
+{guia_arquétipos}
 
-        # Criar PDF
+---
+
+Análise dos gráficos e resultados:
+
+{resumo_dados}
+"""
+
+        # Gerar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
-        pdf.multi_cell(0, 10, texto_final)
+        pdf.multi_cell(0, 10, texto_final.encode('latin-1', 'ignore').decode('latin-1'))
         pdf.output(caminho_local)
 
-        # Enviar ao Google Drive
+        # Enviar para o Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
