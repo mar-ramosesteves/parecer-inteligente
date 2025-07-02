@@ -121,22 +121,22 @@ Guia:
 
         # 🟨 Gráfico 2: ANÁLISE ANALÍTICA
         if json_analitico and "analise" in json_analitico:
-    try:
-        pdf.add_page()
-        labels = [item.get("arquetipo", f"Arquetipo {i+1}") for i, item in enumerate(json_analitico["analise"])]
-        valores = [item.get("pontuacao", 0) for item in json_analitico["analise"]]
-        plt.figure(figsize=(10, 5))
-        plt.bar(labels, valores)
-        plt.ylim(0, 100)
-        plt.title("RELATÓRIO ANALÍTICO DE ARQUETIPOS")
-        plt.xticks(rotation=45)
-        caminho_grafico2 = "/tmp/grafico2.png"
-        plt.tight_layout()
-        plt.savefig(caminho_grafico2)
-        plt.close()
-        pdf.image(caminho_grafico2, w=190)
-    except Exception as erro:
-        print(f"Erro ao gerar gráfico analítico: {erro}")
+            try:
+                pdf.add_page()
+                labels = [item.get("arquetipo", f"Arquetipo {i+1}") for i, item in enumerate(json_analitico["analise"])]
+                valores = [item.get("pontuacao", 0) for item in json_analitico["analise"]]
+                plt.figure(figsize=(10, 5))
+                plt.bar(labels, valores)
+                plt.ylim(0, 100)
+                plt.title("RELATÓRIO ANALÍTICO DE ARQUETIPOS")
+                plt.xticks(rotation=45)
+                caminho_grafico2 = "/tmp/grafico2.png"
+                plt.tight_layout()
+                plt.savefig(caminho_grafico2)
+                plt.close()
+                pdf.image(caminho_grafico2, w=190)
+            except Exception as erro:
+                print(f"Erro ao gerar gráfico analítico: {erro}")
 
         pdf.output(caminho_local)
 
