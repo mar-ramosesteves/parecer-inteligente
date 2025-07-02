@@ -73,17 +73,17 @@ def emitir_parecer_arquetipos():
 
         # Ler guia completo
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            guia = f.read()
+            conteudo_completo = f.read()
 
-        # Montar prompt
+        # Prompt com foco no guia de Arquétipos
         mensagens = [
-    {
-        "role": "system",
-        "content": "Você é um consultor sênior em liderança e cultura organizacional."
-    },
-    {
-        "role": "user",
-        "content": f"""
+            {
+                "role": "system",
+                "content": "Você é um consultor sênior em liderança e cultura organizacional."
+            },
+            {
+                "role": "user",
+                "content": f"""
 Você receberá a seguir o conteúdo completo do **guia de entendimento de Arquétipos de Gestão**.
 
 Sua tarefa:
@@ -99,41 +99,27 @@ Abaixo está o conteúdo integral do guia:
 
 {conteudo_completo}
 """
-    }
-]
+            }
+        ]
 
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-resposta = client.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=mensagens,
-    temperature=0.7
-)
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        resposta = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=mensagens,
+            temperature=0.7
+        )
 
-        conteudo_json = resposta.choices[0].message.content.strip()
-        if conteudo_json.startswith("```json"):
-            conteudo_json = conteudo_json[7:]
-        elif conteudo_json.startswith("```"):
-            conteudo_json = conteudo_json[3:]
-        if conteudo_json.endswith("```"):
-            conteudo_json = conteudo_json[:-3]
+        texto_parecer = resposta.choices[0].message.content.strip()
 
-        parecer = ast.literal_eval(conteudo_json)
-
-        # Gerar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
-        for secao in parecer["secoes"]:
-            pdf.set_font("Arial", "B", 12)
-            pdf.multi_cell(0, 10, f"\n{secao['titulo']}")
-            pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 10, secao["texto"])
+        pdf.multi_cell(0, 10, texto_parecer)
         pdf.output(caminho_local)
 
-        # Enviar ao Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
