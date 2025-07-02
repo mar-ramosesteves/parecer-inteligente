@@ -20,6 +20,33 @@ PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 def index():
     return "API no ar! ✅"
 
+
+def ler_jsons_da_pasta_ia(service, id_lider):
+    try:
+        id_pasta_ia = buscar_id(service, id_lider, "IA_JSON")
+        resultados = service.files().list(
+            q=f"'{id_pasta_ia}' in parents and mimeType='application/json'",
+            fields="files(id, name)"
+        ).execute()
+
+        arquivos = resultados.get("files", [])
+        dados_extraidos = {}
+
+        for arquivo in arquivos:
+            conteudo = service.files().get_media(fileId=arquivo["id"]).execute()
+            texto = conteudo.decode("utf-8")
+            try:
+                dados = json.loads(texto)
+                dados_extraidos[arquivo["name"]] = dados
+            except Exception as e:
+                print(f"Erro ao ler {arquivo['name']}: {str(e)}")
+
+        return dados_extraidos
+
+    except Exception as e:
+        print(f"Erro ao acessar pasta IA_JSON: {str(e)}")
+        return {}
+
 @app.route("/emitir-parecer-inteligente", methods=["POST"])
 def emitir_parecer():
     try:
