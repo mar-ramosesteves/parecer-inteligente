@@ -1,115 +1,148 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
 import os
+import openai
+import json
 from fpdf import FPDF
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from busca_arquivos_drive import buscar_id
-import json
+import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
 PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 
-@app.route("/")
-def index():
-    return "API no ar! ✅"
-
 @app.route("/emitir-parecer-arquetipos", methods=["POST"])
 def emitir_parecer_arquetipos():
     try:
+        # Dados da requisição
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Autenticação com o Google Drive
+        # Autenticação no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
-        # Caminho até a pasta IA_JSON do líder
+        # Acessar pastas
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Buscar todos os arquivos JSON de arquétipos
-        resultados = service.files().list(
-            q=f"'{id_ia_json}' in parents and name contains 'arquetipos' and mimeType='application/json'",
-            spaces='drive',
-            fields='files(id, name)'
-        ).execute()
-        arquivos_json = resultados.get("files", [])
+        # 📌 Carregar JSON de gráficos
+        def carregar_json(nome_parcial):
+            resultados = service.files().list(
+                q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
+                spaces='drive', fields='files(id, name)').execute()
+            arquivos = resultados.get("files", [])
+            if arquivos:
+                conteudo = service.files().get_media(fileId=arquivos[0]['id']).execute()
+                return json.loads(conteudo.decode("utf-8"))
+            return None
 
-        dados_json = []
-        for arq in arquivos_json:
-            conteudo = service.files().get_media(fileId=arq["id"]).execute()
-            dados_json.append(json.loads(conteudo.decode("utf-8")))
+        json_auto_vs_equipe = carregar_json("AUTO_VS_EQUIPE")
+        json_analitico = carregar_json("RELATORIO_ANALITICO_ARQUETIPOS")
 
-        # Criar resumo dos dados
-        resumo_dados = ""
-        for item in dados_json:
-            if isinstance(item, dict):
-                titulo = item.get("titulo", "Sem título")
-                resumo_dados += f"\n\n{titulo}\n"
-                for chave, valor in item.items():
-                    if chave != "titulo":
-                        if isinstance(valor, dict):
-                            for subchave, subvalor in valor.items():
-                                resumo_dados += f"- {subchave}: {subvalor}\n"
-                        elif isinstance(valor, list):
-                            for i, elemento in enumerate(valor, start=1):
-                                resumo_dados += f"{i}. {elemento}\n"
-                        else:
-                            resumo_dados += f"- {chave}: {valor}\n"
-
-        # Ler guia completo e extrair apenas a parte de Arquétipos
+        # 📌 Extrair conteúdo do guia (apenas parte de ARQUÉTIPOS)
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            conteudo = f.read()
-        inicio = conteudo.find("[INICIO_ARQUETIPOS]")
-        fim = conteudo.find("[FIM_ARQUETIPOS]")
-        guia_arquétipos = conteudo[inicio+len("[INICIO_ARQUETIPOS]"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado no arquivo."
+            texto = f.read()
+        inicio = texto.find("##### INÍCIO ARQUÉTIPOS #####")
+        fim = texto.find("##### FIM ARQUÉTIPOS #####")
+        guia = texto[inicio + len("##### INÍCIO ARQUÉTIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
 
-        # Montar conteúdo do parecer
-        texto_final = f"""
-PARECER DE ARQUÉTIPOS DE GESTÃO
-Empresa: {empresa}
-Rodada: {rodada}
-Líder: {email_lider}
-Data: {datetime.now().strftime('%d/%m/%Y')}
+        # 📌 Montar prompt IA
+        mensagens = [
+            {
+                "role": "system",
+                "content": "Você é um consultor sênior em liderança e cultura organizacional."
+            },
+            {
+                "role": "user",
+                "content": f"""
+Você receberá a seguir o conteúdo completo do guia de entendimento de Arquétipos de Gestão.
 
-{guia_arquétipos}
+Sua tarefa:
+- MANTER o conteúdo original do guia integral.
+- INSERIR, ao final, um parecer técnico com base nos dados reais da líder {email_lider}, empresa {empresa}, rodada {rodada}.
+- Linguagem consultiva, clara e estruturada.
 
----
-
-Análise dos gráficos e resultados:
-
-{resumo_dados}
+Guia:
+{guia}
 """
+            }
+        ]
 
-        # Gerar PDF
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        resposta = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=mensagens,
+            temperature=0.7
+        )
+
+        texto_ia = resposta.choices[0].message.content.strip()
+
+        # 📝 Criar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, texto_final.encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
+        pdf.multi_cell(0, 10, texto_ia)
+
+        # 🟦 Gráfico 1: AUTO vs EQUIPE
+        if json_auto_vs_equipe:
+            pdf.add_page()
+            plt.figure(figsize=(10, 5))
+            labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
+            auto = list(json_auto_vs_equipe["autoavaliacao"].values())
+            equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
+            x = range(len(labels))
+            plt.bar(x, auto, width=0.4, label="Autoavaliação", align='center')
+            plt.bar([i + 0.4 for i in x], equipe, width=0.4, label="Equipe", align='center')
+            plt.xticks([i + 0.2 for i in x], labels, rotation=45)
+            plt.ylim(0, 100)
+            plt.title("ARQUÉTIPOS AUTO VS EQUIPE")
+            plt.legend()
+            caminho_grafico1 = "/tmp/grafico1.png"
+            plt.tight_layout()
+            plt.savefig(caminho_grafico1)
+            plt.close()
+            pdf.image(caminho_grafico1, w=190)
+
+        # 🟨 Gráfico 2: ANÁLISE ANALÍTICA
+        if json_analitico:
+            pdf.add_page()
+            labels = [item["arquetipo"] for item in json_analitico["analise"]]
+            valores = [item["pontuacao"] for item in json_analitico["analise"]]
+            plt.figure(figsize=(10, 5))
+            plt.bar(labels, valores)
+            plt.ylim(0, 100)
+            plt.title("RELATÓRIO ANALÍTICO DE ARQUÉTIPOS")
+            plt.xticks(rotation=45)
+            caminho_grafico2 = "/tmp/grafico2.png"
+            plt.tight_layout()
+            plt.savefig(caminho_grafico2)
+            plt.close()
+            pdf.image(caminho_grafico2, w=190)
+
         pdf.output(caminho_local)
 
-        # Enviar para o Google Drive
+        # Subir para o Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        return jsonify({"mensagem": f"✅ Parecer de Arquétipos salvo com sucesso no Drive: {nome_pdf}"})
+        return jsonify({"mensagem": f"✅ Parecer com gráficos salvo com sucesso no Drive: {nome_pdf}"})
 
     except Exception as e:
-        print(f"❌ ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
