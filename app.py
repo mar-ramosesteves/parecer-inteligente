@@ -20,42 +20,41 @@ PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 def index():
     return "API no ar! ✅"
 
-@app.route("/emitir-parecer-inteligente", methods=["POST"])
-def emitir_parecer():
+@app.route("/emitir-parecer-arquetipos", methods=["POST"])
+def emitir_parecer_arquetipos():
     try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Inicializar credenciais e service do Google Drive
+        # Autenticação Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
-        # Buscar subpastas
+        # Caminho da pasta IA_JSON
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Listar arquivos JSON dentro da subpasta IA_JSON
+        # Buscar apenas os JSONs de Arquétipos
         resultados = service.files().list(
-            q=f"'{id_ia_json}' in parents and mimeType='application/json'",
+            q=f"'{id_ia_json}' in parents and name contains 'arquetipos' and mimeType='application/json'",
             spaces='drive',
-            fields='files(id, name)',
+            fields='files(id, name)'
         ).execute()
-        arquivos_json = resultados.get("files", [])
 
-        # Carregar conteúdo de todos os arquivos JSON
+        arquivos_json = resultados.get("files", [])
         dados_json = []
         for arq in arquivos_json:
             conteudo = service.files().get_media(fileId=arq["id"]).execute()
             dados_json.append(json.loads(conteudo.decode("utf-8")))
 
-        # Montar resumo interpretável para IA
+        # Criar resumo dos dados para IA
         resumo_dados = ""
         for item in dados_json:
             if isinstance(item, dict):
@@ -72,62 +71,42 @@ def emitir_parecer():
                         else:
                             resumo_dados += f"- {chave}: {valor}\n"
 
-        # Preparar mensagens para a IA
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Ler guia completo
+        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
+            guia = f.read()
 
-        def ler_txt(caminho):
-            with open(caminho, "r", encoding="utf-8") as f:
-                return f.read()
-
-        conteudo_completo = ler_txt("guias_completos_unificados.txt")
-
+        # Montar prompt
         mensagens = [
-            {
-                "role": "system",
-                "content": "Você é um consultor sênior em liderança e cultura organizacional."
-            },
-            {
-                "role": "user",
-                "content": f"""
-Você receberá a seguir um guia completo de interpretação sobre Arquétipos de Gestão e Microambiente de Equipes. Este guia servirá como BASE FIXA do parecer.
+            {"role": "system", "content": "Você é um consultor sênior em liderança e cultura organizacional."},
+            {"role": "user", "content": f"""
+Você receberá a seguir um guia completo de interpretação sobre Arquétipos de Gestão e Microambiente de Equipes.
+Sua tarefa agora é focar **apenas na parte de Arquétipos de Gestão**.
 
-A sua tarefa será:
+1. Preserve a linguagem consultiva e estruturada.
+2. Insira os dados reais da líder {email_lider}, empresa {empresa}, rodada {rodada}.
+3. Use os dados extraídos dos relatórios abaixo para análises personalizadas.
+4. Gere um parecer ELEGANTE com seções bem organizadas.
 
-1. Preservar todo o conteúdo e estrutura dos guias.
-2. Inserir os dados individuais do líder nos trechos mais adequados, sempre com clareza e transição natural.
-3. Incluir análises personalizadas baseadas nos relatórios extraídos do Google Drive.
-4. Manter uma linguagem consultiva, estruturada e elegante.
-
-Guia completo abaixo:
-
-{conteudo_completo}
-"""
-            },
-            {
-                "role": "user",
-                "content": f"""
-Agora, com base nesse conteúdo, elabore um parecer inteligente da líder {email_lider} da empresa {empresa}, na rodada {rodada}.
-
-Os dados reais extraídos dos relatórios são os seguintes:
+📊 Dados da líder:
 
 {resumo_dados}
 
-Insira essas informações nos trechos mais adequados do texto, com linguagem consultiva, estruturada e elegante.
+📚 Guia completo:
 
-Responda no formato JSON com uma lista chamada \"secoes\", onde cada item contém \"titulo\" e \"texto\".
-"""
-            }
+{guia}
+
+Responda no formato JSON com uma lista chamada "secoes", onde cada item contém "titulo" e "texto".
+"""}
         ]
 
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=mensagens,
-            temperature=0.7,
+            temperature=0.7
         )
 
         conteudo_json = resposta.choices[0].message.content.strip()
-
         if conteudo_json.startswith("```json"):
             conteudo_json = conteudo_json[7:]
         elif conteudo_json.startswith("```"):
@@ -135,39 +114,29 @@ Responda no formato JSON com uma lista chamada \"secoes\", onde cada item conté
         if conteudo_json.endswith("```"):
             conteudo_json = conteudo_json[:-3]
 
-        try:
-            parecer = ast.literal_eval(conteudo_json)
-        except Exception as erro_json:
-            print("❌ ERRO AO INTERPRETAR O JSON:", erro_json)
-            print("🔎 CONTEÚDO ORIGINAL DA IA:")
-            print(conteudo_json[:1000])
-            return jsonify({"erro": "A IA respondeu em formato inválido. Verifique o console para analisar."}), 500
+        parecer = ast.literal_eval(conteudo_json)
 
-        nome_pdf = f"parecer_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        # Gerar PDF
+        nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
-
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, f"PARECER INTELIGENTE\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
-
+        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
         for secao in parecer["secoes"]:
-            titulo = secao.get("titulo", "")
-            texto = secao.get("texto", "")
             pdf.set_font("Arial", "B", 12)
-            pdf.multi_cell(0, 10, f"\n{titulo}")
+            pdf.multi_cell(0, 10, f"\n{secao['titulo']}")
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 10, texto)
-
+            pdf.multi_cell(0, 10, secao["texto"])
         pdf.output(caminho_local)
 
+        # Enviar ao Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        return jsonify({"mensagem": f"✅ Parecer salvo com sucesso no Drive: {nome_pdf}"})
+        return jsonify({"mensagem": f"✅ Parecer de Arquétipos salvo com sucesso no Drive: {nome_pdf}"})
 
     except Exception as e:
-        print(f"ERRO: {str(e)}")
+        print(f"❌ ERRO: {str(e)}")
         return jsonify({"erro": str(e)}), 500
-
