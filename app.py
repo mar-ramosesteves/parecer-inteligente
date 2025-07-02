@@ -55,6 +55,30 @@ def emitir_parecer():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
+        # Buscar a subpasta IA_JSON dentro da pasta do líder
+        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(service, id_empresa, rodada)
+        id_lider = buscar_id(service, id_rodada, email_lider)
+        id_ia_json = buscar_id(service, id_lider, "IA_JSON")
+
+        # Listar arquivos .json dentro da pasta IA_JSON
+        arquivos = service.files().list(q=f"'{id_ia_json}' in parents and name contains '.json'",
+                                        spaces='drive',
+                                        fields='files(id, name)').execute().get("files", [])
+
+        # Ler conteúdos dos arquivos JSON
+        dados_json = []
+        for arquivo in arquivos:
+            conteudo = service.files().get_media(fileId=arquivo["id"]).execute()
+            texto = conteudo.decode("utf-8")
+            try:
+                dados_json.append(json.loads(texto))
+            except Exception as e:
+                print(f"❌ Erro ao interpretar JSON: {arquivo['name']}: {e}")
+
+
+        
+
         import ast
         from openai import OpenAI
 
