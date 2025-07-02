@@ -148,13 +148,19 @@ Guia completo abaixo:
 """
         })
         mensagens.append({
-            "role": "user",
-            "content": f"""
-Agora, com base nesse conteúdo, elabore um parecer inteligente da líder {email_lider} da empresa {empresa}, na rodada {rodada}. Insira os dados e análises personalizadas nos locais apropriados do texto.
+    "role": "user",
+    "content": f"""
+Agora, com base nesse conteúdo, elabore um parecer inteligente da líder {email_lider} da empresa {empresa}, na rodada {rodada}.
+
+Os dados reais extraídos dos relatórios são os seguintes:
+
+{resumo_dados}
+
+Insira essas informações nos trechos mais adequados do texto, com linguagem consultiva, estruturada e elegante.
 
 Responda no formato JSON com uma lista chamada \"secoes\", onde cada item contém \"titulo\" e \"texto\".
 """
-        })
+})
 
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
