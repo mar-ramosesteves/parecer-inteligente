@@ -75,6 +75,26 @@ def emitir_parecer():
             conteudo = service.files().get_media(fileId=arq["id"]).execute()
             dados_json.append(json.loads(conteudo.decode("utf-8")))
 
+                    # Montar resumo interpretável para IA
+            resumo_dados = ""
+            for item in dados_json:
+                if isinstance(item, dict):
+                    titulo = item.get("titulo", "Sem título")
+                    resumo_dados += f"\n\n🔹 {titulo}\n"
+                    for chave, valor in item.items():
+                        if chave != "titulo":
+                            if isinstance(valor, dict):
+                                for subchave, subvalor in valor.items():
+                                    resumo_dados += f"- {subchave}: {subvalor}\n"
+                            elif isinstance(valor, list):
+                                for i, elemento in enumerate(valor, start=1):
+                                    resumo_dados += f"{i}. {elemento}\n"
+                            else:
+                                resumo_dados += f"- {chave}: {valor}\n"
+
+
+        
+
 
         # Listar arquivos .json dentro da pasta IA_JSON
         arquivos = service.files().list(q=f"'{id_ia_json}' in parents and name contains '.json'",
