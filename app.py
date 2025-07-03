@@ -98,7 +98,7 @@ def emitir_parecer_arquetipos():
             # Título e Subtítulo
             plt.title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
             subtitulo = f"{empresa.upper()} / {rodada.upper()} / {email_lider} / {datetime.now().strftime('%B/%Y')}"
-            plt.suptitle(subtitulo, fontsize=10, y=0.92)
+            plt.suptitle(subtitulo, fontsize=10, y=0.85)
 
             plt.ylim(0, 100)
             plt.legend()
