@@ -26,20 +26,17 @@ def emitir_parecer_arquetipos():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Autenticar no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
-        # Localizar pastas
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Função para carregar JSON
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
@@ -52,18 +49,15 @@ def emitir_parecer_arquetipos():
 
         json_auto_vs_equipe = carregar_json("AUTO_VS_EQUIPE")
 
-        # Carregar guia
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
         inicio = texto.find("##### INICIO ARQUETIPOS #####")
         fim = texto.find("##### FIM ARQUETIPOS #####")
         guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
 
-        # Marcador
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
         partes = guia.split(marcador)
 
-        # Gerar gráfico
         caminho_grafico1 = None
         if json_auto_vs_equipe:
             labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
@@ -91,40 +85,27 @@ def emitir_parecer_arquetipos():
             plt.savefig(caminho_grafico1)
             plt.close()
 
-        # Criar PDF do parecer
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
-        pdf.add_page()
-                # 🟡 CAPA COM LOGO E TÍTULOS
-        pdf.add_page()
 
-        # Inserir o logo centralizado (ajuste o caminho/local do arquivo conforme o ambiente)
+        pdf.add_page()
         caminho_logo = "/tmp/logo_hrkey.jpg"
         logo_url = "https://gestor.thehrkey.tech/wp-content/uploads/2025/06/logos-hr-key3_NOVO_REDUZIDA-300x75.png"
-
-        import requests
         with open(caminho_logo, "wb") as f:
             f.write(requests.get(logo_url).content)
-
         pdf.image(caminho_logo, x=35, y=30, w=140)
-
         pdf.set_y(80)
-
         pdf.set_font("Arial", "B", 18)
         pdf.cell(190, 15, "ARQUÉTIPOS DE GESTÃO", 0, 1, "C")
-
         pdf.set_font("Arial", "", 12)
         pdf.ln(5)
         pdf.cell(190, 10, f"{empresa.upper()} / {email_lider} / {rodada.upper()}", 0, 1, "C")
-
         mes_ano = datetime.now().strftime('%B/%Y').upper()
         pdf.cell(190, 10, mes_ano, 0, 1, "C")
 
-        # Página seguinte para o conteúdo
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-
         if len(partes) == 2 and caminho_grafico1:
             pdf.multi_cell(0, 10, partes[0].encode("latin-1", "ignore").decode("latin-1"))
             pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
@@ -138,7 +119,6 @@ def emitir_parecer_arquetipos():
 
         pdf.output(caminho_local)
 
-        # Baixar o relatório analítico existente
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
             spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
@@ -165,7 +145,6 @@ def emitir_parecer_arquetipos():
             merger.close()
             caminho_local = caminho_final
 
-        # Upload no Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
