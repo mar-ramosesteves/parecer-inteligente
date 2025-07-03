@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from busca_arquivos_drive import buscar_id
 import matplotlib.pyplot as plt
+from PyPDF2 import PdfMerger
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -23,20 +24,20 @@ def emitir_parecer_arquetipos():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        # Autenticação no Google Drive
+        # Autenticar no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
-        # Acessar pastas
+        # Localizar pastas
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        # Carregar JSONs
+        # Função para carregar JSON
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
@@ -48,20 +49,19 @@ def emitir_parecer_arquetipos():
             return None
 
         json_auto_vs_equipe = carregar_json("AUTO_VS_EQUIPE")
-        json_analitico = carregar_json("RELATORIO_ANALITICO_ARQUETIPOS")
 
-        # Extrair guia
+        # Carregar guia
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
         inicio = texto.find("##### INICIO ARQUETIPOS #####")
         fim = texto.find("##### FIM ARQUETIPOS #####")
         guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
 
-        # Inserir marcador no guia
+        # Marcador
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
         partes = guia.split(marcador)
 
-        # Gerar gráfico 1
+        # Gerar gráfico
         caminho_grafico1 = None
         if json_auto_vs_equipe:
             labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
@@ -89,7 +89,7 @@ def emitir_parecer_arquetipos():
             plt.savefig(caminho_grafico1)
             plt.close()
 
-        # Criar PDF
+        # Criar PDF do parecer
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
@@ -108,47 +108,9 @@ def emitir_parecer_arquetipos():
                 pdf.add_page()
                 pdf.image(caminho_grafico1, w=190)
 
-        from PyPDF2 import PdfMerger
-
-        # 🔗 Baixar o PDF analítico existente
-        resultado_arquivos = service.files().list(
-            q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
-            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
-        ).execute()
-        arquivos_pdf = resultado_arquivos.get("files", [])
-
-        if arquivos_pdf:
-            id_pdf_analitico = arquivos_pdf[0]["id"]
-            nome_pdf_analitico = arquivos_pdf[0]["name"]
-            caminho_pdf_analitico = f"/tmp/{nome_pdf_analitico}"
-    
-            request_analitico = service.files().get_media(fileId=id_pdf_analitico)
-            with open(caminho_pdf_analitico, "wb") as f:
-                downloader = MediaIoBaseDownload(f, request_analitico)
-                done = False
-                while done is False:
-                    status, done = downloader.next_chunk()
-
-            # 🔗 Mesclar os dois PDFs
-            caminho_final = f"/tmp/FINAL_{nome_pdf}"
-            merger = PdfMerger()
-            merger.append(caminho_local)           # Parecer
-            merger.append(caminho_pdf_analitico)   # Analítico
-            merger.write(caminho_final)
-            merger.close()
-    
-            # Substitui o caminho final a ser salvo
-            caminho_local = caminho_final
-
-        
-        
-       
-                # 🔵 Salvar o parecer PDF gerado
-                # 🔵 Salvar o parecer PDF gerado inicialmente
         pdf.output(caminho_local)
 
-        # 🔗 Baixar o PDF analítico existente
-        from PyPDF2 import PdfMerger
+        # Baixar o relatório analítico existente
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
             spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
@@ -167,17 +129,15 @@ def emitir_parecer_arquetipos():
                 while not done:
                     status, done = downloader.next_chunk()
 
-            # 🔗 Mesclar os dois PDFs
             caminho_final = f"/tmp/FINAL_{nome_pdf}"
             merger = PdfMerger()
-            merger.append(caminho_local)           # Parecer
-            merger.append(caminho_pdf_analitico)   # Analítico
+            merger.append(caminho_local)
+            merger.append(caminho_pdf_analitico)
             merger.write(caminho_final)
             merger.close()
+            caminho_local = caminho_final
 
-            caminho_local = caminho_final  # Atualiza caminho_local com o PDF final
-
-        # ⬆️ Upload do PDF final para o Google Drive
+        # Upload no Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
@@ -187,4 +147,3 @@ def emitir_parecer_arquetipos():
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
-
