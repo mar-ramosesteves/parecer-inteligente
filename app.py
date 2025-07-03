@@ -38,6 +38,8 @@ def emitir_parecer_arquetipos():
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
+        
+
         # 📌 Carregar JSON de gráficos
         def carregar_json(nome_parcial):
             resultados = service.files().list(
@@ -144,6 +146,8 @@ Guia:
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
+        print(f"✅ PDF salvo como {nome_pdf} na pasta do líder ({id_lider})")
 
         return jsonify({"mensagem": f"✅ Parecer com gráficos salvo com sucesso no Drive: {nome_pdf}"})
 
