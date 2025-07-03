@@ -10,6 +10,8 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from busca_arquivos_drive import buscar_id
 import matplotlib.pyplot as plt
 from PyPDF2 import PdfMerger
+import requests
+
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -94,8 +96,30 @@ def emitir_parecer_arquetipos():
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
+                # 🟡 CAPA COM LOGO E TÍTULOS
+        pdf.add_page()
+
+        # Inserir o logo centralizado (ajuste o caminho/local do arquivo conforme o ambiente)
+        caminho_logo = "/tmp/logo_hrkey.png"
+        with open(caminho_logo, "wb") as f:
+            f.write(requests.get("https://gestor.thehrkey.tech/wp-content/uploads/2025/06/logos-hr-key3_NOVO_REDUZIDA-300x75.png").content)
+
+        pdf.image(caminho_logo, x=35, y=30, w=140)  # centralizado (ajuste o `x` se necessário)
+        pdf.set_y(80)
+
+        pdf.set_font("Arial", "B", 18)
+        pdf.cell(190, 15, "ARQUÉTIPOS DE GESTÃO", 0, 1, "C")
+
+        pdf.set_font("Arial", "", 12)
+        pdf.ln(5)
+        pdf.cell(190, 10, f"{empresa.upper()} / {email_lider} / {rodada.upper()}", 0, 1, "C")
+
+        mes_ano = datetime.now().strftime('%B/%Y').upper()
+        pdf.cell(190, 10, mes_ano, 0, 1, "C")
+
+        # Página seguinte para o conteúdo
+        pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, f"PARECER DE ARQUETIPOS DE GESTAO\nEmpresa: {empresa}\nRodada: {rodada}\nLider: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
 
         if len(partes) == 2 and caminho_grafico1:
             pdf.multi_cell(0, 10, partes[0].encode("latin-1", "ignore").decode("latin-1"))
