@@ -144,6 +144,7 @@ def emitir_parecer_arquetipos():
         
        
                 # 🔵 Salvar o parecer PDF gerado
+                # 🔵 Salvar o parecer PDF gerado inicialmente
         pdf.output(caminho_local)
 
         # 🔗 Baixar o PDF analítico existente
@@ -174,9 +175,9 @@ def emitir_parecer_arquetipos():
             merger.write(caminho_final)
             merger.close()
 
-            caminho_local = caminho_final
+            caminho_local = caminho_final  # Atualiza caminho_local com o PDF final
 
-        # ⬆️ Upload para o Google Drive
+        # ⬆️ Upload do PDF final para o Google Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
