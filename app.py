@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import openai
 import json
 from fpdf import FPDF
 from datetime import datetime
@@ -18,25 +19,25 @@ PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
 @app.route("/emitir-parecer-arquetipos", methods=["POST"])
 def emitir_parecer_arquetipos():
     try:
-        print("▶️ Requisição recebida")
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
+        # Autenticacao no Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
+        # Localizar pastas
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
-        print("📁 Pastas localizadas")
-
+        # Carregar JSON de graficos
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
@@ -48,78 +49,59 @@ def emitir_parecer_arquetipos():
             return None
 
         json_auto_vs_equipe = carregar_json("AUTO_VS_EQUIPE")
-        json_analitico = carregar_json("RELATORIO_ANALITICO_ARQUETIPOS")
 
-        print("📊 JSONs carregados")
-
+        # Ler guia de entendimento
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
+        inicio = texto.find("##### INICIO ARQUETIPOS #####")
+        fim = texto.find("##### FIM ARQUETIPOS #####")
+        if inicio != -1 and fim != -1:
+            guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip()
+        else:
+            guia = "Guia de Arquétipos não encontrado."
 
-        inicio = texto.find("##### INÍCIO ARQUÉTIPOS #####")
-        fim = texto.find("##### FIM ARQUÉTIPOS #####")
-        guia = texto[inicio + len("##### INÍCIO ARQUÉTIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
-
-        print("📘 Guia carregado")
-
+        # Criar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
+        pdf.multi_cell(0, 10, "PARECER DE ARQUETIPOS DE GESTAO")
+        pdf.multi_cell(0, 10, f"Empresa: {empresa}")
+        pdf.multi_cell(0, 10, f"Rodada: {rodada}")
+        pdf.multi_cell(0, 10, f"Lider: {email_lider}")
+        pdf.multi_cell(0, 10, f"Data: {datetime.now().strftime('%d/%m/%Y')}")
+        pdf.ln(5)
         pdf.multi_cell(0, 8, guia)
 
-        # ➕ GRÁFICO 1: AUTO vs EQUIPE
+        # Inserir grafico
         if json_auto_vs_equipe:
             pdf.add_page()
-            plt.figure(figsize=(10, 5))
             labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
             auto = list(json_auto_vs_equipe["autoavaliacao"].values())
             equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
             x = range(len(labels))
-            plt.bar(x, auto, width=0.4, label="Autoavaliação", align='center')
+            plt.figure(figsize=(10, 5))
+            plt.bar(x, auto, width=0.4, label="Autoavaliacao", align='center')
             plt.bar([i + 0.4 for i in x], equipe, width=0.4, label="Equipe", align='center')
             plt.xticks([i + 0.2 for i in x], labels, rotation=45)
             plt.ylim(0, 100)
-            plt.title("ARQUÉTIPOS AUTO VS EQUIPE")
+            plt.title("ARQUETIPOS - AUTO VS EQUIPE")
             plt.legend()
-            caminho_grafico1 = "/tmp/grafico1.png"
+            caminho_grafico = "/tmp/grafico_auto_vs_equipe.png"
             plt.tight_layout()
-            plt.savefig(caminho_grafico1)
+            plt.savefig(caminho_grafico)
             plt.close()
-            pdf.image(caminho_grafico1, w=190)
-            print("📊 Gráfico 1 inserido")
-
-        # ➕ GRÁFICO 2: RELATÓRIO ANALÍTICO
-        if json_analitico and "analise" in json_analitico:
-            try:
-                pdf.add_page()
-                labels = [item.get("arquetipo", f"Arquetipo {i+1}") for i, item in enumerate(json_analitico["analise"])]
-                valores = [item.get("pontuacao", 0) for item in json_analitico["analise"]]
-                plt.figure(figsize=(10, 5))
-                plt.bar(labels, valores, color="gray")
-                plt.ylim(0, 100)
-                plt.title("RELATÓRIO ANALÍTICO DE ARQUETIPOS")
-                plt.xticks(rotation=45)
-                caminho_grafico2 = "/tmp/grafico2.png"
-                plt.tight_layout()
-                plt.savefig(caminho_grafico2)
-                plt.close()
-                pdf.image(caminho_grafico2, w=190)
-                print("📊 Gráfico 2 inserido")
-            except Exception as erro:
-                print(f"❌ Erro ao gerar gráfico 2: {erro}")
+            pdf.image(caminho_grafico, w=190)
 
         pdf.output(caminho_local)
 
+        # Subir para o Drive
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        print("✅ PDF salvo no Drive")
-
-        return jsonify({"mensagem": f"✅ Parecer com gráficos salvo no Drive: {nome_pdf}"})
+        return jsonify({"mensagem": f"Relatorio salvo com sucesso: {nome_pdf}"})
 
     except Exception as e:
-        print(f"❌ Erro geral: {str(e)}")
         return jsonify({"erro": str(e)}), 500
