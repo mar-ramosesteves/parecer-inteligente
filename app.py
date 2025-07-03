@@ -67,7 +67,7 @@ def emitir_parecer_arquetipos():
         pdf.multi_cell(0, 10, f"PARECER DE ARQUETIPOS DE GESTAO\nEmpresa: {empresa}\nRodada: {rodada}\nLider: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
         pdf.multi_cell(0, 10, guia.encode("latin-1", "ignore").decode("latin-1"))
 
-        # Gráfico 1: AUTO vs EQUIPE
+                # 🟦 Gráfico 1: AUTO vs EQUIPE (com ajustes visuais)
         if json_auto_vs_equipe:
             pdf.add_page()
             plt.figure(figsize=(10, 5))
@@ -75,11 +75,32 @@ def emitir_parecer_arquetipos():
             auto = list(json_auto_vs_equipe["autoavaliacao"].values())
             equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
             x = range(len(labels))
-            plt.bar(x, auto, width=0.4, label="Autoavaliacao", align='center')
+            
+            # Barras
+            plt.bar(x, auto, width=0.4, label="Autoavaliação", align='center')
             plt.bar([i + 0.4 for i in x], equipe, width=0.4, label="Equipe", align='center')
+
+            # Rótulos nas barras
+            for i, (a, e) in enumerate(zip(auto, equipe)):
+                plt.text(i, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
+                plt.text(i + 0.4, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
+
+            # Eixo X
             plt.xticks([i + 0.2 for i in x], labels, rotation=45)
+
+            # Linhas de referência
+            plt.axhline(50, color="gray", linestyle="--", linewidth=1)
+            plt.text(len(labels) - 0.5, 51, "Suporte", color="gray", fontsize=8, ha='right')
+
+            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+            plt.text(len(labels) - 0.5, 61, "Dominante", color="gray", fontsize=8, ha='right')
+
+            # Título e Subtítulo
+            plt.title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
+            subtitulo = f"{empresa.upper()} / {rodada.upper()} / {email_lider} / {datetime.now().strftime('%B/%Y')}"
+            plt.suptitle(subtitulo, fontsize=10, y=0.92)
+
             plt.ylim(0, 100)
-            plt.title("ARQUETIPOS AUTO VS EQUIPE")
             plt.legend()
             caminho_grafico1 = "/tmp/grafico1.png"
             plt.tight_layout()
