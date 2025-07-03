@@ -90,7 +90,7 @@ def emitir_parecer_arquetipos():
         pdf = FPDF()
 
         pdf.add_page()
-        caminho_logo = "/tmp/logo_hrkey.jpg"
+        caminho_logo = "/tmp/logo_hrkey.png"
         logo_url = "https://gestor.thehrkey.tech/wp-content/uploads/2025/06/logos-hr-key3_NOVO_REDUZIDA-300x75.png"
         with open(caminho_logo, "wb") as f:
             f.write(requests.get(logo_url).content)
