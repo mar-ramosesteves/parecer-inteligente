@@ -15,3 +15,4 @@ google-auth
 google-auth-oauthlib
 xhtml2pdf
 PyMuPDF
+PyPDF2
