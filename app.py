@@ -41,7 +41,8 @@ def emitir_parecer_arquetipos():
 
         inicio = texto.find("##### INÍCIO ARQUÉTIPOS #####")
         fim = texto.find("##### FIM ARQUÉTIPOS #####")
-        guia = texto[inicio + len("##### INÍCIO ARQUÉTIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "❌ Guia de Arquétipos não encontrado."
+        guia = texto[inicio + len("##### INÍCIO ARQUÉTIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
+
 
         # 📝 Criar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -60,7 +61,7 @@ def emitir_parecer_arquetipos():
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        return jsonify({"mensagem": f"✅ Parecer salvo com sucesso no Drive: {nome_pdf}"})
+        return jsonify({"mensagem": f" Parecer salvo com sucesso no Drive: {nome_pdf}"})
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
