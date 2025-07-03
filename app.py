@@ -110,35 +110,35 @@ def emitir_parecer_arquetipos():
 
         from PyPDF2 import PdfMerger
 
-# 🔗 Baixar o PDF analítico existente
-resultado_arquivos = service.files().list(
-    q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
-    spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
-).execute()
-arquivos_pdf = resultado_arquivos.get("files", [])
+        # 🔗 Baixar o PDF analítico existente
+        resultado_arquivos = service.files().list(
+            q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
+            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
+        ).execute()
+        arquivos_pdf = resultado_arquivos.get("files", [])
 
-if arquivos_pdf:
-    id_pdf_analitico = arquivos_pdf[0]["id"]
-    nome_pdf_analitico = arquivos_pdf[0]["name"]
-    caminho_pdf_analitico = f"/tmp/{nome_pdf_analitico}"
+        if arquivos_pdf:
+            id_pdf_analitico = arquivos_pdf[0]["id"]
+            nome_pdf_analitico = arquivos_pdf[0]["name"]
+            caminho_pdf_analitico = f"/tmp/{nome_pdf_analitico}"
     
-    request_analitico = service.files().get_media(fileId=id_pdf_analitico)
-    with open(caminho_pdf_analitico, "wb") as f:
-        downloader = MediaIoBaseDownload(f, request_analitico)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
+            request_analitico = service.files().get_media(fileId=id_pdf_analitico)
+            with open(caminho_pdf_analitico, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request_analitico)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
 
-    # 🔗 Mesclar os dois PDFs
-    caminho_final = f"/tmp/FINAL_{nome_pdf}"
-    merger = PdfMerger()
-    merger.append(caminho_local)           # Parecer
-    merger.append(caminho_pdf_analitico)   # Analítico
-    merger.write(caminho_final)
-    merger.close()
+            # 🔗 Mesclar os dois PDFs
+            caminho_final = f"/tmp/FINAL_{nome_pdf}"
+            merger = PdfMerger()
+            merger.append(caminho_local)           # Parecer
+            merger.append(caminho_pdf_analitico)   # Analítico
+            merger.write(caminho_final)
+            merger.close()
     
-    # Substitui o caminho final a ser salvo
-    caminho_local = caminho_final
+            # Substitui o caminho final a ser salvo
+            caminho_local = caminho_final
 
         
         
