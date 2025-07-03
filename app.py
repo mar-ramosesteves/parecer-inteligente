@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import openai
 import json
 from fpdf import FPDF
 from datetime import datetime
@@ -23,17 +24,20 @@ def emitir_parecer_arquetipos():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
+        # Autenticação Google Drive
         SCOPES = ['https://www.googleapis.com/auth/drive']
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
         info = json.loads(json_str)
         creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
         service = build("drive", "v3", credentials=creds)
 
+        # Acessar pastas
         id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
         id_rodada = buscar_id(service, id_empresa, rodada)
         id_lider = buscar_id(service, id_rodada, email_lider)
         id_ia_json = buscar_id(service, id_lider, "IA_JSON")
 
+        # 🟦 Função para carregar JSON por nome parcial
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
@@ -47,23 +51,29 @@ def emitir_parecer_arquetipos():
         json_auto_vs_equipe = carregar_json("AUTO_VS_EQUIPE")
         json_analitico = carregar_json("RELATORIO_ANALITICO_ARQUETIPOS")
 
+        # 📘 Extrair guia (somente parte de Arquétipos)
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
-        inicio = texto.find("INÍCIO - ARQUÉTIPOS DE GESTÃO")
-        fim = texto.find("FIM - ARQUÉTIPOS DE GESTÃO")
-        guia = texto[inicio + len("INÍCIO - ARQUÉTIPOS DE GESTÃO"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
+        inicio = texto.find("##### INÍCIO ARQUÉTIPOS #####")
+        fim = texto.find("##### FIM ARQUÉTIPOS #####")
+        guia = texto[inicio + len("##### INÍCIO ARQUÉTIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
 
+        # 🧼 Função para limpar caracteres incompatíveis com FPDF (latin-1)
+        def limpar_texto(texto):
+            return texto.encode("latin-1", "ignore").decode("latin-1")
+
+        # 📝 Criar PDF
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n")
-        pdf.set_font("Arial", size=11)
-        for paragrafo in guia.split("\n\n"):
-            pdf.multi_cell(0, 8, paragrafo.strip())
-            pdf.ln()
+        pdf.multi_cell(0, 10, limpar_texto(
+            f"PARECER DE ARQUÉTIPOS DE GESTÃO\nEmpresa: {empresa}\nRodada: {rodada}\nLíder: {email_lider}\nData: {datetime.now().strftime('%d/%m/%Y')}\n\n"
+        ))
+        pdf.multi_cell(0, 10, limpar_texto(guia))
 
+        # 🟦 Gráfico 1: AUTO vs EQUIPE
         if json_auto_vs_equipe:
             pdf.add_page()
             plt.figure(figsize=(10, 5))
@@ -83,13 +93,14 @@ def emitir_parecer_arquetipos():
             plt.close()
             pdf.image(caminho_grafico1, w=190)
 
+        # 🟨 Gráfico 2: RELATÓRIO ANALÍTICO
         if json_analitico and "analise" in json_analitico:
             try:
                 pdf.add_page()
                 labels = [item.get("arquetipo", f"Arquetipo {i+1}") for i, item in enumerate(json_analitico["analise"])]
                 valores = [item.get("pontuacao", 0) for item in json_analitico["analise"]]
                 plt.figure(figsize=(10, 5))
-                plt.bar(labels, valores, color='gray')
+                plt.bar(labels, valores)
                 plt.ylim(0, 100)
                 plt.title("RELATÓRIO ANALÍTICO DE ARQUÉTIPOS")
                 plt.xticks(rotation=45)
@@ -101,12 +112,14 @@ def emitir_parecer_arquetipos():
             except Exception as erro:
                 print(f"Erro ao gerar gráfico analítico: {erro}")
 
+        # 📤 Enviar para Google Drive
         pdf.output(caminho_local)
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        return jsonify({"mensagem": f"✅ Parecer com gráficos salvo com sucesso no Drive: {nome_pdf}"})
+        print(f"✅ PDF salvo como {nome_pdf} na pasta do líder ({id_lider})")
+        return jsonify({"mensagem": f"✅ Parecer com guia e gráficos salvo no Drive: {nome_pdf}"})
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
