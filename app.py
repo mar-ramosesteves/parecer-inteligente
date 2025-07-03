@@ -108,6 +108,53 @@ def emitir_parecer_arquetipos():
                 pdf.add_page()
                 pdf.image(caminho_grafico1, w=190)
 
+                # 🔵 Minigráficos analíticos de arquétipos (por bloco)
+        if json_analitico and "analise" in json_analitico:
+            blocos = {}
+            for item in json_analitico["analise"]:
+                bloco = item.get("bloco", "OUTROS")
+                if bloco not in blocos:
+                    blocos[bloco] = []
+                blocos[bloco].append(item)
+
+            for nome_bloco, perguntas in blocos.items():
+                pdf.add_page()
+                pdf.set_font("Arial", "B", 12)
+                pdf.multi_cell(0, 10, f"ANÁLISE POR BLOCO: {nome_bloco.upper()}")
+                y_offset = 40
+                for i, item in enumerate(perguntas):
+                    try:
+                        afirmacao = item.get("afirmacao", f"Afirmação {i+1}")
+                        valor_auto = item.get("pontuacao_auto", 0)
+                        valor_equipe = item.get("pontuacao_equipe", 0)
+
+                        # Criar gráfico tipo velocímetro horizontal
+                        plt.figure(figsize=(6.5, 0.4))
+                        plt.barh([0], [valor_auto], color="blue", label="Auto", height=0.3)
+                        plt.barh([0.4], [valor_equipe], color="green", label="Equipe", height=0.3)
+                        plt.xlim(0, 100)
+                        plt.xticks([0, 20, 40, 60, 80, 100])
+                        plt.yticks([])
+                        plt.axvline(50, color="gray", linestyle="--", linewidth=0.8)
+                        plt.axvline(60, color="gray", linestyle="--", linewidth=0.8)
+                        plt.text(valor_auto + 1, 0, f"{valor_auto:.0f}%", va='center', fontsize=6)
+                        plt.text(valor_equipe + 1, 0.4, f"{valor_equipe:.0f}%", va='center', fontsize=6)
+                        plt.tight_layout()
+
+                        # Salvar e inserir
+                        caminho_barra = f"/tmp/barra_{nome_bloco}_{i}.png"
+                        plt.savefig(caminho_barra)
+                        plt.close()
+                        pdf.image(caminho_barra, x=10, y=y_offset, w=180)
+                        y_offset += 12
+                        if y_offset > 260:
+                            pdf.add_page()
+                            y_offset = 40
+                    except Exception as erro:
+                        print(f"Erro ao gerar minigráfico {i} do bloco {nome_bloco}: {erro}")
+
+        
+        
         # Salvar no Drive
         pdf.output(caminho_local)
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
