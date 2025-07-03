@@ -142,15 +142,48 @@ def emitir_parecer_arquetipos():
 
         
         
-        # Salvar no Drive
+       
+                # 🔵 Salvar o parecer PDF gerado
         pdf.output(caminho_local)
-        file_metadata = {"name": nome_pdf, "parents": [id_lider]}
-        media = MediaIoBaseUpload(open(caminho_final, "rb"), mimetype="application/pdf")
 
+        # 🔗 Baixar o PDF analítico existente
+        from PyPDF2 import PdfMerger
+        resultado_arquivos = service.files().list(
+            q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
+            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
+        ).execute()
+        arquivos_pdf = resultado_arquivos.get("files", [])
+
+        if arquivos_pdf:
+            id_pdf_analitico = arquivos_pdf[0]["id"]
+            nome_pdf_analitico = arquivos_pdf[0]["name"]
+            caminho_pdf_analitico = f"/tmp/{nome_pdf_analitico}"
+
+            request_analitico = service.files().get_media(fileId=id_pdf_analitico)
+            with open(caminho_pdf_analitico, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request_analitico)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+
+            # 🔗 Mesclar os dois PDFs
+            caminho_final = f"/tmp/FINAL_{nome_pdf}"
+            merger = PdfMerger()
+            merger.append(caminho_local)           # Parecer
+            merger.append(caminho_pdf_analitico)   # Analítico
+            merger.write(caminho_final)
+            merger.close()
+
+            caminho_local = caminho_final
+
+        # ⬆️ Upload para o Google Drive
+        file_metadata = {"name": nome_pdf, "parents": [id_lider]}
+        media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
         print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
-    
+
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
