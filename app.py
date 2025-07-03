@@ -89,20 +89,32 @@ def emitir_parecer_arquetipos():
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
 
+        # 🟡 CAPA SEM LOGO - COM TEXTO CENTRALIZADO
         pdf.add_page()
-        caminho_logo = "/tmp/logo_hrkey.png"
-        logo_url = "https://gestor.thehrkey.tech/wp-content/uploads/2025/06/logos-hr-key3_NOVO_REDUZIDA-300x75.png"
-        with open(caminho_logo, "wb") as f:
-            f.write(requests.get(logo_url).content)
-        pdf.image(caminho_logo, x=35, y=30, w=140)
-        pdf.set_y(80)
+
+        # Título da marca
+        pdf.set_y(40)
+        pdf.set_font("Arial", "B", 22)
+        pdf.cell(190, 15, "THE HR KEY", 0, 1, "C")
+
+        # Slogan
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(190, 10, "Empowering Performance through People", 0, 1, "C")
+
+        # Título principal
+        pdf.ln(20)
         pdf.set_font("Arial", "B", 18)
         pdf.cell(190, 15, "ARQUÉTIPOS DE GESTÃO", 0, 1, "C")
+
+        # Subtítulo com informações do líder
         pdf.set_font("Arial", "", 12)
         pdf.ln(5)
         pdf.cell(190, 10, f"{empresa.upper()} / {email_lider} / {rodada.upper()}", 0, 1, "C")
+
+        # Mês e ano
         mes_ano = datetime.now().strftime('%B/%Y').upper()
         pdf.cell(190, 10, mes_ano, 0, 1, "C")
+
 
         pdf.add_page()
         pdf.set_font("Arial", size=12)
