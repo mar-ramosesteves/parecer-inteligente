@@ -1,4 +1,4 @@
-INÍCIO - ARQUÉTIPOS DE GESTÃO
+##### INÍCIO ARQUÉTIPOS #####
 
 High Performance Leadership
 Guia de entendimento 
@@ -153,9 +153,9 @@ Apoie o plano de desenvolvimento. Determine como você apoiará o plano de desen
 Busque oportunidades para os seus Colaboradores. Tente achar ou criar oportunidades para melhorar o desenvolvimento profissional de seus Colaboradores, incluindo a divulgação apropriada da capacitação da sua equipe, dentro da organização. 
 Incentive o crescimento. Avalie, periodicamente, o progresso de cada um de seus Colaboradores e aconselhe os a ajustar seus planos de desenvolvimento quando for necessário ou apropriado. 
 FIM
-FIM - ARQUÉTIPOS DE GESTÃO
+##### FIM ARQUÉTIPOS #####
 
-INÍCIO - MICROAMBIENTE DE EQUIPES
+##### INÍCIO MICROAMBIENTE #####
 High Performance Leadership  
 Guia de entendimento
 MICROAMBIENTE DE EQUIPES 
@@ -350,4 +350,4 @@ Incentivar bons relacionamentos profissionais.
 Mostrar respeito e confiança mútuos. 
 Trabalhar com integridade, orgulho e dignidade. 
 FIM
-FIM - MICROAMBIENTE DE EQUIPES
+##### FIM MICROAMBIENTE #####
