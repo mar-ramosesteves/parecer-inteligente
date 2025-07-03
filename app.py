@@ -6,7 +6,7 @@ from fpdf import FPDF
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from busca_arquivos_drive import buscar_id
 import matplotlib.pyplot as plt
 
