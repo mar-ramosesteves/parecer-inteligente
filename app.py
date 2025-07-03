@@ -100,11 +100,15 @@ def emitir_parecer_arquetipos():
         pdf.add_page()
 
         # Inserir o logo centralizado (ajuste o caminho/local do arquivo conforme o ambiente)
-        caminho_logo = "/tmp/logo_hrkey.png"
-        with open(caminho_logo, "wb") as f:
-            f.write(requests.get("https://gestor.thehrkey.tech/wp-content/uploads/2025/06/logos-hr-key3_NOVO_REDUZIDA-300x75.png").content)
+        caminho_logo = "/tmp/logo_hrkey.jpg"
+        logo_url = "https://gestor.thehrkey.tech/wp-content/uploads/2025/06/logos-hr-key3_NOVO_REDUZIDA-300x75.png"
 
-        pdf.image(caminho_logo, x=35, y=30, w=140)  # centralizado (ajuste o `x` se necessário)
+        import requests
+        with open(caminho_logo, "wb") as f:
+            f.write(requests.get(logo_url).content)
+
+        pdf.image(caminho_logo, x=35, y=30, w=140)
+
         pdf.set_y(80)
 
         pdf.set_font("Arial", "B", 18)
