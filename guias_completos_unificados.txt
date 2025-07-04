@@ -1,12 +1,12 @@
 ##### INICIO ARQUETIPOS #####
 Guia de entendimento 
 
-##Arquétipos de Gestão
+## Arquétipos de Gestão
 
 Os Arquétipos de Gestão referem-se a forma com que um líder se comporta nas diversas situações inerentes ao seu papel. De todas as variáveis que impactam a efetividade do ambiente de trabalho e o esforço da equipe, os Arquétipos de Gestão são a variável que apresenta maior impacto. A amplitude do repertório de Arquétipos de Gestão determina a sua efetividade. Os líderes preferem os arquétipos que lhes parecem mais naturais, podendo limitar-se apenas a estes. Os arquétipos que parecem mais naturais ao líder são determinados pelas suas competências individuais.
 
 Apesar dos líderes enfrentarem uma quantidade ilimitada de situações gerenciais, pesquisas mostraram que existem seis padrões de comportamento, utilizados pelos líderes. São eles: 
-**- o arquétipo Imperativo;**
+** - o arquétipo Imperativo; **
 - o Arquétipo Resoluto: 
 - o Arquétipo Cuidativo: 
 - o Arquétipo Consultivo; 
@@ -25,7 +25,7 @@ A efetividade de um líder depende da sua habilidade em identificar as demandas 
 
 Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:
 
-###Os seis Arquétipos de Gestão e as condições que os tomam efetivos serão detalhadas a seguir: 
+### Os seis Arquétipos de Gestão e as condições que os tomam efetivos serão detalhadas a seguir: 
 
 Arquétipo Imperativo
 
