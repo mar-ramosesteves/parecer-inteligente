@@ -119,10 +119,13 @@ def emitir_parecer_arquetipos():
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2 and caminho_grafico1:
-            pdf.multi_cell(0, 10, partes[0].encode("latin-1", "ignore").decode("latin-1"))
-            pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
+            renderizar_bloco_personalizado(pdf, partes[0])
+            pdf.ln(5)
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"), ln=True)
             pdf.image(caminho_grafico1, w=190)
-            pdf.multi_cell(0, 10, partes[1].encode("latin-1", "ignore").decode("latin-1"))
+            renderizar_bloco_personalizado(pdf, partes[1])
+
         else:
             renderizar_bloco_personalizado(pdf, guia)
 
