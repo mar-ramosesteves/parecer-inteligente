@@ -168,9 +168,10 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Imperativo, te
 - Monitore os Colaboradores de perto. Acompanhe de perto o que está acontecendo. Estabeleça procedimentos que darão a você informações necessárias para avaliar o nível de atividade de cada pessoa e os resultados destas atividades. 
 - Aponte claramente os desvios das regras. Mostre as pessoas quais comportamentos não se adequam aos padrões. Insista em seguir as regras da sua organização. 
 
-
+[COR:VERMELHO]
 Eficácia através do Arquétipo Resoluto
 
+[COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Resoluto, tente o seguinte: 
 
 - Formule sua visão, estratégias e objetivos. Crie uma visão clara, uma estratégia para atingir esta visão e os objetivos para mensurar quando a visão for alcançada. 
@@ -184,9 +185,10 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Resoluto, tent
 - Ofereça feedback. Diga quando você percebe que os Colaboradores estão fazendo um bom trabalho ou quando não estão. Seja especifico sobre o comportamento que você observou. De feedback regularmente. 
 - Recompense com justiça. Declare as políticas com firmeza. Não discrimine. 
 
-
+[COR:VERMELHO]
 Eficácia através do Arquétipo Cuidativo 
 
+[COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Cuidativo, tento o seguinte: 
 
 - Identifique e aja para resolver conflitos interpessoais. Reconheça as particularidades das pessoas e aceito-as como são. Incentive as a agir da mesma forma, e a trabalhar em conjunto com harmonia. 
@@ -197,9 +199,10 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Cuidativo, ten
 - Promova atividades sociais. Realize atividades de grupo 
 - Cumprimente as pessoas. Parabenize por aniversários individualmente, e por outras ocasiões especiais. 
 
-
+[COR:VERMELHO]
 Eficácia através do Arquétipo Consultivo 
 
+[COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Consultivo, tente o seguinte: 
 
 - Faça reuniões para compartilhar informações. Mantenha cada um informado sobre as questões organizacionais que os afetam, realizando reuniões frequentes para dividir informações e ideias. 
@@ -208,9 +211,10 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Consultivo, te
 - Busque o consenso. Evite agir ou tomar uma decisão até que todos tenham ouvido e possam concordar em apoiar, encontrando a melhor solução para a situação apresentada. 
 - Reconheça o bom desempenho. Incentive o bom desempenho, oferecendo feedback positivo aos seus Colaboradores e reconhecendo os seus maiores esforços. 
 
-
+[COR:VERMELHO]
 Eficácia através do Arquétipo Prescritivo 
 
+[COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Prescritivo, tente usar o seguinte: 
 
 - Desenvolva seu conhecimento e habilidades profissionais e técnicas. Você deve inspirar confiança e ser um especialista no que faz. 
@@ -219,8 +223,10 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Prescritivo, t
 - Delegue tarefas com níveis baixos a moderados de risco. Delegue tarefas que você esteja realmente certo de que a pessoa possa conduzir bem. Se os resultados forem críticos, tente ter uma pessoa experiente como apoio. 
 - Destaque os resultados. Comunique aos seus empregados que eles não terão a sua interferência enquanto estiverem alcançando os resultados que você espera. No entanto, se eles precisarem de ajuda. mostre se a disposição para aconselhar ou ajudar. 
 
+[COR:VERMELHO]
 Eficácia através do Arquétipo Formador
 
+[COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Formador, tente usar o seguinte:
 
 - Crie metas de desenvolvimento com os Colaboradores. Tenha uma conversa franca com seus Colaboradores sobre suas aspirações de longo prazo. Debata a possibilidade de estas aspirações serem consideradas pela empresa. 
@@ -230,7 +236,7 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Formador, tent
 - Incentive o crescimento. Avalie, periodicamente, o progresso de cada um de seus Colaboradores e aconselhe os a ajustar seus planos de desenvolvimento quando for necessário ou apropriado. 
 
 
-A seguir, o relatório analítico por afirmação, comparando a sua perceção de como voce atua com a média da percepção de sua equipe direta, dividias por bloco de impacto por arquétipo. Boa leitura!
+### A seguir, o relatório analítico por afirmação, comparando a sua perceção de como voce atua com a média da percepção de sua equipe direta, dividias por bloco de impacto por arquétipo. Boa leitura!
 ##### FIM ARQUETIPOS #####
 
 ##### INICIO MICROAMBIENTE #####
