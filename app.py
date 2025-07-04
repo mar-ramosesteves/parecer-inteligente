@@ -177,7 +177,6 @@ def emitir_parecer_arquetipos():
 
 def renderizar_bloco_personalizado(pdf, texto):
     import re
-
     cores = {
         "AZUL": (30, 60, 120),
         "CINZA": (100, 100, 100),
@@ -187,22 +186,19 @@ def renderizar_bloco_personalizado(pdf, texto):
         "PADRAO": (0, 0, 0)
     }
 
-    cor_atual = cores["PADRAO"]
     pdf.set_font("Arial", size=12)
-    pdf.set_text_color(*cor_atual)
+    pdf.set_text_color(0, 0, 0)
 
     linhas = texto.split("\n")
     for linha in linhas:
         linha = linha.strip()
 
-        # Trocar cor
         if linha.startswith("[COR:"):
             cor_tag = linha[5:-1].upper()
-            cor_atual = cores.get(cor_tag, cores["PADRAO"])
-            pdf.set_text_color(*cor_atual)
+            cor_rgb = cores.get(cor_tag, (0, 0, 0))
+            pdf.set_text_color(*cor_rgb)
             continue
 
-        # Caixa de destaque
         elif linha.startswith("[[CAIXA:") and linha.endswith("]]"):
             conteudo = linha[8:-2].strip()
             pdf.set_fill_color(240, 240, 240)
@@ -211,57 +207,48 @@ def renderizar_bloco_personalizado(pdf, texto):
             pdf.multi_cell(0, 10, conteudo.encode("latin-1", "ignore").decode("latin-1"), border=1, fill=True)
             pdf.ln(2)
             pdf.set_font("Arial", size=12)
-            pdf.set_text_color(*cor_atual)
             continue
 
-        # Quebra de página
         elif linha == "[[PAGEBREAK]]":
             pdf.add_page()
             continue
 
-        # Título
         elif linha.startswith("## "):
             pdf.set_font("Arial", "B", 16)
-            pdf.set_text_color(*cor_atual)
+            pdf.set_text_color(*cores["AZUL"])
             titulo = linha[3:].strip().encode("latin-1", "ignore").decode("latin-1")
             pdf.multi_cell(0, 12, titulo)
-            pdf.ln(2)
+            pdf.ln(1)
             pdf.set_font("Arial", size=12)
-            pdf.set_text_color(*cor_atual)
+            pdf.set_text_color(*cores["PADRAO"])
             continue
 
-        # Subtítulo
         elif linha.startswith("### "):
             pdf.set_font("Arial", "B", 13)
-            pdf.set_text_color(*cor_atual)
+            pdf.set_text_color(*cores["CINZA"])
             subtitulo = linha[4:].strip().encode("latin-1", "ignore").decode("latin-1")
             pdf.multi_cell(0, 10, subtitulo)
-            pdf.ln(2)
+            pdf.ln(1)
             pdf.set_font("Arial", size=12)
-            pdf.set_text_color(*cor_atual)
+            pdf.set_text_color(*cores["PADRAO"])
             continue
 
-        # Negrito ** e itálico _
-        linha = re.sub(r"\*\*(.*?)\*\*", r"\x01\1\x01", linha)
-        linha = re.sub(r"_(.*?)_", r"\x02\1\x02", linha)
+        # Negrito e itálico (dentro da linha)
+        linha = re.sub(r"\*\*(.*?)\*\*", lambda m: f"\x01{m.group(1)}\x01", linha)
+        linha = re.sub(r"_(.*?)_", lambda m: f"\x02{m.group(1)}\x02", linha)
 
         partes = re.split(r"(\x01.*?\x01|\x02.*?\x02)", linha)
-
         for parte in partes:
             if parte.startswith("\x01") and parte.endswith("\x01"):
                 pdf.set_font("Arial", "B", 12)
-                pdf.set_text_color(*cor_atual)
                 texto_limpo = parte[1:-1].encode("latin-1", "ignore").decode("latin-1")
-                pdf.multi_cell(0, 7, texto_limpo)
+                pdf.write(5, texto_limpo)
             elif parte.startswith("\x02") and parte.endswith("\x02"):
                 pdf.set_font("Arial", "I", 12)
-                pdf.set_text_color(*cor_atual)
                 texto_limpo = parte[1:-1].encode("latin-1", "ignore").decode("latin-1")
-                pdf.multi_cell(0, 7, texto_limpo)
+                pdf.write(5, texto_limpo)
             else:
                 pdf.set_font("Arial", size=12)
-                pdf.set_text_color(*cor_atual)
                 texto_limpo = parte.encode("latin-1", "ignore").decode("latin-1")
-                pdf.multi_cell(0, 7, texto_limpo)
-
-        pdf.ln(2)
+                pdf.write(5, texto_limpo)
+        pdf.ln(7)
