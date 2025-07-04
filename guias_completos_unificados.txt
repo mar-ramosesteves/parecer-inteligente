@@ -240,33 +240,53 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Formador, tent
 ##### FIM ARQUETIPOS #####
 
 ##### INICIO MICROAMBIENTE #####
-High Performance Leadership  
-Guia de entendimento
-MICROAMBIENTE DE EQUIPES 
-O que é Microambiente de Equipes? 
+## High Performance Leadership  
+## Guia de entendimento
+## MICROAMBIENTE DE EQUIPES 
+
+
+### O que é Microambiente de Equipes? 
+
+
 Microambiente de Equipes é a percepção dos profissionais sobre os aspectos do seu ambiente de trabalho em sua equipe que impactam diretamente o seu desempenho. 
+
 Inúmeros estudos encontraram uma conexão direta entre o Ambiente da Equipe e o desempenho da organização. O Ambiente da Equipe é o que mais se aproxima de um demonstrativo de ganhos e perdas decorrentes do gerenciamento de pessoas. Organizações que têm alto desempenho têm Ambiente com características muito específicas e mensuráveis. 
+
 O Ambiente afeta o desempenho organizacional através de sua influência na motivação dos empregados. Em muitos cargos, especialmente nos mais complexos, há um "abismo" entre o que os empregados devem fazer para atender o que é esperado deles e o que eles poderiam fazer se utilizassem o seu potencial máximo. O Ambiente da Equipe influencia os esforços e comprometimento dos empregados. Ambientes positivos incentivam e Ambientes negativos inibem os esforços. 
 Ambientes de alta performance são caracterizados por indivíduos que, rotineiramente, fazem "o que for preciso" para alcançar suas metas, fechar negócios ou satisfazer os clientes. Períodos extensos de Ambiente ruim faz com que as pessoas percam a crença na ideia de que as coisas podem melhorar, o que as leva a perder o estímulo pelo cargo e pela organização. Os resultados prováveis são: turnover, abstenção, insatisfação e baixa produtividade. 
+
 O inventário de Microambiente de Equipe é baseado nos conceitos de inteligência emocional. Diferente de pesquisas de clima organizacional que cobrem uma variedade de questões, o inventário se concentra em seis dimensões de Microambiente da Equipe que têm demonstrado, consistentemente, uma consequência direta no desempenho individual e na unidade de trabalho. 
+
 São elas: 
-Adaptabilidade 
-Não há regras, procedimentos, políticas ou práticas desnecessários. Novas ideias são facilmente aceitas. 
-A Adaptabilidade é uma medida das restrições identificadas no ambiente de trabalho, da quantidade de barreiras e, especialmente, de barreiras desnecessárias na organização.  
-Quão limitado você está pelas regras, políticas e procedimentos que interferem na execução do trabalho, sem necessidade? E, somando-se a isto, quão aberta está a organização para novas formas de ver as coisas, para novas ideias, para novas formas de proceder? Idealmente, a Adaptabilidade deverá ser alta na organização. E numa organização empreendedora ela deverá ser muito alta. 
-Perguntas-chave para você fazer a si mesmo a fim de determinar a presença ou a ausência de Adaptabilidade na organização: 
-Existem regras e procedimentos desnecessários? 
-É relativamente fácil inovar e fazer novas ideias serem aceitas? 
-As pessoas acham que tem que lutar contra limitações pouco pertinentes? 
-Responsabilidade 
-Os colaboradores têm autonomia para realizar as suas tarefas sem procurar por constante aprovação. 
-Responsabilidade é o sentimento que os colaboradores têm de que muita autonomia é delegada a eles; é o grau de autonomia que eles têm para realizar o seu trabalho sem verificar tudo com o seu gestor, sentindo-se completamente responsável pelo resultado.  
-Em organizações com alto grau de responsabilidade, os Colaboradores se sentem incentivados a escolher a melhor forma de realizar o trabalho e de fazer o que acham certo, ao invés de meramente se isentarem do problema. 
-Perguntas-chave para fazer a si próprio para determinar a presença ou a ausência de Responsabilidade na organização: 
-São delegadas importantes tarefas aos colaboradores? 
-Os indivíduos são encorajados a assumirem iniciativas sem terem sempre que checar com o superior? 
-Os indivíduos são incentivados a assumir riscos calculados, baseados em seu próprio julgamento? 
-Eles têm a oportunidade de experienciar o sucesso ou a falha de seus próprios esforços? 
+
+## Adaptabilidade 
+
+
+** - Não há regras, procedimentos, políticas ou práticas desnecessários. Novas ideias são facilmente aceitas. **
+** - A Adaptabilidade é uma medida das restrições identificadas no ambiente de trabalho, da quantidade de barreiras e, especialmente, de barreiras desnecessárias na organização. **
+** - Quão limitado você está pelas regras, políticas e procedimentos que interferem na execução do trabalho, sem necessidade? E, somando-se a isto, quão aberta está a organização para novas formas de ver as coisas, para novas ideias, para novas formas de proceder? Idealmente, a Adaptabilidade deverá ser alta na organização. E numa organização empreendedora ela deverá ser muito alta. **
+
+### Perguntas-chave para você fazer a si mesmo a fim de determinar a presença ou a ausência de Adaptabilidade na organização:
+       - Existem regras e procedimentos desnecessários? 
+       - É relativamente fácil inovar e fazer novas ideias serem aceitas? 
+       - As pessoas acham que tem que lutar contra limitações pouco pertinentes? 
+
+
+## Responsabilidade 
+
+
+** - Os colaboradores têm autonomia para realizar as suas tarefas sem procurar por constante aprovação. **
+** - Responsabilidade é o sentimento que os colaboradores têm de que muita autonomia é delegada a eles; é o grau de autonomia que eles têm para realizar o seu trabalho sem verificar tudo com o seu gestor, sentindo-se completamente responsável pelo resultado.  **
+** - Em organizações com alto grau de responsabilidade, os Colaboradores se sentem incentivados a escolher a melhor forma de realizar o trabalho e de fazer o que acham certo, ao invés de meramente se isentarem do problema. **
+
+### Perguntas-chave para fazer a si próprio para determinar a presença ou a ausência de Responsabilidade na organização: **
+       - São delegadas importantes tarefas aos colaboradores? 
+       - Os indivíduos são encorajados a assumirem iniciativas sem terem sempre que checar com o superior? 
+       - Os indivíduos são incentivados a assumir riscos calculados, baseados em seu próprio julgamento? 
+       - Eles têm a oportunidade de experienciar o sucesso ou a falha de seus próprios esforços? 
+
+
+
 Performance 
 A dimensão Performance mede a ênfase que a organização dá em fazer o melhor. 
 Isto se reflete tipicamente no estabelecimento de metas que sejam tanto desafiadoras como alcançáveis. Padrões altos representam uma boa combinação entre expectativas e capacidade, tanto da organização como dos indivíduos. 
