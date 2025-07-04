@@ -240,8 +240,6 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Formador, tent
 ##### FIM ARQUETIPOS #####
 
 ##### INICIO MICROAMBIENTE #####
-## High Performance Leadership  
-
 ## Guia de entendimento
 
 
@@ -259,7 +257,16 @@ O Ambiente afeta o desempenho organizacional através de sua influência na moti
 
 Ambientes de alta performance são caracterizados por indivíduos que, rotineiramente, fazem "o que for preciso" para alcançar suas metas, fechar negócios ou satisfazer os clientes. Períodos extensos de Ambiente ruim faz com que as pessoas percam a crença na ideia de que as coisas podem melhorar, o que as leva a perder o estímulo pelo cargo e pela organização. Os resultados prováveis são: turnover, abstenção, insatisfação e baixa produtividade. 
 
-O inventário de Microambiente de Equipe é baseado nos conceitos de inteligência emocional. Diferente de pesquisas de clima organizacional que cobrem uma variedade de questões, o inventário se concentra em seis dimensões de Microambiente da Equipe que têm demonstrado, consistentemente, uma consequência direta no desempenho individual e na unidade de trabalho. 
+### Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção: 
+
+
+
+
+### e a seguir, o gráfico de dimensões e subdimensões de microambiete na visão da sua equipe direta: 
+
+
+
+O inventário de Microambiente de Equipe é baseado nos conceitos de inteligência emocional. Diferente de pesquisas de clima organizacional que cobrem uma variedade de questões, o inventário se concentra em seis dimensões de Microambiente da Equipe que têm demonstrado, consistentemente, uma consequência direta no desempenho individual e na unidade de trabalho.
 
 São elas: 
 
@@ -328,14 +335,27 @@ Perguntas chave para fazer a si próprio para determinar a presença ou ausênci
 Os indivíduos e as equipes cooperam efetivamente para realizar o trabalho? 
 Os conflitos não resolvidos efetivamente? 
 Os sentimentos de orgulho e lealdade organizacional existem no ambiente de trabalho? 
+
+
 Resultados do inventário 
+
 Os resultados consistem em dois perfis: 
-O perfil de "Ambiente que seu time vivencia (Como as coisas são)" sumariza a percepção do ambiente real, que eles percebem no dia a dia. 
-O perfil de "Ambiente que seu tive gostaria que existisse (Como as coisas deveriam ser)" sumariza o desejo deles sobre como seria um ambiente ideal na visão deles. 
+
+- O perfil de "Ambiente que seu time vivencia (Como as coisas são)" sumariza a percepção do ambiente real, que eles percebem no dia a dia. 
+- O perfil de "Ambiente que seu tive gostaria que existisse (Como as coisas deveriam ser)" sumariza o desejo deles sobre como seria um ambiente ideal na visão deles. 
+
 Isto é, primeiramente, afetado pela forma que você está levando esta equipe. Cada perfil indica dois resultados nas seis dimensões chave de Ambiente. 
+
 O Ambiente é considerado positivo quando os resultados de cada dimensão estão próximos (gaps de menos de 20 pontos percentuais), e, ao mesmo tempo, que os percentuais de cada resultado estejam idealmente acima de 60%. 
-O gráfico de Microambiente de Equipes é um importante feedback sobre o Ambiente do trabalho na organização, mais especificamente no ambiente que eles vivenciam em sua equipe.  
-Ao fazer isto, os seus colaboradores tentaram dizer a você como é trabalhar em seu grupo. Eles tiraram tempo para apresentar a você uma reflexão honesta de seu ponto de vista e sentimentos. Este esforço merece uma reposta. 
+
+O gráfico de Microambiente de Equipes é um importante feedback sobre o Ambiente do trabalho na organização, mais especificamente no ambiente que eles vivenciam em sua equipe.
+
+Ao fazer isto, os seus colaboradores tentaram dizer a você como é trabalhar em seu grupo. Eles tiraram tempo para apresentar a você uma reflexão honesta de seu ponto de vista e sentimentos. Este esforço merece uma reposta.
+
+Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe: 
+
+## INSERIR GRÁFICO WATERFALL
+
 Seria útil se você checasse o seu entendimento sobre as questões que foram levantadas na pesquisa. Uma forma de fazer isto é fazer uma reunião com os seus subordinados diretos para dividir e discutir os resultados do Ambiente e trazer as questões a público. Você não só irá levar adiante o seu próprio entendimento, mas também: 
 Reconhecerá a participação dos empregados na pesquisa. 
 Dividirá os resultados da pesquisa diretamente com eles. 
@@ -351,8 +371,12 @@ Por onde começar
 Dimensões com gaps significativos (diferença de 30 pontos ou mais entre o Atual e o Ideal) e baixa pontuação (gaps significativos e escores Atual abaixo de 30%) são o mais importante.  
 Aumentar a pontuação das dimensões (até 100%) e diminuir os gaps (para as dimensões em que existam gaps) se refletem em aumento da produtividade da unidade de trabalho. Você terá maior oportunidade de obter uma melhora significativa se você priorizar uma ou duas dimensões no mesmo tempo. 
 Quando você selecionar as dimensões que você quer priorizar, formule suas próprias hipóteses para o que pode estar contribuindo para os gaps ou para a baixa pontuação nestas dimensões. Depois, teste suas hipóteses durante a reunião. 
-O Processo 
-O processo de levar esta sessão adiante tem três passos: 
+
+
+O Processo
+
+O processo de levar esta sessão adiante tem três passos:
+
 Relatório de Resultados. A tradução dos resultados da pesquisa em suas próprias palavras. 
 Entendimento dos Resultados. Checar o entendimento dos resultados da pesquisa. 
 Resumindo a Reunião. Fornecer um resumo dos resultados da pesquisa, clarificados ou validados e os passos para ir em frente. 
@@ -461,5 +485,11 @@ Sugestões para os Colaboradores aumentarem a Colaboração Mútua:
 Incentivar bons relacionamentos profissionais. 
 Mostrar respeito e confiança mútuos. 
 Trabalhar com integridade, orgulho e dignidade. 
-FIM
+
+Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe. Quanto menor o número GAP's, maior o estímulo que os integrantes de sua equipe tem em se engajar e produzir resultados de alta performance.
+
+## INSERIR GRÁFICO TERMÔMETRO
+
+A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!
 ##### FIM MICROAMBIENTE #####
+## INSERIR RELATÓRIO ANALÍTICO POR AFIRMAÇÃO - MICROAMBIENTE.
