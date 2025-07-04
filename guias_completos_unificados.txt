@@ -169,7 +169,7 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Imperativo, te
 - Aponte claramente os desvios das regras. Mostre as pessoas quais comportamentos não se adequam aos padrões. Insista em seguir as regras da sua organização. 
 
 [COR:VERMELHO]
-Eficácia através do Arquétipo Resoluto
+** Eficácia através do Arquétipo Resoluto **
 
 [COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Resoluto, tente o seguinte: 
@@ -186,7 +186,7 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Resoluto, tent
 - Recompense com justiça. Declare as políticas com firmeza. Não discrimine. 
 
 [COR:VERMELHO]
-Eficácia através do Arquétipo Cuidativo 
+** Eficácia através do Arquétipo Cuidativo ** 
 
 [COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Cuidativo, tento o seguinte: 
@@ -200,7 +200,7 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Cuidativo, ten
 - Cumprimente as pessoas. Parabenize por aniversários individualmente, e por outras ocasiões especiais. 
 
 [COR:VERMELHO]
-Eficácia através do Arquétipo Consultivo 
+** Eficácia através do Arquétipo Consultivo **
 
 [COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Consultivo, tente o seguinte: 
@@ -212,7 +212,7 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Consultivo, te
 - Reconheça o bom desempenho. Incentive o bom desempenho, oferecendo feedback positivo aos seus Colaboradores e reconhecendo os seus maiores esforços. 
 
 [COR:VERMELHO]
-Eficácia através do Arquétipo Prescritivo 
+** Eficácia através do Arquétipo Prescritivo ** 
 
 [COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Prescritivo, tente usar o seguinte: 
@@ -224,7 +224,7 @@ Para aumentar a percepção dos outros em relação ao Arquétipo Prescritivo, t
 - Destaque os resultados. Comunique aos seus empregados que eles não terão a sua interferência enquanto estiverem alcançando os resultados que você espera. No entanto, se eles precisarem de ajuda. mostre se a disposição para aconselhar ou ajudar. 
 
 [COR:VERMELHO]
-Eficácia através do Arquétipo Formador
+** Eficácia através do Arquétipo Formador **
 
 [COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Formador, tente usar o seguinte:
