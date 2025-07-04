@@ -231,7 +231,8 @@ def renderizar_bloco_personalizado(pdf, texto):
 
         elif linha.startswith("### "):
             pdf.set_font("Arial", "B", 13)
-            pdf.set_text_color(*cores["CINZA"])
+            pdf.set_text_color(0, 130, 60)
+
             subtitulo = linha[4:].strip().encode("latin-1", "ignore").decode("latin-1")
             pdf.multi_cell(0, 10, subtitulo)
             pdf.ln(1)
