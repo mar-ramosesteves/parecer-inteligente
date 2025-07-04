@@ -122,7 +122,9 @@ def emitir_parecer_arquetipos():
             renderizar_bloco_personalizado(pdf, partes[0])
             pdf.ln(5)
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"), ln=True)
+            pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
+            pdf.ln(2)
+
             pdf.image(caminho_grafico1, w=190)
             renderizar_bloco_personalizado(pdf, partes[1])
 
