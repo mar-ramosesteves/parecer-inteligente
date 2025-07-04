@@ -91,25 +91,31 @@ def emitir_parecer_arquetipos():
 
         # 🟡 CAPA SEM LOGO - COM TEXTO CENTRALIZADO
         pdf.add_page()
+        pdf.set_text_color(30, 60, 120)  # Azul escuro
 
         # Título da marca
         pdf.set_y(40)
         pdf.set_font("Arial", "B", 22)
         pdf.cell(190, 15, "THE HR KEY", 0, 1, "C")
+        pdf.set_text_color(0, 130, 60)  # verde
+
 
         # Slogan
         pdf.set_font("Arial", "", 12)
         pdf.cell(190, 10, "Empowering Performance through People", 0, 1, "C")
+        pdf.set_text_color(30, 60, 120)  # Azul escuro
 
         # Título principal
         pdf.ln(20)
         pdf.set_font("Arial", "B", 18)
         pdf.cell(190, 15, "ARQUÉTIPOS DE GESTÃO", 0, 1, "C")
+        pdf.set_text_color(30, 60, 120)  # Azul escuro
 
         # Subtítulo com informações do líder
         pdf.set_font("Arial", "", 12)
         pdf.ln(5)
         pdf.cell(190, 10, f"{empresa.upper()} / {email_lider} / {rodada.upper()}", 0, 1, "C")
+        pdf.set_text_color(30, 60, 120)  # Azul escuro
 
         # Mês e ano
         mes_ano = datetime.now().strftime('%B/%Y').upper()
