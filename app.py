@@ -259,3 +259,123 @@ def renderizar_bloco_personalizado(pdf, texto):
                 texto_limpo = parte.encode("latin-1", "ignore").decode("latin-1")
                 pdf.write(5, texto_limpo)
         pdf.ln(7)
+
+
+
+@app.route("/emitir-parecer-microambiente", methods=["POST"])
+def emitir_parecer_microambiente():
+    try:
+        dados = request.get_json()
+        empresa = dados["empresa"].lower()
+        rodada = dados["codrodada"].lower()
+        email_lider = dados["emailLider"].lower()
+
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        info = json.loads(json_str)
+        creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        service = build("drive", "v3", credentials=creds)
+
+        id_empresa = buscar_id(service, PASTA_RAIZ, empresa)
+        id_rodada = buscar_id(service, id_empresa, rodada)
+        id_lider = buscar_id(service, id_rodada, email_lider)
+        id_ia_json = buscar_id(service, id_lider, "IA_JSON")
+
+        def carregar_json(nome_parcial):
+            resultados = service.files().list(
+                q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
+                spaces='drive', fields='files(id, name)').execute()
+            arquivos = resultados.get("files", [])
+            if arquivos:
+                conteudo = service.files().get_media(fileId=arquivos[0]['id']).execute()
+                return json.loads(conteudo.decode("utf-8"))
+            return None
+
+        json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
+        caminho_grafico1 = None
+
+        if json_dimensao:
+            labels = list(json_dimensao["valores"].keys())
+            valores = list(json_dimensao["valores"].values())
+            x = range(len(labels))
+            plt.figure(figsize=(10, 5))
+            plt.bar(x, valores, color="#1f77b4")
+            for i, v in enumerate(valores):
+                plt.text(i, v + 1, f"{v:.0f}%", ha="center", fontsize=8)
+            plt.xticks(x, labels, rotation=45)
+            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+            plt.ylim(0, 100)
+            plt.title("AUTOAVALIAÇÃO - MICROAMBIENTE", fontsize=14, weight="bold")
+            subtitulo = f"{empresa.upper()} / {rodada.upper()} / {email_lider} / {datetime.now().strftime('%B/%Y')}"
+            plt.suptitle(subtitulo, fontsize=10, y=0.85)
+            caminho_grafico1 = "/tmp/grafico_micro.png"
+            plt.tight_layout()
+            plt.savefig(caminho_grafico1)
+            plt.close()
+
+        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
+            texto = f.read()
+        inicio = texto.find("##### INICIO MICROAMBIENTE #####")
+        fim = texto.find("##### FIM MICROAMBIENTE #####")
+        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
+
+        marcador = "Abaixo, o resultado da análise de Microambiente de Equipes com base na sua autoavaliação, comparada com os parâmetros ideais:"
+        partes = guia.split(marcador)
+
+        nome_pdf = f"parecer_microambiente_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        caminho_local = f"/tmp/{nome_pdf}"
+        pdf = FPDF()
+
+        # 🟢 CAPA
+        pdf.add_page()
+        pdf.set_text_color(30, 60, 120)  # Azul escuro
+
+        pdf.set_y(40)
+        pdf.set_font("Arial", "B", 22)
+        pdf.cell(190, 15, "THE HR KEY", 0, 1, "C")
+
+        pdf.set_text_color(0, 130, 60)  # Verde
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(190, 10, "Empowering Performance through People", 0, 1, "C")
+
+        pdf.set_text_color(30, 60, 120)
+        pdf.ln(20)
+        pdf.set_font("Arial", "B", 18)
+        pdf.cell(190, 15, "MICROAMBIENTE DE EQUIPES", 0, 1, "C")
+
+        pdf.set_font("Arial", "", 12)
+        pdf.ln(5)
+        pdf.cell(190, 10, f"{empresa.upper()} / {email_lider} / {rodada.upper()}", 0, 1, "C")
+
+        mes_ano = datetime.now().strftime('%B/%Y').upper()
+        pdf.cell(190, 10, mes_ano, 0, 1, "C")
+
+        # 🔵 CONTEÚDO
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        if len(partes) == 2 and caminho_grafico1:
+            renderizar_bloco_personalizado(pdf, partes[0])
+            pdf.ln(5)
+            pdf.set_font("Arial", "B", 12)
+            pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
+            pdf.ln(2)
+            pdf.image(caminho_grafico1, w=190)
+            renderizar_bloco_personalizado(pdf, partes[1])
+        else:
+            renderizar_bloco_personalizado(pdf, guia)
+            if caminho_grafico1:
+                pdf.add_page()
+                pdf.image(caminho_grafico1, w=190)
+
+        pdf.output(caminho_local)
+
+        file_metadata = {"name": nome_pdf, "parents": [id_lider]}
+        media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
+        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
+        print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
+        return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
