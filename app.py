@@ -246,8 +246,8 @@ def renderizar_bloco_personalizado(pdf, texto):
                 pdf.set_font("Arial", "I", 12)
                 texto_limpo = parte[1:-1].encode("latin-1", "ignore").decode("latin-1")
                 pdf.multi_cell(0, 7, texto_limpo)
-            else:
+        else:
                 pdf.set_font("Arial", size=12)
                 texto_limpo = parte.encode("latin-1", "ignore").decode("latin-1")
                 pdf.multi_cell(0, 7, texto_limpo)
-        pdf.ln(1)
+
