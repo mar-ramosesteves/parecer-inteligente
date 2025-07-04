@@ -157,7 +157,8 @@ Por outro lado, o Arquétipo Formador isolado não será suficiente para atender
 
 [COR:VERMELHO]
 ** Eficácia através do Arquétipo Imperativo **
-[COR:PADRAO]
+
+[COR:PRETO]
 Para aumentar a percepção dos outros em relação ao Arquétipo Imperativo, tente o seguinte:
 
 - Conheça o trabalho. Conheça as funções melhor do que as pessoas que as ocupam, ou do que as pessoas que estão realizando um trabalho ao qual você quer influenciar. Seu julgamento sobre o trabalho em questão deve ter precedente sobre os outros. 
