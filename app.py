@@ -180,6 +180,7 @@ def renderizar_bloco_personalizado(pdf, texto):
         "CINZA": (100, 100, 100),
         "VERDE": (0, 130, 60),
         "VERMELHO": (180, 30, 30),
+        "PRETO": (0, 0, 0),
         "PADRAO": (0, 0, 0)
     }
 
