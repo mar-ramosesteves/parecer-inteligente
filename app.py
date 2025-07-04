@@ -180,8 +180,8 @@ def renderizar_bloco_personalizado(pdf, texto):
         "CINZA": (100, 100, 100),
         "VERDE": (0, 130, 60),
         "VERMELHO": (180, 30, 30),
-        "PRETO": (0, 0, 0),
-        "PADRAO": (0, 0, 0)
+        "PADRAO": (0, 0, 0),
+        "PRETO": (0, 0, 0)
     }
 
     pdf.set_font("Arial", size=12)
@@ -236,18 +236,18 @@ def renderizar_bloco_personalizado(pdf, texto):
         linha = re.sub(r"_(.*?)_", lambda m: f"\x02{m.group(1)}\x02", linha)
 
         partes = re.split(r"(\x01.*?\x01|\x02.*?\x02)", linha)
+        linha_completa = ""
         for parte in partes:
             if parte.startswith("\x01") and parte.endswith("\x01"):
                 pdf.set_font("Arial", "B", 12)
                 texto_limpo = parte[1:-1].encode("latin-1", "ignore").decode("latin-1")
-                pdf.write(5, texto_limpo)
+                pdf.multi_cell(0, 7, texto_limpo)
             elif parte.startswith("\x02") and parte.endswith("\x02"):
                 pdf.set_font("Arial", "I", 12)
                 texto_limpo = parte[1:-1].encode("latin-1", "ignore").decode("latin-1")
-                pdf.write(5, texto_limpo)
+                pdf.multi_cell(0, 7, texto_limpo)
             else:
                 pdf.set_font("Arial", size=12)
                 texto_limpo = parte.encode("latin-1", "ignore").decode("latin-1")
-                pdf.write(5, texto_limpo)
-        pdf.ln(7)
-
+                pdf.multi_cell(0, 7, texto_limpo)
+        pdf.ln(1)
