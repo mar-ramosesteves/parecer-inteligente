@@ -264,12 +264,14 @@ São elas:
 
 ## Adaptabilidade 
 
-
 ** - Não há regras, procedimentos, políticas ou práticas desnecessários. Novas ideias são facilmente aceitas. **
 ** - A Adaptabilidade é uma medida das restrições identificadas no ambiente de trabalho, da quantidade de barreiras e, especialmente, de barreiras desnecessárias na organização. **
 ** - Quão limitado você está pelas regras, políticas e procedimentos que interferem na execução do trabalho, sem necessidade? E, somando-se a isto, quão aberta está a organização para novas formas de ver as coisas, para novas ideias, para novas formas de proceder? Idealmente, a Adaptabilidade deverá ser alta na organização. E numa organização empreendedora ela deverá ser muito alta. **
 
-### Perguntas-chave para você fazer a si mesmo a fim de determinar a presença ou a ausência de Adaptabilidade na organização:
+[COR:VERMELHO]
+** Perguntas-chave para você fazer a si mesmo a fim de determinar a presença ou a ausência de Adaptabilidade na organização: **
+
+[COR:PRETO]
        - Existem regras e procedimentos desnecessários? 
        - É relativamente fácil inovar e fazer novas ideias serem aceitas? 
        - As pessoas acham que tem que lutar contra limitações pouco pertinentes? 
@@ -277,12 +279,14 @@ São elas:
 
 ## Responsabilidade 
 
-
 ** - Os colaboradores têm autonomia para realizar as suas tarefas sem procurar por constante aprovação. **
 ** - Responsabilidade é o sentimento que os colaboradores têm de que muita autonomia é delegada a eles; é o grau de autonomia que eles têm para realizar o seu trabalho sem verificar tudo com o seu gestor, sentindo-se completamente responsável pelo resultado.  **
 ** - Em organizações com alto grau de responsabilidade, os Colaboradores se sentem incentivados a escolher a melhor forma de realizar o trabalho e de fazer o que acham certo, ao invés de meramente se isentarem do problema. **
 
-### Perguntas-chave para fazer a si próprio para determinar a presença ou a ausência de Responsabilidade na organização: **
+[COR:VERMELHO]
+** Perguntas-chave para fazer a si próprio para determinar a presença ou a ausência de Responsabilidade na organização: **
+
+[COR:PRETO]
        - São delegadas importantes tarefas aos colaboradores? 
        - Os indivíduos são encorajados a assumirem iniciativas sem terem sempre que checar com o superior? 
        - Os indivíduos são incentivados a assumir riscos calculados, baseados em seu próprio julgamento? 
