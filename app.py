@@ -344,10 +344,15 @@ def emitir_parecer_microambiente():
 
 
         json_dimensao = carregar_json("grafico_microambiente_autoavaliacao")
-
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
+        json_eq_dimensao = carregar_json("grafico_microambiente_mediaequipe_dimensao")
+        json_eq_subdimensao = carregar_json("grafico_microambiente_mediaequipe_subdimensao")     
+          
         caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao.png")
         caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao.png")
+        caminho_grafico3 = gerar_grafico_linha(json_eq_dimensao, "Média da Equipe por Dimensões", "grafico_eq_dimensao.png")
+        caminho_grafico4 = gerar_grafico_linha(json_eq_subdimensao, "Média da Equipe por Subdimensões", "grafico_eq_subdimensao.png")
+
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
@@ -428,6 +433,67 @@ def emitir_parecer_microambiente():
             if caminho_grafico2:
                 pdf.image(caminho_grafico2, w=180)
                 pdf.ln(2)
+                # Frase de transição para gráficos da equipe
+                pdf.set_font("Arial", "B", 12)
+                pdf.multi_cell(0, 8, "e a seguir, o gráfico de dimensões e subdimensões de microambiente na visão da sua equipe direta:")
+            
+                pdf.ln(6)
+            
+                # Gráfico de DIMENSÕES - EQUIPE
+                json_dimensao_eq = carregar_json("microambiente_mediaequipe_dimensao")
+                if json_dimensao_eq and "dados" in json_dimensao_eq:
+                    try:
+                        dados_eq = json_dimensao_eq["dados"]
+                        labels_eq = [item["DIMENSAO"] for item in dados_eq]
+                        ideal_eq = [item["IDEAL_%"] for item in dados_eq]
+                        real_eq = [item["REAL_%"] for item in dados_eq]
+            
+                        plt.figure(figsize=(10, 5))
+                        plt.plot(labels_eq, ideal_eq, marker='o', label='Como Deveria Ser (Ideal)', linewidth=2)
+                        plt.plot(labels_eq, real_eq, marker='o', label='Como É (Real)', linewidth=2)
+                        plt.xticks(rotation=45, ha='right')
+                        plt.ylim(0, 100)
+                        plt.ylabel("Percentual (%)")
+                        plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                        plt.title("Média da Equipe por Dimensões", fontsize=11, weight="bold", loc='center')
+                        plt.tight_layout()
+                        plt.grid(True, linestyle="--", alpha=0.5)
+                        plt.legend()
+                        caminho_grafico_eq_dimensao = "/tmp/grafico_eq_dimensao.png"
+                        plt.savefig(caminho_grafico_eq_dimensao)
+                        plt.close()
+            
+                        pdf.image(caminho_grafico_eq_dimensao, w=180)
+                        pdf.ln(2)
+                    except Exception as e:
+                        print("Erro ao gerar gráfico de dimensões da equipe:", e)
+
+    # Gráfico de SUBDIMENSÕES - EQUIPE
+    json_sub_eq = carregar_json("microambiente_media_equipe_subdimensao")
+    if json_sub_eq and "dados" in json_sub_eq:
+        try:
+            dados_sub = json_sub_eq["dados"]
+            labels_sub = [item["SUBDIMENSAO"] for item in dados_sub]
+            valores_sub = [item["REAL_%"] for item in dados_sub]
+
+            plt.figure(figsize=(10, 4))
+            plt.plot(labels_sub, valores_sub, marker='o', color="#1f77b4", linewidth=2)
+            for i, valor in enumerate(valores_sub):
+                plt.text(i, valor + 2, f"{valor:.1f}%", ha='center', fontsize=8)
+            plt.xticks(rotation=45, ha='right')
+            plt.ylim(0, 100)
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+            plt.title("Média da Equipe por Subdimensões", fontsize=11, weight="bold", loc='center')
+            plt.tight_layout()
+            caminho_grafico_eq_sub = "/tmp/grafico_eq_subdimensao.png"
+            plt.savefig(caminho_grafico_eq_sub)
+            plt.close()
+
+            pdf.image(caminho_grafico_eq_sub, w=180)
+            pdf.ln(2)
+        except Exception as e:
+            print("Erro ao gerar gráfico de subdimensões da equipe:", e)
 
 
             renderizar_bloco_personalizado(pdf, partes[1])
