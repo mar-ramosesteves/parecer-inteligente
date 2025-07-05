@@ -307,16 +307,34 @@ def emitir_parecer_microambiente():
                     return None
                 dados = json_dados["dados"]
                 labels = [item.get("DIMENSAO") or item.get("SUBDIMENSAO") for item in dados]
-                valores = [item.get("REAL_%", 0) for item in dados]
-                if not labels or not valores:
+                valores_reais = [item.get("REAL_%", 0) for item in dados]
+                valores_ideais = [item.get("IDEAL_%", 0) for item in dados]
+        
+                if not labels or not valores_reais:
                     return None
+        
                 plt.figure(figsize=(10, 5))
-                plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
+        
+                # Linha "Como deveria ser"
+                plt.plot(labels, valores_ideais, marker='o', linestyle='--', color='gray', linewidth=2, label="Como deveria ser")
+                for i, v in enumerate(valores_ideais):
+                    plt.text(i, v + 1.5, f"{v:.1f}%", ha='center', va='bottom', fontsize=8, color='gray')
+        
+                # Linha "Como é"
+                plt.plot(labels, valores_reais, marker='o', color="#1f77b4", linewidth=2, label="Como é")
+                for i, v in enumerate(valores_reais):
+                    plt.text(i, v - 3, f"{v:.1f}%", ha='center', va='top', fontsize=8, color='#1f77b4')
+        
                 plt.xticks(rotation=45, ha='right')
                 plt.ylim(0, 100)
                 plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                 plt.grid(True, linestyle='--', alpha=0.6)
                 plt.title(titulo, fontsize=14, weight="bold")
+        
+                subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
+                plt.suptitle(subtitulo, fontsize=10, y=0.92)
+        
+                plt.legend()
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho)
