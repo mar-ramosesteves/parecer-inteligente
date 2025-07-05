@@ -331,9 +331,7 @@ def emitir_parecer_microambiente():
                 plt.grid(True, linestyle='--', alpha=0.6)
                 subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
                 plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)  # título mais acima
-                plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título
-
-        
+                plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título        
                 plt.legend()
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
@@ -407,13 +405,11 @@ def emitir_parecer_microambiente():
                     plt.xticks(rotation=45, ha='right')
                     plt.ylim(0, 100)
                     plt.ylabel("Percentual (%)")
-                    plt.title(titulo, fontsize=12, weight="bold", loc='center')
-                    plt.suptitle(subtitulo, fontsize=10)
-
                     plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-                    plt.grid(True, linestyle="--", alpha=0.5)
-                    plt.legend()
+                    plt.title(f"{titulo}\n{subtitulo}", fontsize=11, weight="bold", loc='center')
                     plt.tight_layout()
+                    plt.grid(True, linestyle="--", alpha=0.5)
+                    plt.legend()                    
                     caminho_grafico_dimensao = "/tmp/grafico_micro_dimensao.png"
                     plt.savefig(caminho_grafico_dimensao)
                     plt.close()
