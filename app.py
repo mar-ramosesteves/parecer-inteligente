@@ -133,9 +133,9 @@ def emitir_parecer_arquetipos():
                         pdf.ln(3)
                         
                         
-            if caminho_grafico1:
-                pdf.add_page()
-                pdf.image(caminho_grafico1, w=190)
+        if caminho_grafico1:
+            pdf.add_page()
+            pdf.image(caminho_grafico1, w=190)
 
         pdf.output(caminho_local)
 
