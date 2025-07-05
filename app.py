@@ -295,6 +295,8 @@ def emitir_parecer_microambiente():
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
 
         def gerar_grafico_linha(dados_json, titulo, nome_arquivo):
+            if not dados_json or "valores" not in dados_json:
+                return None
             labels = list(dados_json.get("valores", {}).keys())
             valores = list(dados_json.get("valores", {}).values())
             if not labels or not valores:
@@ -312,16 +314,16 @@ def emitir_parecer_microambiente():
             plt.close()
             return caminho
 
-        caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavalia\u00e7\u00e3o por Dimens\u00f5es", "grafico_dimensao_micro.png")
-        caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavalia\u00e7\u00e3o por Subdimens\u00f5es", "grafico_subdimensao_micro.png")
+        caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao_micro.png")
+        caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao_micro.png")
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
         inicio = texto.find("##### INICIO MICROAMBIENTE #####")
         fim = texto.find("##### FIM MICROAMBIENTE #####")
-        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente n\u00e3o encontrado."
+        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
 
-        marcador = "Abaixo, os gr\u00e1ficos de dimens\u00f5es e subdimens\u00f5es de microambiente na sua percep\u00e7\u00e3o:"
+        marcador = "Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:"
         partes = guia.split(marcador)
 
         nome_pdf = f"parecer_microambiente_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -397,8 +399,8 @@ def emitir_parecer_microambiente():
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        print(f"\u2705 PDF salvo com sucesso no Drive: {nome_pdf}")
-        return jsonify({"mensagem": f"\u2705 Parecer salvo no Drive: {nome_pdf}"})
+        print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
+        return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
