@@ -468,32 +468,32 @@ def emitir_parecer_microambiente():
                     except Exception as e:
                         print("Erro ao gerar gráfico de dimensões da equipe:", e)
 
-    # Gráfico de SUBDIMENSÕES - EQUIPE
-    json_sub_eq = carregar_json("microambiente_media_equipe_subdimensao")
-    if json_sub_eq and "dados" in json_sub_eq:
-        try:
-            dados_sub = json_sub_eq["dados"]
-            labels_sub = [item["SUBDIMENSAO"] for item in dados_sub]
-            valores_sub = [item["REAL_%"] for item in dados_sub]
+                # Gráfico de SUBDIMENSÕES - EQUIPE
+                json_sub_eq = carregar_json("microambiente_media_equipe_subdimensao")
+                if json_sub_eq and "dados" in json_sub_eq:
+                    try:
+                        dados_sub = json_sub_eq["dados"]
+                        labels_sub = [item["SUBDIMENSAO"] for item in dados_sub]
+                        valores_sub = [item["REAL_%"] for item in dados_sub]
 
-            plt.figure(figsize=(10, 4))
-            plt.plot(labels_sub, valores_sub, marker='o', color="#1f77b4", linewidth=2)
-            for i, valor in enumerate(valores_sub):
-                plt.text(i, valor + 2, f"{valor:.1f}%", ha='center', fontsize=8)
-            plt.xticks(rotation=45, ha='right')
-            plt.ylim(0, 100)
-            plt.grid(True, linestyle='--', alpha=0.6)
-            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-            plt.title("Média da Equipe por Subdimensões", fontsize=11, weight="bold", loc='center')
-            plt.tight_layout()
-            caminho_grafico_eq_sub = "/tmp/grafico_eq_subdimensao.png"
-            plt.savefig(caminho_grafico_eq_sub)
-            plt.close()
+                        plt.figure(figsize=(10, 4))
+                        plt.plot(labels_sub, valores_sub, marker='o', color="#1f77b4", linewidth=2)
+                        for i, valor in enumerate(valores_sub):
+                            plt.text(i, valor + 2, f"{valor:.1f}%", ha='center', fontsize=8)
+                        plt.xticks(rotation=45, ha='right')
+                        plt.ylim(0, 100)
+                        plt.grid(True, linestyle='--', alpha=0.6)
+                        plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                        plt.title("Média da Equipe por Subdimensões", fontsize=11, weight="bold", loc='center')
+                        plt.tight_layout()
+                        caminho_grafico_eq_sub = "/tmp/grafico_eq_subdimensao.png"
+                        plt.savefig(caminho_grafico_eq_sub)
+                        plt.close()
 
-            pdf.image(caminho_grafico_eq_sub, w=180)
-            pdf.ln(2)
-        except Exception as e:
-            print("Erro ao gerar gráfico de subdimensões da equipe:", e)
+                        pdf.image(caminho_grafico_eq_sub, w=180)
+                        pdf.ln(2)
+                    except Exception as e:
+                        print("Erro ao gerar gráfico de subdimensões da equipe:", e)
 
 
             renderizar_bloco_personalizado(pdf, partes[1])
