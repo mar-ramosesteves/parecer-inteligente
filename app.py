@@ -125,14 +125,33 @@ def emitir_parecer_arquetipos():
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2 and caminho_grafico1:
-            renderizar_bloco_personalizado(pdf, partes[0])
-            pdf.ln(5)
-            pdf.set_font("Arial", "B", 12)
-            pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
-            pdf.ln(2)
+                renderizar_bloco_personalizado(pdf, partes[0])
+                pdf.ln(5)
 
-            pdf.image(caminho_grafico1, w=190)
-            renderizar_bloco_personalizado(pdf, partes[1])
+                # Localiza a frase-chave exata no texto já renderizado
+                pdf.set_font("Arial", "B", 12)
+                pdf.multi_cell(0, 10, "Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:")
+                pdf.ln(2)
+
+                # === GRÁFICO 1: Dimensões - Autoavaliação ===
+                caminho_pdf_dim = "/tmp/grafico_microambiente_autoavaliacao.pdf"
+                id_pdf_dim = buscar_id(service, id_lider, "grafico_microambiente_autoavaliacao")
+                conteudo_dim = service.files().get_media(fileId=id_pdf_dim).execute()
+                with open(caminho_pdf_dim, "wb") as f:
+                    f.write(conteudo_dim)
+                pdf.image(caminho_pdf_dim, x=10, w=190)
+                pdf.ln(6)
+
+                # === GRÁFICO 2: Subdimensões - Autoavaliação ===
+                caminho_pdf_sub = "/tmp/grafico_microambiente_autoavaliacao_subdimensao.pdf"
+                id_pdf_sub = buscar_id(service, id_lider, "grafico_microambiente_autoavaliacao_subdimensao")
+                conteudo_sub = service.files().get_media(fileId=id_pdf_sub).execute()
+                with open(caminho_pdf_sub, "wb") as f:
+                    f.write(conteudo_sub)
+                pdf.image(caminho_pdf_sub, x=10, w=190)
+                pdf.ln(10)
+
+                renderizar_bloco_personalizado(pdf, partes[1])
 
         else:
             renderizar_bloco_personalizado(pdf, guia)
