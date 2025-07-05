@@ -407,8 +407,8 @@ def emitir_parecer_microambiente():
                     plt.xticks(rotation=45, ha='right')
                     plt.ylim(0, 100)
                     plt.ylabel("Percentual (%)")
-                    plt.title("Autoavaliação por Dimensões", fontsize=14, weight="bold")
-                    plt.suptitle(json_dimensao.get("subtitulo", ""), fontsize=10)
+                    plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)  # título mais acima
+                    plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título
                     plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                     plt.grid(True, linestyle="--", alpha=0.5)
                     plt.legend()
