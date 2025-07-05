@@ -266,14 +266,6 @@ def renderizar_bloco_personalizado(pdf, texto):
 def emitir_parecer_microambiente():
     try:
         from matplotlib import pyplot as plt
-        import os
-        import json
-        from datetime import datetime
-        from fpdf import FPDF
-        from PyPDF2 import PdfMerger
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-        from google.oauth2 import service_account
 
         dados = request.get_json()
         empresa = dados["empresa"].lower()
@@ -301,40 +293,24 @@ def emitir_parecer_microambiente():
                 return json.loads(conteudo.decode("utf-8"))
             return None
 
-        def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
+        json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
+        json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
+
+        def gerar_grafico_micro_json(json_data, campo, titulo, subtitulo, nome_arquivo):
             try:
-                if not json_dados or "dados" not in json_dados:
-                    return None
-                dados = json_dados["dados"]
+                dados = json_data.get("dados", [])
                 labels = [item.get("DIMENSAO") or item.get("SUBDIMENSAO") for item in dados]
-                valores_reais = [item.get("REAL_%", 0) for item in dados]
-                valores_ideais = [item.get("IDEAL_%", 0) for item in dados]
-        
-                if not labels or not valores_reais:
-                    return None
-        
-                plt.figure(figsize=(10, 5))
-        
-                # Linha "Como deveria ser"
-                plt.plot(labels, valores_ideais, marker='o', linestyle='--', color='gray', linewidth=2, label="Como deveria ser")
-                for i, v in enumerate(valores_ideais):
-                    plt.text(i, v + 1.5, f"{v:.1f}%", ha='center', va='bottom', fontsize=8, color='gray')
-        
-                # Linha "Como é"
-                plt.plot(labels, valores_reais, marker='o', color="#1f77b4", linewidth=2, label="Como é")
-                for i, v in enumerate(valores_reais):
-                    plt.text(i, v - 3, f"{v:.1f}%", ha='center', va='top', fontsize=8, color='#1f77b4')
-        
+                valores = [item.get(campo) for item in dados]
+                plt.figure(figsize=(10, 4))
+                plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
+                for i, valor in enumerate(valores):
+                    plt.text(i, valor + 2, f"{valor:.1f}%", ha='center', fontsize=8)
                 plt.xticks(rotation=45, ha='right')
                 plt.ylim(0, 100)
-                plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                 plt.grid(True, linestyle='--', alpha=0.6)
-                subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
-                plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)  # título mais acima
-                plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título
-
-        
-                plt.legend()
+                plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                plt.title(titulo, fontsize=12, weight="bold", loc='center')
+                plt.suptitle(subtitulo, fontsize=10)
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho)
@@ -344,11 +320,9 @@ def emitir_parecer_microambiente():
                 print(f"Erro ao gerar gráfico: {e}")
                 return None
 
-
-        json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
-        json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
-        caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao.png")
-        caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao.png")
+        subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
+        caminho_grafico1 = gerar_grafico_micro_json(json_dimensao, "REAL_%", "Autoavaliação por Dimensões", subtitulo, "grafico_dimensoes_micro.png")
+        caminho_grafico2 = gerar_grafico_micro_json(json_subdimensao, "REAL_%", "Autoavaliação por Subdimensões", subtitulo, "grafico_subdimensoes_micro.png")
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
@@ -363,7 +337,6 @@ def emitir_parecer_microambiente():
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
 
-        # CAPA
         pdf.add_page()
         pdf.set_text_color(30, 60, 120)
         pdf.set_y(40)
@@ -385,55 +358,25 @@ def emitir_parecer_microambiente():
         mes_ano = datetime.now().strftime('%B/%Y').upper()
         pdf.cell(190, 10, mes_ano, 0, 1, "C")
 
-        # CONTEÚDO
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2:
             renderizar_bloco_personalizado(pdf, partes[0])
-            pdf.set_font("Arial", "B", 12)
-            pdf.multi_cell(0, 8, marcador)
-            # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
-            if json_dimensao and "dados" in json_dimensao:
-                try:
-                    dados = json_dimensao["dados"]
-                    labels = [item["DIMENSAO"] for item in dados]
-                    ideal = [item["IDEAL_%"] for item in dados]
-                    real = [item["REAL_%"] for item in dados]
-            
-                    plt.figure(figsize=(10, 5))
-                    plt.plot(labels, ideal, marker='o', label='Como Deveria Ser (Ideal)', linewidth=2)
-                    plt.plot(labels, real, marker='o', label='Como É (Real)', linewidth=2)
-                    plt.xticks(rotation=45, ha='right')
-                    plt.ylim(0, 100)
-                    plt.ylabel("Percentual (%)")
-                    plt.title("Autoavaliação por Dimensões", fontsize=14, weight="bold")
-                    plt.suptitle(json_dimensao.get("subtitulo", ""), fontsize=10)
-                    plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-                    plt.grid(True, linestyle="--", alpha=0.5)
-                    plt.legend()
-                    plt.tight_layout()
-                    caminho_grafico_dimensao = "/tmp/grafico_micro_dimensao.png"
-                    plt.savefig(caminho_grafico_dimensao)
-                    plt.close()
-            
-                    pdf.image(caminho_grafico_dimensao, w=180)
-                    pdf.ln(2)
-                except Exception as e:
-                    print("Erro ao gerar gráfico de dimensões:", e)
-            
-            # Gráfico de SUBDIMENSÕES (linha única, já existente)
+            pdf.ln(4)
+            pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
+            if caminho_grafico1:
+                pdf.ln(3)
+                pdf.image(caminho_grafico1, w=180)
             if caminho_grafico2:
+                pdf.ln(5)
                 pdf.image(caminho_grafico2, w=180)
-                pdf.ln(2)
-
-
+            pdf.ln(3)
             renderizar_bloco_personalizado(pdf, partes[1])
         else:
             renderizar_bloco_personalizado(pdf, guia)
 
         pdf.output(caminho_local)
 
-        # JUNTAR COM RELATÓRIO ANALÍTICO
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
             spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
@@ -462,6 +405,7 @@ def emitir_parecer_microambiente():
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
+        print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
 
     except Exception as e:
