@@ -265,6 +265,16 @@ def renderizar_bloco_personalizado(pdf, texto):
 @app.route("/emitir-parecer-microambiente", methods=["POST"])
 def emitir_parecer_microambiente():
     try:
+        from matplotlib import pyplot as plt
+        import os
+        import json
+        from datetime import datetime
+        from fpdf import FPDF
+        from PyPDF2 import PdfMerger
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+        from google.oauth2 import service_account
+
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
@@ -291,48 +301,29 @@ def emitir_parecer_microambiente():
                 return json.loads(conteudo.decode("utf-8"))
             return None
 
-        json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
-        json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
-
         def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
             dados = json_dados.get("dados", [])
             if not dados:
                 return None
-        
-            labels = []
-            valores = []
-        
-            for item in dados:
-                labels.append(item.get("DIMENSAO", ""))
-                valores.append(item.get("REAL_%", 0))  # usamos o valor REAL
-        
-            if not labels or not valores:
-                return None
-        
+            labels = [d["DIMENSAO"] for d in dados]
+            valores = [d["REAL_%"] for d in dados]
             plt.figure(figsize=(10, 5))
             plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
             plt.xticks(rotation=45, ha='right')
             plt.ylim(0, 100)
-            plt.grid(True, linestyle='--', alpha=0.6)
             plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+            plt.grid(True, linestyle='--', alpha=0.6)
             plt.title(titulo, fontsize=14, weight="bold")
             plt.tight_layout()
-        
             caminho = f"/tmp/{nome_arquivo}"
             plt.savefig(caminho)
             plt.close()
             return caminho
 
-
-        caminho_grafico1 = None
-        caminho_grafico2 = None
-
-        if json_dimensao and "valores" in json_dimensao and json_dimensao["valores"]:
-            caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao_micro.png")
-
-        if json_subdimensao and "valores" in json_subdimensao and json_subdimensao["valores"]:
-            caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao_micro.png")
-
+        json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
+        json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
+        caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao.png")
+        caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao.png")
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
@@ -347,6 +338,7 @@ def emitir_parecer_microambiente():
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
 
+        # CAPA
         pdf.add_page()
         pdf.set_text_color(30, 60, 120)
         pdf.set_y(40)
@@ -368,6 +360,7 @@ def emitir_parecer_microambiente():
         mes_ano = datetime.now().strftime('%B/%Y').upper()
         pdf.cell(190, 10, mes_ano, 0, 1, "C")
 
+        # CONTEÚDO
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2:
@@ -388,6 +381,7 @@ def emitir_parecer_microambiente():
 
         pdf.output(caminho_local)
 
+        # JUNTAR COM RELATÓRIO ANALÍTICO
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
             spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
@@ -416,7 +410,6 @@ def emitir_parecer_microambiente():
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
 
     except Exception as e:
