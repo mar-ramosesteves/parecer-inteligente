@@ -302,7 +302,9 @@ def emitir_parecer_microambiente():
             return None
 
         def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
-            dados = json_dados.get("dados", [])
+            if not json_dados or "dados" not in json_dados:
+                return None
+            dados = json_dados["dados"]
             if not dados:
                 return None
             labels = [d["DIMENSAO"] for d in dados]
@@ -319,6 +321,7 @@ def emitir_parecer_microambiente():
             plt.savefig(caminho)
             plt.close()
             return caminho
+
 
         json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
