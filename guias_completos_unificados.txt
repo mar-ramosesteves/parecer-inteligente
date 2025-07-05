@@ -257,12 +257,12 @@ O Ambiente afeta o desempenho organizacional através de sua influência na moti
 
 Ambientes de alta performance são caracterizados por indivíduos que, rotineiramente, fazem "o que for preciso" para alcançar suas metas, fechar negócios ou satisfazer os clientes. Períodos extensos de Ambiente ruim faz com que as pessoas percam a crença na ideia de que as coisas podem melhorar, o que as leva a perder o estímulo pelo cargo e pela organização. Os resultados prováveis são: turnover, abstenção, insatisfação e baixa produtividade. 
 
-### Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção: 
+** Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção: ** 
 
 
 
 
-### e a seguir, o gráfico de dimensões e subdimensões de microambiete na visão da sua equipe direta: 
+** e a seguir, o gráfico de dimensões e subdimensões de microambiete na visão da sua equipe direta: **
 
 
 
@@ -347,7 +347,7 @@ A Nitidez é, provavelmente, a dimensão de Ambiente mais importante. É a mais 
 A Nitidez é o sentimento de saber o que é operado de si e entender como esta expectativa se relaciona com as grandes metas e os objetivos da organização. É a resposta à pergunta: Para onde estamos indo e como me encaixo nisso? 
 
 [COR:VERMELHO]
-Perguntas-chave para fazer a si próprio para determinar a presença ou ausência de  Nitidez na organização: 
+** Perguntas-chave para fazer a si próprio para determinar a presença ou ausência de  Nitidez na organização: **
 
 [COR:PRETO]
 - Você tem uma ideia nítida do que é esperado de você? 
@@ -365,7 +365,7 @@ O orgulho está mais diretamente relacionado ao nível de desempenho da organiza
 A segunda parte da Colaboração Mútua é confiar que cada um está trabalhando em vista de um objetivo comum. A alta Colaboração Mútua é mais evidente quando as pessoas, individualmente, comemoram o sucesso de cada um. 
 
 [COR:VERMELHO]
-Perguntas chave para fazer a si próprio para determinar a presença ou ausência de Colaboração Mútua na organização: 
+** Perguntas chave para fazer a si próprio para determinar a presença ou ausência de Colaboração Mútua na organização: **
 
 [COR:PRETO]
 - Os indivíduos e as equipes cooperam efetivamente para realizar o trabalho? 
@@ -573,7 +573,7 @@ A dimensão Reconhecimento do Ambiente da Equipe é influenciada por dois fatore
 
 
 
-@@ Aumentando a Nitidez 
+## Aumentando a Nitidez 
 
 A dimensão Nitidez do Ambiente da Equipe é influenciada por dois fatores: 
 
