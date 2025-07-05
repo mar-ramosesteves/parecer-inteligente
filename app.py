@@ -294,13 +294,21 @@ def emitir_parecer_microambiente():
         json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
 
-        def gerar_grafico_linha(dados_json, titulo, nome_arquivo):
-            if not dados_json or "valores" not in dados_json:
+        def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
+            dados = json_dados.get("dados", [])
+            if not dados:
                 return None
-            labels = list(dados_json.get("valores", {}).keys())
-            valores = list(dados_json.get("valores", {}).values())
+        
+            labels = []
+            valores = []
+        
+            for item in dados:
+                labels.append(item.get("DIMENSAO", ""))
+                valores.append(item.get("REAL_%", 0))  # usamos o valor REAL
+        
             if not labels or not valores:
                 return None
+        
             plt.figure(figsize=(10, 5))
             plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
             plt.xticks(rotation=45, ha='right')
@@ -309,10 +317,12 @@ def emitir_parecer_microambiente():
             plt.axhline(60, color="gray", linestyle="--", linewidth=1)
             plt.title(titulo, fontsize=14, weight="bold")
             plt.tight_layout()
+        
             caminho = f"/tmp/{nome_arquivo}"
             plt.savefig(caminho)
             plt.close()
             return caminho
+
 
         caminho_grafico1 = None
         caminho_grafico2 = None
