@@ -337,6 +337,7 @@ def emitir_parecer_microambiente():
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
 
+        # CAPA
         pdf.add_page()
         pdf.set_text_color(30, 60, 120)
         pdf.set_y(40)
@@ -358,25 +359,31 @@ def emitir_parecer_microambiente():
         mes_ano = datetime.now().strftime('%B/%Y').upper()
         pdf.cell(190, 10, mes_ano, 0, 1, "C")
 
+        # CONTEÚDO
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2:
             renderizar_bloco_personalizado(pdf, partes[0])
             pdf.ln(4)
             pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
+
+            # GRAFICO 1 - DIMENSÕES
             if caminho_grafico1:
                 pdf.ln(3)
                 pdf.image(caminho_grafico1, w=180)
+
+            # GRAFICO 2 - SUBDIMENSÕES
             if caminho_grafico2:
                 pdf.ln(5)
                 pdf.image(caminho_grafico2, w=180)
+
             pdf.ln(3)
             renderizar_bloco_personalizado(pdf, partes[1])
         else:
             renderizar_bloco_personalizado(pdf, guia)
 
+        # MERGE COM ANALÍTICO
         pdf.output(caminho_local)
-
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
             spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
@@ -401,6 +408,7 @@ def emitir_parecer_microambiente():
             merger.close()
             caminho_local = caminho_final
 
+        # UPLOAD FINAL
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
