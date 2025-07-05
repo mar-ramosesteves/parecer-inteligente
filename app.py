@@ -125,62 +125,62 @@ def emitir_parecer_arquetipos():
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2 and caminho_grafico1:
-                    renderizar_bloco_personalizado(pdf, partes[0])
-                    pdf.ln(5)
-
-                    pdf.set_font("Arial", "B", 12)
-                    pdf.multi_cell(0, 10, "Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:")
-                    pdf.ln(3)
-
-                    # === GRAFICO 1: Dimensões ===
-                    json_dim = carregar_json("grafico_microambiente_autoavaliacao")
-                    if json_dim:
-                        labels = list(json_dim["valores"].keys())
-                        como_e = list(json_dim["valores"].values())
-                        como_deveria = list(json_dim["valores_ideais"].values())
-                        x = range(len(labels))
-                        plt.figure(figsize=(10, 5))
-                        plt.bar(x, como_e, width=0.4, label="Como é", align='center')
-                        plt.bar([i + 0.4 for i in x], como_deveria, width=0.4, label="Como deveria ser", align='center')
-                        for i, (v1, v2) in enumerate(zip(como_e, como_deveria)):
-                            plt.text(i, v1 + 1, f"{v1:.0f}%", ha='center', fontsize=8)
-                            plt.text(i + 0.4, v2 + 1, f"{v2:.0f}%", ha='center', fontsize=8)
-                        plt.xticks([i + 0.2 for i in x], labels, rotation=45)
-                        plt.ylim(0, 100)
-                        plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-                        plt.title("MICROAMBIENTE DE EQUIPES - DIMENSÕES", fontsize=14, weight="bold")
-                        plt.tight_layout()
-                        caminho_img1 = "/tmp/grafico_micro_dimensao.png"
-                        plt.savefig(caminho_img1)
-                        plt.close()
-                        pdf.image(caminho_img1, x=10, w=190)
+                        renderizar_bloco_personalizado(pdf, partes[0])
                         pdf.ln(5)
 
-                    # === GRAFICO 2: Subdimensões ===
-                    json_sub = carregar_json("grafico_microambiente_autoavaliacao_subdimensao")
-                    if json_sub:
-                        labels = list(json_sub["valores"].keys())
-                        como_e = list(json_sub["valores"].values())
-                        como_deveria = list(json_sub["valores_ideais"].values())
-                        x = range(len(labels))
-                        plt.figure(figsize=(10, 5))
-                        plt.bar(x, como_e, width=0.4, label="Como é", align='center')
-                        plt.bar([i + 0.4 for i in x], como_deveria, width=0.4, label="Como deveria ser", align='center')
-                        for i, (v1, v2) in enumerate(zip(como_e, como_deveria)):
-                            plt.text(i, v1 + 1, f"{v1:.0f}%", ha='center', fontsize=7)
-                            plt.text(i + 0.4, v2 + 1, f"{v2:.0f}%", ha='center', fontsize=7)
-                        plt.xticks([i + 0.2 for i in x], labels, rotation=90)
-                        plt.ylim(0, 100)
-                        plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-                        plt.title("MICROAMBIENTE DE EQUIPES - SUBDIMENSÕES", fontsize=14, weight="bold")
-                        plt.tight_layout()
-                        caminho_img2 = "/tmp/grafico_micro_subdimensao.png"
-                        plt.savefig(caminho_img2)
-                        plt.close()
-                        pdf.image(caminho_img2, x=10, w=190)
-                        pdf.ln(10)
+                        pdf.set_font("Arial", "B", 12)
+                        pdf.multi_cell(0, 10, "Abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:")
+                        pdf.ln(3)
 
-                    renderizar_bloco_personalizado(pdf, partes[1])
+                        # === GRÁFICO 1: Dimensões ===
+                        json_dim = carregar_json("grafico_microambiente_autoavaliacao")
+                        if json_dim and "dados" in json_dim:
+                            labels = [item["DIMENSAO"] for item in json_dim["dados"]]
+                            como_e = [item["REAL_%"] for item in json_dim["dados"]]
+                            como_deveria = [item["IDEAL_%"] for item in json_dim["dados"]]
+                            x = range(len(labels))
+                            plt.figure(figsize=(10, 5))
+                            plt.bar(x, como_e, width=0.4, label="Como é", align='center')
+                            plt.bar([i + 0.4 for i in x], como_deveria, width=0.4, label="Como deveria ser", align='center')
+                            for i, (v1, v2) in enumerate(zip(como_e, como_deveria)):
+                                plt.text(i, v1 + 1, f"{v1:.0f}%", ha='center', fontsize=8)
+                                plt.text(i + 0.4, v2 + 1, f"{v2:.0f}%", ha='center', fontsize=8)
+                            plt.xticks([i + 0.2 for i in x], labels, rotation=45)
+                            plt.ylim(0, 100)
+                            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                            plt.title("MICROAMBIENTE DE EQUIPES - DIMENSÕES", fontsize=14, weight="bold")
+                            plt.tight_layout()
+                            caminho_img1 = "/tmp/grafico_micro_dimensao.png"
+                            plt.savefig(caminho_img1)
+                            plt.close()
+                            pdf.image(caminho_img1, x=10, w=190)
+                            pdf.ln(5)
+                    
+                        # === GRÁFICO 2: Subdimensões ===
+                        json_sub = carregar_json("grafico_microambiente_autoavaliacao_subdimensao")
+                        if json_sub and "dados" in json_sub:
+                            labels = [item["SUBDIMENSAO"] for item in json_sub["dados"]]
+                            como_e = [item["REAL_%"] for item in json_sub["dados"]]
+                            como_deveria = [item["IDEAL_%"] for item in json_sub["dados"]]
+                            x = range(len(labels))
+                            plt.figure(figsize=(10, 6))
+                            plt.bar(x, como_e, width=0.4, label="Como é", align='center')
+                            plt.bar([i + 0.4 for i in x], como_deveria, width=0.4, label="Como deveria ser", align='center')
+                            for i, (v1, v2) in enumerate(zip(como_e, como_deveria)):
+                                plt.text(i, v1 + 1, f"{v1:.0f}%", ha='center', fontsize=6)
+                                plt.text(i + 0.4, v2 + 1, f"{v2:.0f}%", ha='center', fontsize=6)
+                            plt.xticks([i + 0.2 for i in x], labels, rotation=90)
+                            plt.ylim(0, 100)
+                            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                            plt.title("MICROAMBIENTE DE EQUIPES - SUBDIMENSÕES", fontsize=14, weight="bold")
+                            plt.tight_layout()
+                            caminho_img2 = "/tmp/grafico_micro_subdimensao.png"
+                            plt.savefig(caminho_img2)
+                            plt.close()
+                            pdf.image(caminho_img2, x=10, w=190)
+                            pdf.ln(10)
+                    
+                        renderizar_bloco_personalizado(pdf, partes[1])
 
         else:
             renderizar_bloco_personalizado(pdf, guia)
