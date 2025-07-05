@@ -302,25 +302,29 @@ def emitir_parecer_microambiente():
             return None
 
         def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
-            if not json_dados or "dados" not in json_dados:
+            try:
+                if not json_dados or "dados" not in json_dados:
+                    return None
+                dados = json_dados["dados"]
+                labels = [item.get("DIMENSAO") or item.get("SUBDIMENSAO") for item in dados]
+                valores = [item.get("REAL_%", 0) for item in dados]
+                if not labels or not valores:
+                    return None
+                plt.figure(figsize=(10, 5))
+                plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
+                plt.xticks(rotation=45, ha='right')
+                plt.ylim(0, 100)
+                plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                plt.grid(True, linestyle='--', alpha=0.6)
+                plt.title(titulo, fontsize=14, weight="bold")
+                plt.tight_layout()
+                caminho = f"/tmp/{nome_arquivo}"
+                plt.savefig(caminho)
+                plt.close()
+                return caminho
+            except Exception as e:
+                print(f"Erro ao gerar gráfico: {e}")
                 return None
-            dados = json_dados["dados"]
-            if not dados:
-                return None
-            labels = [d["DIMENSAO"] for d in dados]
-            valores = [d["REAL_%"] for d in dados]
-            plt.figure(figsize=(10, 5))
-            plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
-            plt.xticks(rotation=45, ha='right')
-            plt.ylim(0, 100)
-            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-            plt.grid(True, linestyle='--', alpha=0.6)
-            plt.title(titulo, fontsize=14, weight="bold")
-            plt.tight_layout()
-            caminho = f"/tmp/{nome_arquivo}"
-            plt.savefig(caminho)
-            plt.close()
-            return caminho
 
 
         json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
