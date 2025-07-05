@@ -390,17 +390,16 @@ def emitir_parecer_microambiente():
         pdf.set_font("Arial", size=12)
         if len(partes) == 2:
             renderizar_bloco_personalizado(pdf, partes[0])
-            pdf.ln(5)
             pdf.set_font("Arial", "B", 12)
-            pdf.multi_cell(0, 10, marcador)  # sem encode/decode e sem asteriscos
-
-            pdf.ln(4)
+            pdf.multi_cell(0, 8, marcador)
             if caminho_grafico1:
+                pdf.ln(2)
                 pdf.image(caminho_grafico1, w=180)
-                pdf.ln(3)
             if caminho_grafico2:
+                pdf.ln(2)
                 pdf.image(caminho_grafico2, w=180)
-                pdf.ln(5)
+            pdf.ln(2)
+
             renderizar_bloco_personalizado(pdf, partes[1])
         else:
             renderizar_bloco_personalizado(pdf, guia)
