@@ -345,7 +345,8 @@ def emitir_parecer_microambiente():
                 return None
 
 
-        json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
+        json_dimensao = carregar_json("grafico_microambiente_autoavaliacao")
+
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
         caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao.png")
         caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao.png")
