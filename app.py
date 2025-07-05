@@ -329,10 +329,10 @@ def emitir_parecer_microambiente():
                 plt.ylim(0, 100)
                 plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                 plt.grid(True, linestyle='--', alpha=0.6)
-                plt.title(titulo, fontsize=14, weight="bold")
-        
                 subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
-                plt.suptitle(subtitulo, fontsize=10, y=0.92)
+                plt.suptitle(titulo, fontsize=14, weight="bold", y=1.02)  # título mais acima
+                plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título
+
         
                 plt.legend()
                 plt.tight_layout()
