@@ -314,8 +314,15 @@ def emitir_parecer_microambiente():
             plt.close()
             return caminho
 
-        caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao_micro.png")
-        caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao_micro.png")
+        caminho_grafico1 = None
+        caminho_grafico2 = None
+
+        if json_dimensao and "valores" in json_dimensao and json_dimensao["valores"]:
+            caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao_micro.png")
+
+        if json_subdimensao and "valores" in json_subdimensao and json_subdimensao["valores"]:
+            caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao_micro.png")
+
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
