@@ -330,7 +330,7 @@ def emitir_parecer_microambiente():
                 plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                 plt.grid(True, linestyle='--', alpha=0.6)
                 subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
-                plt.suptitle(titulo, fontsize=14, weight="bold", y=1.02)  # título mais acima
+                plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)  # título mais acima
                 plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título
 
         
@@ -392,7 +392,8 @@ def emitir_parecer_microambiente():
             renderizar_bloco_personalizado(pdf, partes[0])
             pdf.ln(5)
             pdf.set_font("Arial", "B", 12)
-            pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
+            pdf.multi_cell(0, 10, marcador)  # sem encode/decode e sem asteriscos
+
             pdf.ln(4)
             if caminho_grafico1:
                 pdf.image(caminho_grafico1, w=180)
