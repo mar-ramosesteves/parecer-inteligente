@@ -392,13 +392,40 @@ def emitir_parecer_microambiente():
             renderizar_bloco_personalizado(pdf, partes[0])
             pdf.set_font("Arial", "B", 12)
             pdf.multi_cell(0, 8, marcador)
-            if caminho_grafico1:
-                pdf.ln(2)
-                pdf.image(caminho_grafico1, w=180)
+            # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
+            if json_dimensao and "dados" in json_dimensao:
+                try:
+                    dados = json_dimensao["dados"]
+                    labels = [item["DIMENSAO"] for item in dados]
+                    ideal = [item["IDEAL_%"] for item in dados]
+                    real = [item["REAL_%"] for item in dados]
+            
+                    plt.figure(figsize=(10, 5))
+                    plt.plot(labels, ideal, marker='o', label='Como Deveria Ser (Ideal)', linewidth=2)
+                    plt.plot(labels, real, marker='o', label='Como É (Real)', linewidth=2)
+                    plt.xticks(rotation=45, ha='right')
+                    plt.ylim(0, 100)
+                    plt.ylabel("Percentual (%)")
+                    plt.title("Autoavaliação por Dimensões", fontsize=14, weight="bold")
+                    plt.suptitle(json_dimensao.get("subtitulo", ""), fontsize=10)
+                    plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                    plt.grid(True, linestyle="--", alpha=0.5)
+                    plt.legend()
+                    plt.tight_layout()
+                    caminho_grafico_dimensao = "/tmp/grafico_micro_dimensao.png"
+                    plt.savefig(caminho_grafico_dimensao)
+                    plt.close()
+            
+                    pdf.image(caminho_grafico_dimensao, w=180)
+                    pdf.ln(2)
+                except Exception as e:
+                    print("Erro ao gerar gráfico de dimensões:", e)
+            
+            # Gráfico de SUBDIMENSÕES (linha única, já existente)
             if caminho_grafico2:
-                pdf.ln(2)
                 pdf.image(caminho_grafico2, w=180)
-            pdf.ln(2)
+                pdf.ln(2)
+
 
             renderizar_bloco_personalizado(pdf, partes[1])
         else:
