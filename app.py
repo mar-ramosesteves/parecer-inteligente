@@ -293,53 +293,41 @@ def emitir_parecer_microambiente():
 
         json_dimensao = carregar_json("AUTOAVALIACAO_DIMENSOES")
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
-        caminho_grafico1 = None
-        caminho_grafico2 = None
 
-        if json_dimensao:
-            labels = list(json_dimensao["valores"].keys())
-            valores = list(json_dimensao["valores"].values())
-            x = range(len(labels))
-            plt.figure(figsize=(10, 4))
-            plt.plot(x, valores, marker='o')
-            plt.xticks(x, labels, rotation=45)
-            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+        def gerar_grafico_linha(dados_json, titulo, nome_arquivo):
+            labels = list(dados_json.get("valores", {}).keys())
+            valores = list(dados_json.get("valores", {}).values())
+            if not labels or not valores:
+                return None
+            plt.figure(figsize=(10, 5))
+            plt.plot(labels, valores, marker='o', color="#1f77b4", linewidth=2)
+            plt.xticks(rotation=45, ha='right')
             plt.ylim(0, 100)
-            plt.title("AUTOAVALIAÇÃO - MICROAMBIENTE POR DIMENSÃO", fontsize=12, weight="bold")
-            caminho_grafico1 = "/tmp/grafico_dimensao_microambiente_linha.png"
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+            plt.title(titulo, fontsize=14, weight="bold")
             plt.tight_layout()
-            plt.savefig(caminho_grafico1)
+            caminho = f"/tmp/{nome_arquivo}"
+            plt.savefig(caminho)
             plt.close()
+            return caminho
 
-        if json_subdimensao:
-            labels = list(json_subdimensao["valores"].keys())
-            valores = list(json_subdimensao["valores"].values())
-            x = range(len(labels))
-            plt.figure(figsize=(10, 4))
-            plt.plot(x, valores, marker='o')
-            plt.xticks(x, labels, rotation=45)
-            plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-            plt.ylim(0, 100)
-            plt.title("AUTOAVALIAÇÃO - MICROAMBIENTE POR SUBDIMENSÃO", fontsize=12, weight="bold")
-            caminho_grafico2 = "/tmp/grafico_subdimensao_microambiente_linha.png"
-            plt.tight_layout()
-            plt.savefig(caminho_grafico2)
-            plt.close()
+        caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavalia\u00e7\u00e3o por Dimens\u00f5es", "grafico_dimensao_micro.png")
+        caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavalia\u00e7\u00e3o por Subdimens\u00f5es", "grafico_subdimensao_micro.png")
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
         inicio = texto.find("##### INICIO MICROAMBIENTE #####")
         fim = texto.find("##### FIM MICROAMBIENTE #####")
-        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
+        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente n\u00e3o encontrado."
 
-        marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
+        marcador = "Abaixo, os gr\u00e1ficos de dimens\u00f5es e subdimens\u00f5es de microambiente na sua percep\u00e7\u00e3o:"
         partes = guia.split(marcador)
 
         nome_pdf = f"parecer_microambiente_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
         pdf = FPDF()
 
-        # CAPA
         pdf.add_page()
         pdf.set_text_color(30, 60, 120)
         pdf.set_y(40)
@@ -361,7 +349,6 @@ def emitir_parecer_microambiente():
         mes_ano = datetime.now().strftime('%B/%Y').upper()
         pdf.cell(190, 10, mes_ano, 0, 1, "C")
 
-        # CONTEÚDO
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         if len(partes) == 2:
@@ -369,12 +356,12 @@ def emitir_parecer_microambiente():
             pdf.ln(5)
             pdf.set_font("Arial", "B", 12)
             pdf.multi_cell(0, 10, marcador.encode("latin-1", "ignore").decode("latin-1"))
-            pdf.ln(2)
+            pdf.ln(4)
             if caminho_grafico1:
-                pdf.image(caminho_grafico1, w=190)
-                pdf.ln(5)
+                pdf.image(caminho_grafico1, w=180)
+                pdf.ln(3)
             if caminho_grafico2:
-                pdf.image(caminho_grafico2, w=190)
+                pdf.image(caminho_grafico2, w=180)
                 pdf.ln(5)
             renderizar_bloco_personalizado(pdf, partes[1])
         else:
@@ -410,8 +397,8 @@ def emitir_parecer_microambiente():
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-        print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
-        return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
+        print(f"\u2705 PDF salvo com sucesso no Drive: {nome_pdf}")
+        return jsonify({"mensagem": f"\u2705 Parecer salvo no Drive: {nome_pdf}"})
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
