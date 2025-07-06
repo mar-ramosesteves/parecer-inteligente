@@ -433,7 +433,7 @@ def emitir_parecer_microambiente():
             if caminho_grafico2:
                 pdf.image(caminho_grafico2, w=180)
                 pdf.ln(2)
-                Frase de transição para gráficos da equipe
+                # Frase de transição para gráficos da equipe
                 pdf.set_font("Arial", "B", 12)
                 pdf.multi_cell(0, 8, "e a seguir, o gráfico de dimensões e subdimensões de microambiente na visão da sua equipe direta:")
             
