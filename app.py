@@ -342,6 +342,7 @@ def emitir_parecer_microambiente():
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho)
+                print("Salvei em:", caminho)
                 plt.close()
                 return caminho
             except Exception as e:
