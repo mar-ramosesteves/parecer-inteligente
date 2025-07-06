@@ -307,6 +307,7 @@ def emitir_parecer_microambiente():
                 if not json_dados or "dados" not in json_dados:
                     return None
                 dados = json_dados["dados"]
+                # usa TANTO DIMENSÃO quanto SUBDIMENSÃO
                 labels = [item.get("DIMENSAO") or item.get("SUBDIMENSAO") for item in dados]
                 valores_reais = [item.get("REAL_%", 0) for item in dados]
                 valores_ideais = [item.get("IDEAL_%", 0) for item in dados]
@@ -325,15 +326,17 @@ def emitir_parecer_microambiente():
                 plt.plot(labels, valores_reais, marker='o', color="#1f77b4", linewidth=2, label="Como é")
                 for i, v in enumerate(valores_reais):
                     plt.text(i, v - 3, f"{v:.1f}%", ha='center', va='top', fontsize=8, color='#1f77b4')
-        
+
                 plt.xticks(rotation=45, ha='right')
                 plt.ylim(0, 100)
                 plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                 plt.grid(True, linestyle='--', alpha=0.6)
+        
                 subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
-                plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)  # título mais acima
-                plt.title(subtitulo, fontsize=10)  # subtítulo abaixo do título        
+                plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)
+                plt.title(subtitulo, fontsize=10)
                 plt.legend()
+        
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho)
@@ -343,6 +346,7 @@ def emitir_parecer_microambiente():
             except Exception as e:
                 print(f"Erro ao gerar gráfico: {e}")
                 return None
+
 
 
         json_dimensao = carregar_json("grafico_microambiente_autoavaliacao")
