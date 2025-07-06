@@ -75,9 +75,20 @@ def emitir_parecer_arquetipos():
             plt.text(len(labels) - 0.5, 51, "Suporte", color="gray", fontsize=8, ha='right')
             plt.axhline(60, color="gray", linestyle="--", linewidth=1)
             plt.text(len(labels) - 0.5, 61, "Dominante", color="gray", fontsize=8, ha='right')
+            plt.figure(figsize=(10, 5))
+            # ... (suas barras e anotações)
+
             plt.title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
-            subtitulo = f"{empresa.upper()} / {rodada.upper()} / {email_lider} / {datetime.now().strftime('%B/%Y')}"
-            plt.suptitle(subtitulo, fontsize=10, y=0.85)
+            subtitulo = f"{empresa.upper()} / {rodada.upper()} / {email_lider} / {datetime.now():%B/%Y}"
+            plt.figtext(0.5, 0.92, subtitulo, ha='center', fontsize=10)  # subtítulo seguro
+
+            plt.ylim(0, 100)
+            plt.legend(loc='upper right')
+            plt.tight_layout(rect=[0, 0, 1, 0.9])  # espaço para o subtítulo
+            caminho_grafico1 = "/tmp/grafico1.png"
+            plt.savefig(caminho_grafico1)
+            plt.close()
+
             plt.ylim(0, 100)
             plt.legend()
             caminho_grafico1 = "/tmp/grafico1.png"
