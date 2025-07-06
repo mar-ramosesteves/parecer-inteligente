@@ -89,12 +89,7 @@ def emitir_parecer_arquetipos():
             plt.savefig(caminho_grafico1)
             plt.close()
 
-            plt.ylim(0, 100)
-            plt.legend()
-            caminho_grafico1 = "/tmp/grafico1.png"
-            plt.tight_layout()
-            plt.savefig(caminho_grafico1)
-            plt.close()
+            
 
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
