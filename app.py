@@ -305,46 +305,57 @@ def emitir_parecer_microambiente():
         def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
             try:
                 if not json_dados or "dados" not in json_dados:
+                    print(f"→ Sem dados para gráfico {titulo}")
                     return None
-                dados = json_dados["dados"]
-                # usa TANTO DIMENSÃO quanto SUBDIMENSÃO
-                labels = [item.get("DIMENSAO") or item.get("SUBDIMENSAO") for item in dados]
-                valores_reais = [item.get("REAL_%", 0) for item in dados]
-                valores_ideais = [item.get("IDEAL_%", 0) for item in dados]
         
-                if not labels or not valores_reais:
+                dados = json_dados["dados"]
+                labels = []
+                valores_real = []
+                valores_ideal = []
+                for item in dados:
+                    # Tenta DIMENSAO, se não existir tenta SUBDIMENSAO
+                    label = item.get("DIMENSAO") or item.get("SUBDIMENSAO")
+                    if label is None:
+                        print("❗ Ignorando item sem DIMENSAO/SUBDIMENSAO:", item)
+                        continue
+                    labels.append(label)
+                    valores_real.append(item.get("REAL_%", 0))
+                    valores_ideal.append(item.get("IDEAL_%", 0))
+        
+                if not labels:
+                    print("→ Nenhuma label válida encontrada em:", dados)
                     return None
         
                 plt.figure(figsize=(10, 5))
-        
-                # Linha "Como deveria ser"
-                plt.plot(labels, valores_ideais, marker='o', linestyle='--', color='gray', linewidth=2, label="Como deveria ser")
-                for i, v in enumerate(valores_ideais):
+                plt.plot(labels, valores_ideal, marker='o', linestyle='--',
+                         color='gray', linewidth=2, label="Como deveria ser")
+                for i, v in enumerate(valores_ideal):
                     plt.text(i, v + 1.5, f"{v:.1f}%", ha='center', va='bottom', fontsize=8, color='gray')
         
-                # Linha "Como é"
-                plt.plot(labels, valores_reais, marker='o', color="#1f77b4", linewidth=2, label="Como é")
-                for i, v in enumerate(valores_reais):
+                plt.plot(labels, valores_real, marker='o', color="#1f77b4",
+                         linewidth=2, label="Como é")
+                for i, v in enumerate(valores_real):
                     plt.text(i, v - 3, f"{v:.1f}%", ha='center', va='top', fontsize=8, color='#1f77b4')
-
+        
                 plt.xticks(rotation=45, ha='right')
                 plt.ylim(0, 100)
                 plt.axhline(60, color="gray", linestyle="--", linewidth=1)
                 plt.grid(True, linestyle='--', alpha=0.6)
         
-                subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%B/%Y').upper()}"
+                subtitulo = f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now():%B/%Y}".upper()
                 plt.suptitle(titulo, fontsize=14, weight="bold", y=0.98)
                 plt.title(subtitulo, fontsize=10)
                 plt.legend()
-        
                 plt.tight_layout()
+        
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho)
-                print("Salvei em:", caminho)
                 plt.close()
+                print("✅ Gráfico salvo em:", caminho)
                 return caminho
+        
             except Exception as e:
-                print(f"Erro ao gerar gráfico: {e}")
+                print(f"❌ Erro ao gerar gráfico '{titulo}':", e)
                 return None
 
 
