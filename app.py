@@ -474,12 +474,26 @@ def emitir_parecer_microambiente():
                     try:
                         dados_sub = json_sub_eq["dados"]
                         labels_sub = [item["SUBDIMENSAO"] for item in dados_sub]
-                        valores_sub = [item["REAL_%"] for item in dados_sub]
+                        ideal_sub = [item["IDEAL_%"] for item in dados_sub]
+                        real_sub = [item["REAL_%"] for item in dados_sub]
+                        
+                        plt.figure(figsize=(10, 5))
+                        plt.plot(labels_sub, ideal_sub, marker='o', linestyle='--', color='gray', linewidth=2, label="Como deveria ser")
+                        for i, v in enumerate(ideal_sub):
+                            plt.text(i, v + 1.5, f"{v:.1f}%", ha='center', va='bottom', fontsize=8, color='gray')
+                        
+                        plt.plot(labels_sub, real_sub, marker='o', color="#1f77b4", linewidth=2, label="Como é")
+                        for i, v in enumerate(real_sub):
+                            plt.text(i, v - 3, f"{v:.1f}%", ha='center', va='top', fontsize=8, color='#1f77b4')
+                        
+                        plt.xticks(rotation=45, ha='right')
+                        plt.ylim(0, 100)
+                        plt.grid(True, linestyle='--', alpha=0.6)
+                        plt.axhline(60, color="gray", linestyle="--", linewidth=1)
+                        plt.title("Média da Equipe por Subdimensões", fontsize=11, weight="bold", loc='center')
+                        plt.tight_layout()
+                        plt.legend()
 
-                        plt.figure(figsize=(10, 4))
-                        plt.plot(labels_sub, valores_sub, marker='o', color="#1f77b4", linewidth=2)
-                        for i, valor in enumerate(valores_sub):
-                            plt.text(i, valor + 2, f"{valor:.1f}%", ha='center', fontsize=8)
                         plt.xticks(rotation=45, ha='right')
                         plt.ylim(0, 100)
                         plt.grid(True, linestyle='--', alpha=0.6)
