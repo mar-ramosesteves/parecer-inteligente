@@ -41,8 +41,7 @@ def emitir_parecer_arquetipos():
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
                 spaces='drive', fields='files(id, name)',
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True
+                
             ).execute()
             arquivos = resultados.get("files", [])
             if arquivos:
@@ -161,7 +160,7 @@ def emitir_parecer_arquetipos():
             fields='files(id, name)',
             orderBy='createdTime desc',
             supportsAllDrives=True,
-            includeItemsFromAllDrives=True
+            
         ).execute()
         arquivos_pdf = resultado_arquivos.get("files", [])
 
@@ -320,7 +319,7 @@ def emitir_parecer_microambiente():
                 spaces='drive',
                 fields='files(id, name)',
                 supportsAllDrives=True,
-                includeItemsFromAllDrives=True
+                
             ).execute()
             arquivos = resultados.get("files", [])
             if arquivos:
@@ -690,8 +689,7 @@ def emitir_parecer_microambiente():
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
             spaces='drive',
-            includeItemsFromAllDrives=True,
-            supportsAllDrives=True,
+            
             fields='files(id, name)',
             orderBy='createdTime desc'
         ).execute()
@@ -724,7 +722,7 @@ def emitir_parecer_microambiente():
             media_body=media,
             fields="id",
             supportsAllDrives=True,
-            includeItemsFromAllDrives=True
+            
         ).execute()
 
 
