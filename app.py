@@ -399,6 +399,8 @@ def emitir_parecer_microambiente():
         caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao.png")
         caminho_grafico3 = gerar_grafico_linha(json_eq_dimensao, "Média da Equipe por Dimensões", "grafico_eq_dimensao.png")
         caminho_grafico4 = gerar_grafico_linha(json_eq_subdimensao, "Média da Equipe por Subdimensões", "grafico_eq_subdimensao.png")
+        caminho_termometro = gerar_grafico_termometro(json_termometro, "termometro.png")
+        caminho_waterfall  = gerar_grafico_waterfall(json_waterfall, "waterfall.png")
 
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
