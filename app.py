@@ -357,9 +357,35 @@ def emitir_parecer_microambiente():
             except Exception as e:
                 print(f"❌ Erro ao gerar gráfico '{titulo}':", e)
                 return None
+    
+
+    
+        def gerar_grafico_termometro(json_term, nome_arquivo):
+            try:
+                if not json_term or "porcentagemGaps" not in json_term:
+                    return None
+                pct = float(json_term["porcentagemGaps"])
+                classe = json_term.get("classificacao", "")
+        
+                fig, ax = plt.subplots(figsize=(4, 8))
+                ax.barh([0], [pct], color="#1f77b4")
+                ax.set_xlim(0, 100)
+                ax.set_title(json_term.get("titulo", ""), fontsize=12, weight="bold")
+                ax.text(0.5, -0.1, f"{pct:.1f}% – {classe}", ha="center", va="center", transform=ax.transAxes)
+                ax.axis('off')
+                caminho = f"/tmp/{nome_arquivo}"
+                plt.tight_layout()
+                plt.savefig(caminho)
+                plt.close()
+                print("✅ Termômetro salvo em:", caminho)
+                return caminho
+            except Exception as e:
+                print(f"❌ Erro ao gerar termômetro:", e)
+                return None
+        # ← fim da função
 
 
-
+        
         json_dimensao = carregar_json("grafico_microambiente_autoavaliacao")
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
         json_eq_dimensao = carregar_json("grafico_microambiente_mediaequipe_dimensao")
