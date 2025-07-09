@@ -463,8 +463,8 @@ def emitir_parecer_microambiente():
         json_eq_dimensao = carregar_json("grafico_microambiente_mediaequipe_dimensao")
         json_eq_subdimensao = carregar_json("grafico_microambiente_mediaequipe_subdimensao")  
         # === Inserção do JSON do termômetro e waterfall ===
-        json_termometro = carregar_json("STATUS - TERMÔMETRO")
         json_waterfall = carregar_json("GAP MÉDIO POR DIMENSÃO E SUBDIMENSÃO")
+        json_termometro = carregar_json("STATUS - TERMÔMETRO DE MICROAMBIENTE")
 
         print(">> json_waterfall:", json_waterfall)
 
