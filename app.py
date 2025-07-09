@@ -429,7 +429,8 @@ def emitir_parecer_microambiente():
         json_eq_subdimensao = carregar_json("grafico_microambiente_mediaequipe_subdimensao")  
         # === Inserção do JSON do termômetro e waterfall ===
         json_termometro = carregar_json("STATUS - TERMÔMETRO")
-        json_waterfall = carregar_json("GAP MÉDIO POR DIMENSÃO E SUBDIMENSÃO")
+        json_waterfall = carregar_json("IA_waterfall_gaps")
+        print(">> json_waterfall:", json_waterfall)
 
           
         caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao.png")
@@ -437,7 +438,8 @@ def emitir_parecer_microambiente():
         caminho_grafico3 = gerar_grafico_linha(json_eq_dimensao, "Média da Equipe por Dimensões", "grafico_eq_dimensao.png")
         caminho_grafico4 = gerar_grafico_linha(json_eq_subdimensao, "Média da Equipe por Subdimensões", "grafico_eq_subdimensao.png")
         caminho_termometro = gerar_grafico_termometro(json_termometro, "termometro.png")
-        caminho_waterfall  = gerar_grafico_waterfall(json_waterfall, "waterfall.png")
+        caminho_waterfall = gerar_grafico_waterfall(json_waterfall, "grafico_waterfall.png")
+        print(">> caminho_waterfall:", caminho_waterfall)
 
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
@@ -486,15 +488,14 @@ def emitir_parecer_microambiente():
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
 
         # → INSERÇÃO DE GRÁFICO WATERFALLL (novidade)
+        chave = "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:"
         pdf.set_font("Arial", "B", 12)
-        pdf.multi_cell(0, 8,
-            "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devem ser priorizados, na visão de sua equipe:")
-        pdf.ln(6)
+        pdf.multi_cell(0, 8, chave)
         if caminho_waterfall:
             pdf.image(caminho_waterfall, w=180)
-            pdf.ln(6)
+            pdf.ln(2)
         else:
-            print("❌ Gráfico waterfall não gerado")
+            print("⚠️ Waterfall não foi gerado; caminho_waterfall:", caminho_waterfall)
 
 
 
