@@ -16,7 +16,7 @@ import requests
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
-PASTA_RAIZ = "1l4kOZwed-Yc5nHU4RBTmWQz3zYAlpniS"
+PASTA_RAIZ = "1ekQKwPchEN_fO4AK0eyDd_JID5YO3hAF"
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST"])
 def emitir_parecer_arquetipos():
