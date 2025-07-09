@@ -485,7 +485,7 @@ def emitir_parecer_microambiente():
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
 
-        # → Inserção do Gráfico Waterfall (novidade)
+        # → INSERÇÃO DE GRÁFICO WATERFALLL (novidade)
         pdf.set_font("Arial", "B", 12)
         pdf.multi_cell(0, 8,
             "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devem ser priorizados, na visão de sua equipe:")
