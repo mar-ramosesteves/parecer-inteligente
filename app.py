@@ -180,7 +180,13 @@ def emitir_parecer_arquetipos():
 
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
-        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+        service.files().create(
+            body=file_metadata,
+            media_body=media,
+            supportsAllDrives=True,           # ➤ aqui
+            fields="id"
+        ).execute()
+
 
         print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
@@ -694,7 +700,14 @@ def emitir_parecer_microambiente():
 
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
-        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+        service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
+
 
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
 
