@@ -392,7 +392,7 @@ def emitir_parecer_microambiente():
                 dim = sorted(dados.get("dimensao", []), key=lambda x: x["GAP"])
                 sub = sorted(dados.get("subdimensao", []), key=lambda x: x["GAP"])
         
-                fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+                fig, axs = plt.subplots(2, 1, figsize=(8, 6))
                 # DIMENSÕES
                 x_d = [d["DIMENSAO"] for d in dim]
                 y_d = [-d["GAP"] for d in dim]  # inverter sinal
@@ -413,6 +413,8 @@ def emitir_parecer_microambiente():
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho)
+                plt.savefig(caminho, dpi=100)
+
                 plt.close()
                 print("✅ Waterfall salvo em:", caminho)
                 return caminho
