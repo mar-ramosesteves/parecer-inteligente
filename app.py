@@ -349,7 +349,8 @@ def emitir_parecer_microambiente():
                 plt.tight_layout()
         
                 caminho = f"/tmp/{nome_arquivo}"
-                plt.savefig(caminho)
+                plt.savefig(caminho, dpi=100)
+
                 plt.close()
                 print("✅ Gráfico salvo em:", caminho)
                 return caminho
@@ -375,7 +376,8 @@ def emitir_parecer_microambiente():
                 ax.axis('off')
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.tight_layout()
-                plt.savefig(caminho)
+                plt.savefig(caminho, dpi=100)
+
                 plt.close()
                 print("✅ Termômetro salvo em:", caminho)
                 return caminho
@@ -412,12 +414,16 @@ def emitir_parecer_microambiente():
         
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
-                plt.savefig(caminho)
-                plt.savefig(caminho, dpi=100)
-
+                from io import BytesIO
+                buf = BytesIO()
+                plt.savefig(buf, format='png', dpi=100)   # define dpi menor
+                buf.seek(0)
+                with open(caminho, 'wb') as f:
+                    f.write(buf.read())
                 plt.close()
                 print("✅ Waterfall salvo em:", caminho)
                 return caminho
+
             except Exception as e:
                 print("❌ Erro ao gerar waterfall:", e)
                 return None
