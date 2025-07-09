@@ -40,9 +40,7 @@ def emitir_parecer_arquetipos():
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
-                spaces='drive', fields='files(id, name)',
-                
-            ).execute()
+                spaces='drive', fields='files(id, name)').execute()
             arquivos = resultados.get("files", [])
             if arquivos:
                 conteudo = service.files().get_media(fileId=arquivos[0]['id']).execute()
@@ -85,16 +83,8 @@ def emitir_parecer_arquetipos():
             caminho_grafico1 = "/tmp/grafico1.png"
             plt.tight_layout()
             plt.savefig(caminho_grafico1)
-            plt.savefig(caminho, dpi=100)
-            # reduzir peso
-            from PIL import Image
-            img = Image.open(caminho)
-            img = img.convert("RGB")
-            img.save(caminho, optimize=True, quality=60)
-            print("✅ Waterfall otimizado salvo em:", caminho)
             plt.close()
-
-
+            
 
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
@@ -156,14 +146,9 @@ def emitir_parecer_arquetipos():
 
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
-            spaces='drive',
-            fields='files(id, name)',
-            orderBy='createdTime desc',
-            supportsAllDrives=True,
-            
+            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
         ).execute()
         arquivos_pdf = resultado_arquivos.get("files", [])
-
 
         if arquivos_pdf:
             id_pdf_analitico = arquivos_pdf[0]["id"]
@@ -187,13 +172,7 @@ def emitir_parecer_arquetipos():
 
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
-        service.files().create(
-            body=file_metadata,
-            media_body=media,
-            supportsAllDrives=True,           # ➤ aqui
-            fields="id"
-        ).execute()
-
+        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
         print(f"✅ PDF salvo com sucesso no Drive: {nome_pdf}")
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
@@ -316,17 +295,12 @@ def emitir_parecer_microambiente():
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
-                spaces='drive',
-                fields='files(id, name)',
-                supportsAllDrives=True,
-                
-            ).execute()
+                spaces='drive', fields='files(id, name)').execute()
             arquivos = resultados.get("files", [])
             if arquivos:
                 conteudo = service.files().get_media(fileId=arquivos[0]['id']).execute()
                 return json.loads(conteudo.decode("utf-8"))
             return None
-
 
         def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
             try:
@@ -375,17 +349,7 @@ def emitir_parecer_microambiente():
                 plt.tight_layout()
         
                 caminho = f"/tmp/{nome_arquivo}"
-                plt.savefig(caminho, dpi=100)
-                
-                # reduzir peso
-                from PIL import Image
-                img = Image.open(caminho)
-                img = img.convert("RGB")
-                img.save(caminho, optimize=True, quality=60)
-                print("✅ Waterfall otimizado salvo em:", caminho)
-                plt.close()
-
-
+                plt.savefig(caminho)
                 plt.close()
                 print("✅ Gráfico salvo em:", caminho)
                 return caminho
@@ -393,89 +357,22 @@ def emitir_parecer_microambiente():
             except Exception as e:
                 print(f"❌ Erro ao gerar gráfico '{titulo}':", e)
                 return None
-    
-
-    
-        def gerar_grafico_termometro(json_term, nome_arquivo):
-            try:
-                if not json_term or "porcentagemGaps" not in json_term:
-                    return None
-                pct = float(json_term["porcentagemGaps"])
-                classe = json_term.get("classificacao", "")
-        
-                fig, ax = plt.subplots(figsize=(4, 8))
-                ax.barh([0], [pct], color="#1f77b4")
-                ax.set_xlim(0, 100)
-                ax.set_title(json_term.get("titulo", ""), fontsize=12, weight="bold")
-                ax.text(0.5, -0.1, f"{pct:.1f}% – {classe}", ha="center", va="center", transform=ax.transAxes)
-                ax.axis('off')
-                caminho = f"/tmp/{nome_arquivo}"
-                plt.tight_layout()
-                plt.savefig(caminho, dpi=100)
-                # reduzir peso
-                from PIL import Image
-                img = Image.open(caminho)
-                img = img.convert("RGB")
-                img.save(caminho, optimize=True, quality=60)
-                print("✅ Waterfall otimizado salvo em:", caminho)
-                plt.close()
-
-
-                
-                print("✅ Termômetro salvo em:", caminho)
-                return caminho
-            except Exception as e:
-                print(f"❌ Erro ao gerar termômetro:", e)
-                return None
-        # ← fim da função
-
-        def gerar_grafico_waterfall(json_gap, nome_arquivo):
-            try:
-                if not json_gap or "dados" not in json_gap:
-                    return None
-                ...
-                plt.tight_layout()
-                caminho = f"/tmp/{nome_arquivo}"
-                plt.savefig(caminho, dpi=100)
-                plt.close()
-        
-                # pós-processamento para PNG leve
-                from PIL import Image
-                img = Image.open(caminho)
-                img = img.convert("RGB")
-                img.save(caminho, optimize=True, quality=60)
-                print("✅ Waterfall salvo (leve) em:", caminho)
-                return caminho
-            except Exception as e:
-                print("❌ Erro ao gerar waterfall:", e)
-                return None
-
-            except Exception as e:
-                print("❌ Erro ao gerar waterfall:", e)
-                return None
 
 
 
-        
         json_dimensao = carregar_json("grafico_microambiente_autoavaliacao")
         json_subdimensao = carregar_json("AUTOAVALIACAO_SUBDIMENSAO")
         json_eq_dimensao = carregar_json("grafico_microambiente_mediaequipe_dimensao")
         json_eq_subdimensao = carregar_json("grafico_microambiente_mediaequipe_subdimensao")  
         # === Inserção do JSON do termômetro e waterfall ===
+        json_termometro = carregar_json("STATUS - TERMÔMETRO")
         json_waterfall = carregar_json("GAP MÉDIO POR DIMENSÃO E SUBDIMENSÃO")
-        json_termometro = carregar_json("STATUS - TERMÔMETRO DE MICROAMBIENTE")
-
-        print(">> json_waterfall:", json_waterfall)
 
           
         caminho_grafico1 = gerar_grafico_linha(json_dimensao, "Autoavaliação por Dimensões", "grafico_dimensao.png")
         caminho_grafico2 = gerar_grafico_linha(json_subdimensao, "Autoavaliação por Subdimensões", "grafico_subdimensao.png")
         caminho_grafico3 = gerar_grafico_linha(json_eq_dimensao, "Média da Equipe por Dimensões", "grafico_eq_dimensao.png")
         caminho_grafico4 = gerar_grafico_linha(json_eq_subdimensao, "Média da Equipe por Subdimensões", "grafico_eq_subdimensao.png")
-        caminho_termometro = gerar_grafico_termometro(json_termometro, "termometro.png")
-        caminho_waterfall = gerar_grafico_waterfall(json_waterfall, "grafico_waterfall.png")
-        print(">> caminho_waterfall:", caminho_waterfall)
-
 
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
@@ -522,22 +419,6 @@ def emitir_parecer_microambiente():
             pdf.multi_cell(0, 8, marcador)
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
-
-        # → INSERÇÃO DE GRÁFICO WATERFALLL (novidade)
-        chave = "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:"
-        pdf.set_font("Arial", "B", 12)
-        pdf.multi_cell(0, 8, chave)
-        if caminho_waterfall:
-            pdf.image(caminho_waterfall, w=180)
-            pdf.ln(2)
-        else:
-            print("⚠️ Waterfall não foi gerado; caminho_waterfall:", caminho_waterfall)
-
-
-
-
-
-        
         if json_dimensao and "dados" in json_dimensao:
             try:
                 dados = json_dimensao["dados"]
@@ -562,15 +443,6 @@ def emitir_parecer_microambiente():
                 plt.legend()
                 caminho_grafico_dimensao = "/tmp/grafico_micro_dimensao.png"
                 plt.savefig(caminho_grafico_dimensao)
-                plt.savefig(caminho, dpi=100)
-                # reduzir peso
-                from PIL import Image
-                img = Image.open(caminho)
-                img = img.convert("RGB")
-                img.save(caminho, optimize=True, quality=60)
-                print("✅ Waterfall otimizado salvo em:", caminho)
-                
-
                 plt.close()
         
                 pdf.image(caminho_grafico_dimensao, w=180)
@@ -610,18 +482,7 @@ def emitir_parecer_microambiente():
                         plt.legend()
                         caminho_grafico_eq_dimensao = "/tmp/grafico_eq_dimensao.png"
                         plt.savefig(caminho_grafico_eq_dimensao)
-                        plt.savefig(caminho, dpi=100)
-                        # reduzir peso
-                        from PIL import Image
-                        img = Image.open(caminho)
-                        img = img.convert("RGB")
-                        img.save(caminho, optimize=True, quality=60)
-                        print("✅ Waterfall otimizado salvo em:", caminho)
                         plt.close()
-
-
-                        
-                       
             
                         pdf.image(caminho_grafico_eq_dimensao, w=180)
                         pdf.ln(2)
@@ -662,16 +523,7 @@ def emitir_parecer_microambiente():
                         plt.tight_layout()
                         caminho_grafico_eq_sub = "/tmp/grafico_eq_subdimensao.png"
                         plt.savefig(caminho_grafico_eq_sub)
-                        plt.savefig(caminho, dpi=100)
-                        # reduzir peso
-                        from PIL import Image
-                        img = Image.open(caminho)
-                        img = img.convert("RGB")
-                        img.save(caminho, optimize=True, quality=60)
-                        print("✅ Waterfall otimizado salvo em:", caminho)
                         plt.close()
-
-                        
 
                         pdf.image(caminho_grafico_eq_sub, w=180)
                         pdf.ln(2)
@@ -688,13 +540,8 @@ def emitir_parecer_microambiente():
         # JUNTAR COM RELATÓRIO ANALÍTICO
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
-            spaces='drive',
-            
-            fields='files(id, name)',
-            orderBy='createdTime desc'
+            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
         ).execute()
-
-
         arquivos_pdf = resultado_arquivos.get("files", [])
 
         if arquivos_pdf:
@@ -717,14 +564,7 @@ def emitir_parecer_microambiente():
 
         file_metadata = {"name": nome_pdf, "parents": [id_lider]}
         media = MediaIoBaseUpload(open(caminho_local, "rb"), mimetype="application/pdf")
-        service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id",
-            supportsAllDrives=True,
-            
-        ).execute()
-
+        service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
         return jsonify({"mensagem": f"✅ Parecer salvo no Drive: {nome_pdf}"})
 
