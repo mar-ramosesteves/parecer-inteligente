@@ -83,8 +83,16 @@ def emitir_parecer_arquetipos():
             caminho_grafico1 = "/tmp/grafico1.png"
             plt.tight_layout()
             plt.savefig(caminho_grafico1)
+            plt.savefig(caminho, dpi=100)
+            # reduzir peso
+            from PIL import Image
+            img = Image.open(caminho)
+            img = img.convert("RGB")
+            img.save(caminho, optimize=True, quality=60)
+            print("✅ Waterfall otimizado salvo em:", caminho)
             plt.close()
-            
+
+
 
         nome_pdf = f"parecer_arquetipos_{email_lider}_{rodada}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_local = f"/tmp/{nome_pdf}"
@@ -350,6 +358,15 @@ def emitir_parecer_microambiente():
         
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.savefig(caminho, dpi=100)
+                
+                # reduzir peso
+                from PIL import Image
+                img = Image.open(caminho)
+                img = img.convert("RGB")
+                img.save(caminho, optimize=True, quality=60)
+                print("✅ Waterfall otimizado salvo em:", caminho)
+                plt.close()
+
 
                 plt.close()
                 print("✅ Gráfico salvo em:", caminho)
@@ -377,8 +394,16 @@ def emitir_parecer_microambiente():
                 caminho = f"/tmp/{nome_arquivo}"
                 plt.tight_layout()
                 plt.savefig(caminho, dpi=100)
-
+                # reduzir peso
+                from PIL import Image
+                img = Image.open(caminho)
+                img = img.convert("RGB")
+                img.save(caminho, optimize=True, quality=60)
+                print("✅ Waterfall otimizado salvo em:", caminho)
                 plt.close()
+
+
+                
                 print("✅ Termômetro salvo em:", caminho)
                 return caminho
             except Exception as e:
@@ -390,39 +415,22 @@ def emitir_parecer_microambiente():
             try:
                 if not json_gap or "dados" not in json_gap:
                     return None
-                dados = json_gap["dados"]
-                dim = sorted(dados.get("dimensao", []), key=lambda x: x["GAP"])
-                sub = sorted(dados.get("subdimensao", []), key=lambda x: x["GAP"])
-        
-                fig, axs = plt.subplots(2, 1, figsize=(8, 6))
-                # DIMENSÕES
-                x_d = [d["DIMENSAO"] for d in dim]
-                y_d = [-d["GAP"] for d in dim]  # inverter sinal
-                axs[0].barh(x_d, y_d, color="#1f77b4")
-                axs[0].set_title("GAP por Dimensão", fontsize=12, weight="bold")
-        
-                # SUBDIMENSÕES
-                x_s = [s["SUBDIMENSAO"] for s in sub]
-                y_s = [-s["GAP"] for s in sub]
-                axs[1].barh(x_s, y_s, color="#ff7f0e")
-                axs[1].set_title("GAP por Subdimensão", fontsize=12, weight="bold")
-        
-                for ax in axs:
-                    ax.set_xlim(0, max(max(y_d, default=0), max(y_s, default=0)) * 1.1)
-                    ax.invert_yaxis()
-                    ax.tick_params(axis='y', labelsize=8)
-        
+                ...
                 plt.tight_layout()
                 caminho = f"/tmp/{nome_arquivo}"
-                from io import BytesIO
-                buf = BytesIO()
-                plt.savefig(buf, format='png', dpi=100)   # define dpi menor
-                buf.seek(0)
-                with open(caminho, 'wb') as f:
-                    f.write(buf.read())
+                plt.savefig(caminho, dpi=100)
                 plt.close()
-                print("✅ Waterfall salvo em:", caminho)
+        
+                # pós-processamento para PNG leve
+                from PIL import Image
+                img = Image.open(caminho)
+                img = img.convert("RGB")
+                img.save(caminho, optimize=True, quality=60)
+                print("✅ Waterfall salvo (leve) em:", caminho)
                 return caminho
+            except Exception as e:
+                print("❌ Erro ao gerar waterfall:", e)
+                return None
 
             except Exception as e:
                 print("❌ Erro ao gerar waterfall:", e)
@@ -534,6 +542,15 @@ def emitir_parecer_microambiente():
                 plt.legend()
                 caminho_grafico_dimensao = "/tmp/grafico_micro_dimensao.png"
                 plt.savefig(caminho_grafico_dimensao)
+                plt.savefig(caminho, dpi=100)
+                # reduzir peso
+                from PIL import Image
+                img = Image.open(caminho)
+                img = img.convert("RGB")
+                img.save(caminho, optimize=True, quality=60)
+                print("✅ Waterfall otimizado salvo em:", caminho)
+                
+
                 plt.close()
         
                 pdf.image(caminho_grafico_dimensao, w=180)
@@ -573,7 +590,18 @@ def emitir_parecer_microambiente():
                         plt.legend()
                         caminho_grafico_eq_dimensao = "/tmp/grafico_eq_dimensao.png"
                         plt.savefig(caminho_grafico_eq_dimensao)
+                        plt.savefig(caminho, dpi=100)
+                        # reduzir peso
+                        from PIL import Image
+                        img = Image.open(caminho)
+                        img = img.convert("RGB")
+                        img.save(caminho, optimize=True, quality=60)
+                        print("✅ Waterfall otimizado salvo em:", caminho)
                         plt.close()
+
+
+                        
+                       
             
                         pdf.image(caminho_grafico_eq_dimensao, w=180)
                         pdf.ln(2)
@@ -614,7 +642,16 @@ def emitir_parecer_microambiente():
                         plt.tight_layout()
                         caminho_grafico_eq_sub = "/tmp/grafico_eq_subdimensao.png"
                         plt.savefig(caminho_grafico_eq_sub)
+                        plt.savefig(caminho, dpi=100)
+                        # reduzir peso
+                        from PIL import Image
+                        img = Image.open(caminho)
+                        img = img.convert("RGB")
+                        img.save(caminho, optimize=True, quality=60)
+                        print("✅ Waterfall otimizado salvo em:", caminho)
                         plt.close()
+
+                        
 
                         pdf.image(caminho_grafico_eq_sub, w=180)
                         pdf.ln(2)
