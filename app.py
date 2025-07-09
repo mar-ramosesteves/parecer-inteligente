@@ -384,6 +384,43 @@ def emitir_parecer_microambiente():
                 return None
         # ← fim da função
 
+        def gerar_grafico_waterfall(json_gap, nome_arquivo):
+            try:
+                if not json_gap or "dados" not in json_gap:
+                    return None
+                dados = json_gap["dados"]
+                dim = sorted(dados.get("dimensao", []), key=lambda x: x["GAP"])
+                sub = sorted(dados.get("subdimensao", []), key=lambda x: x["GAP"])
+        
+                fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+                # DIMENSÕES
+                x_d = [d["DIMENSAO"] for d in dim]
+                y_d = [-d["GAP"] for d in dim]  # inverter sinal
+                axs[0].barh(x_d, y_d, color="#1f77b4")
+                axs[0].set_title("GAP por Dimensão", fontsize=12, weight="bold")
+        
+                # SUBDIMENSÕES
+                x_s = [s["SUBDIMENSAO"] for s in sub]
+                y_s = [-s["GAP"] for s in sub]
+                axs[1].barh(x_s, y_s, color="#ff7f0e")
+                axs[1].set_title("GAP por Subdimensão", fontsize=12, weight="bold")
+        
+                for ax in axs:
+                    ax.set_xlim(0, max(max(y_d, default=0), max(y_s, default=0)) * 1.1)
+                    ax.invert_yaxis()
+                    ax.tick_params(axis='y', labelsize=8)
+        
+                plt.tight_layout()
+                caminho = f"/tmp/{nome_arquivo}"
+                plt.savefig(caminho)
+                plt.close()
+                print("✅ Waterfall salvo em:", caminho)
+                return caminho
+            except Exception as e:
+                print("❌ Erro ao gerar waterfall:", e)
+                return None
+
+
 
         
         json_dimensao = carregar_json("grafico_microambiente_autoavaliacao")
