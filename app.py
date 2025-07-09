@@ -484,6 +484,23 @@ def emitir_parecer_microambiente():
             pdf.multi_cell(0, 8, marcador)
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
             # Gráfico de DIMENSÕES (duas linhas: Ideal e Real)
+
+        # → Inserção do Gráfico Waterfall (novidade)
+        pdf.set_font("Arial", "B", 12)
+        pdf.multi_cell(0, 8,
+            "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devem ser priorizados, na visão de sua equipe:")
+        pdf.ln(6)
+        if caminho_waterfall:
+            pdf.image(caminho_waterfall, w=180)
+            pdf.ln(6)
+        else:
+            print("❌ Gráfico waterfall não gerado")
+
+
+
+
+
+        
         if json_dimensao and "dados" in json_dimensao:
             try:
                 dados = json_dimensao["dados"]
