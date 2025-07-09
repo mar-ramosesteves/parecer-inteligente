@@ -40,7 +40,10 @@ def emitir_parecer_arquetipos():
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
-                spaces='drive', fields='files(id, name)').execute()
+                spaces='drive', fields='files(id, name)',
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
             arquivos = resultados.get("files", [])
             if arquivos:
                 conteudo = service.files().get_media(fileId=arquivos[0]['id']).execute()
@@ -154,9 +157,14 @@ def emitir_parecer_arquetipos():
 
         resultado_arquivos = service.files().list(
             q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_ARQUETIPOS' and mimeType='application/pdf'",
-            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
+            spaces='drive',
+            fields='files(id, name)',
+            orderBy='createdTime desc',
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
         ).execute()
         arquivos_pdf = resultado_arquivos.get("files", [])
+
 
         if arquivos_pdf:
             id_pdf_analitico = arquivos_pdf[0]["id"]
@@ -309,12 +317,17 @@ def emitir_parecer_microambiente():
         def carregar_json(nome_parcial):
             resultados = service.files().list(
                 q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
-                spaces='drive', fields='files(id, name)').execute()
+                spaces='drive',
+                fields='files(id, name)',
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
             arquivos = resultados.get("files", [])
             if arquivos:
                 conteudo = service.files().get_media(fileId=arquivos[0]['id']).execute()
                 return json.loads(conteudo.decode("utf-8"))
             return None
+
 
         def gerar_grafico_linha(json_dados, titulo, nome_arquivo):
             try:
@@ -674,10 +687,14 @@ def emitir_parecer_microambiente():
         pdf.output(caminho_local)
 
         # JUNTAR COM RELATÓRIO ANALÍTICO
-        resultado_arquivos = service.files().list(
-            q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
-            spaces='drive', fields='files(id, name)', orderBy='createdTime desc'
+        resultados = service.files().list(
+            q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
+            spaces='drive',
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+            fields='files(id, name)'
         ).execute()
+
         arquivos_pdf = resultado_arquivos.get("files", [])
 
         if arquivos_pdf:
