@@ -687,13 +687,15 @@ def emitir_parecer_microambiente():
         pdf.output(caminho_local)
 
         # JUNTAR COM RELATÓRIO ANALÍTICO
-        resultados = service.files().list(
-            q=f"'{id_ia_json}' in parents and name contains '{nome_parcial}' and mimeType='application/json'",
+        resultado_arquivos = service.files().list(
+            q=f"'{id_lider}' in parents and name contains 'RELATORIO_ANALITICO_MICROAMBIENTE' and mimeType='application/pdf'",
             spaces='drive',
-            supportsAllDrives=True,
             includeItemsFromAllDrives=True,
-            fields='files(id, name)'
+            supportsAllDrives=True,
+            fields='files(id, name)',
+            orderBy='createdTime desc'
         ).execute()
+
 
         arquivos_pdf = resultado_arquivos.get("files", [])
 
