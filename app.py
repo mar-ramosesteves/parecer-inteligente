@@ -445,7 +445,8 @@ def emitir_parecer_microambiente():
         json_eq_subdimensao = carregar_json("grafico_microambiente_mediaequipe_subdimensao")  
         # === Inserção do JSON do termômetro e waterfall ===
         json_termometro = carregar_json("STATUS - TERMÔMETRO")
-        json_waterfall = carregar_json("IA_waterfall_gaps")
+        json_waterfall = carregar_json("GAP MÉDIO POR DIMENSÃO E SUBDIMENSÃO")
+
         print(">> json_waterfall:", json_waterfall)
 
           
@@ -456,6 +457,7 @@ def emitir_parecer_microambiente():
         caminho_termometro = gerar_grafico_termometro(json_termometro, "termometro.png")
         caminho_waterfall = gerar_grafico_waterfall(json_waterfall, "grafico_waterfall.png")
         print(">> caminho_waterfall:", caminho_waterfall)
+
 
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
