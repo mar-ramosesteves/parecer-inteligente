@@ -118,6 +118,8 @@ def emitir_parecer_arquetipos():
 
         imagem_base64 = ""
         grafico = buscar_json_supabase("arquetipos_grafico_comparativo", empresa, rodada, email_lider)
+        print("JSON DO GRÁFICO:", grafico)
+
         if grafico:
             imagem_base64 = gerar_grafico_base64(grafico)
 
