@@ -26,6 +26,14 @@ import io
 import json
 import os
 
+
+
+SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+
+
+
 @app.route("/emitir-parecer-arquetipos", methods=["POST"])
 def emitir_parecer_arquetipos():
     try:
