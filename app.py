@@ -67,6 +67,79 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
+
+
+# --- Trecho completo para colar no app.py dentro da rota `emitir_parecer_arquetipos` ---
+
+import matplotlib.pyplot as plt
+import io
+import base64
+import numpy as np
+import requests
+
+# Função para buscar o JSON do Supabase
+def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    filtro = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.{tipo_relatorio}&order=data_criacao.desc&limit=1"
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro}"
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        dados = resp.json()
+        if dados:
+            return dados[0].get("dados_json")
+    return None
+
+# Função para gerar o gráfico base64
+def gerar_grafico_base64(dados):
+    arquetipos = dados.get("arquetipos", [])
+    auto = [dados["autoavaliacao"].get(a, 0) for a in arquetipos]
+    equipe = [dados["mediaEquipe"].get(a, 0) for a in arquetipos]
+    x = np.arange(len(arquetipos))
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color='#00b0f0')
+    ax.bar(x + 0.2, equipe, width=0.4, label="Média da Equipe", color='#f7931e')
+
+    for i, (a, e) in enumerate(zip(auto, equipe)):
+        ax.text(i - 0.2, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
+        ax.text(i + 0.2, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(arquetipos, rotation=45)
+    ax.set_ylim(0, 100)
+    ax.axhline(50, color='gray', linestyle=':', linewidth=1)
+    ax.text(len(x)-0.5, 52, "Suporte", color='gray', fontsize=8, ha='right')
+    ax.axhline(60, color='gray', linestyle='--', linewidth=1)
+    ax.text(len(x)-0.5, 62, "Dominante", color='gray', fontsize=8, ha='right')
+    ax.set_title(dados.get("titulo", ""), fontsize=12, weight='bold')
+    ax.legend()
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    return img_base64
+
+# --- Dentro da sua rota emitir_parecer_arquetipos ---
+
+marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
+
+if marcador not in conteudo_html:
+    conteudo_html = conteudo_html + f"\n\n{marcador}"
+
+# Buscar JSON do gráfico e gerar imagem
+grafico = buscar_json_supabase("arquetipos_grafico_comparativo", empresa, rodada, email_lider)
+if grafico:
+    grafico_base64 = gerar_grafico_base64(grafico)
+    img_tag = f'<br><br><img src="data:image/png;base64,{grafico_base64}" style="width:100%;max-width:800px;"><br><br>'
+    conteudo_html = conteudo_html.replace(marcador, f"{marcador}\n{img_tag}")
+
+
 @app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
 def emitir_parecer_arquetipos():
     if request.method == "OPTIONS":
