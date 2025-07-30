@@ -109,6 +109,8 @@ def emitir_parecer_arquetipos():
         guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
 
         conteudo_html = guia
+        print("GUIA CARREGADO:", conteudo_html[:500])
+
 
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
         partes = guia.split(marcador)
