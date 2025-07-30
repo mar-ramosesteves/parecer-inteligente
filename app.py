@@ -111,7 +111,8 @@ def emitir_parecer_arquetipos():
         conteudo_html = guia
 
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
-        partes = conteudo_html.split(marcador)
+        partes = guia.split(marcador)
+
 
         imagem_base64 = ""
         grafico = buscar_json_supabase("arquetipos_grafico_comparativo", empresa, rodada, email_lider)
@@ -119,7 +120,8 @@ def emitir_parecer_arquetipos():
             imagem_base64 = gerar_grafico_base64(grafico)
 
         if len(partes) == 2:
-            conteudo_html = partes[0] + marcador + f'<br><br><img src="data:image/png;base64,{imagem_base64}" style="width:100%;max-width:800px;"><br><br>' + partes[1]
+            conteudo_html = partes[0] + f"{marcador}\n<br><br><img src=\"data:image/png;base64,{imagem_base64}\" style=\"width:100%;max-width:800px;\"><br><br>" + partes[1]
+
 
         dados_retorno = {
             "titulo": "ARQUÉTIPOS DE GESTÃO",
