@@ -67,37 +67,47 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
-@app.route("/emitir-parecer-arquetipos", methods=["POST"])
+@app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
 def emitir_parecer_arquetipos():
     if request.method == "OPTIONS":
-        return '', 204
-    
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
     try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        tipo_relatorio = "arquetipos_ia"
+        tipo_relatorio = "arquetipos_parecer_ia"
 
-        # Buscar JSONs salvos no Supabase
-        import requests
+        # Buscar JSONs no Supabase
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
 
-        filtro1 = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.arquetipos_grafico_comparativo&select=dados_json"
-        url1 = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro1}"
-        r1 = requests.get(url1, headers=headers)
-        json_grafico = r1.json()[0]["dados_json"] if r1.ok and r1.json() else None
+        def buscar_json(tipo):
+            url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+            params = {
+                "empresa": f"eq.{empresa}",
+                "codrodada": f"eq.{rodada}",
+                "emaillider": f"eq.{email_lider}",
+                "tipo_relatorio": f"eq.{tipo}",
+                "order": "data_criacao.desc",
+                "limit": 1
+            }
+            resp = requests.get(url, headers=headers, params=params)
+            if resp.status_code == 200 and resp.json():
+                return resp.json()[0]["dados_json"]
+            return None
 
-        filtro2 = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.arquetipos_analitico&select=dados_json"
-        url2 = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro2}"
-        r2 = requests.get(url2, headers=headers)
-        json_analitico = r2.json()[0]["dados_json"] if r2.ok and r2.json() else None
+        json_auto_vs_equipe = buscar_json("arquetipos_grafico_comparativo")
 
-        # Lê o conteúdo da base textual
+        # Carregar o guia base
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
         inicio = texto.find("##### INICIO ARQUETIPOS #####")
@@ -107,54 +117,60 @@ def emitir_parecer_arquetipos():
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
         partes = guia.split(marcador)
 
-        # Gerar gráfico como base64
-        grafico_base64 = None
-        if json_grafico:
-            labels = list(json_grafico["autoavaliacao"].keys())
-            auto = list(json_grafico["autoavaliacao"].values())
-            equipe = list(json_grafico["mediaEquipe"].values())
+        imagem_base64 = ""
+        if json_auto_vs_equipe:
+            import matplotlib.pyplot as plt
+            import io, base64
+            import numpy as np
 
-            x = range(len(labels))
+            labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
+            auto = list(json_auto_vs_equipe["autoavaliacao"].values())
+            equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
+            x = np.arange(len(labels))
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.bar([i - 0.2 for i in x], auto, width=0.4, label="Autoavaliação", color='skyblue')
-            ax.bar([i + 0.2 for i in x], equipe, width=0.4, label="Equipe", color='orange')
-
-            for i, (a, e) in enumerate(zip(auto, equipe)):
-                ax.text(i - 0.2, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
-                ax.text(i + 0.2, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
-
-            ax.set_xticks(list(x))
+            ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color="royalblue")
+            ax.bar(x + 0.2, equipe, width=0.4, label="Equipe", color="darkorange")
+            for i in range(len(labels)):
+                ax.text(x[i] - 0.2, auto[i] + 1, f"{auto[i]:.0f}%", ha='center', fontsize=8)
+                ax.text(x[i] + 0.2, equipe[i] + 1, f"{equipe[i]:.0f}%", ha='center', fontsize=8)
+            ax.set_xticks(x)
             ax.set_xticklabels(labels, rotation=45)
-            ax.set_ylim(0, 100)
             ax.axhline(50, color="gray", linestyle="--")
             ax.axhline(60, color="gray", linestyle=":")
-            ax.legend()
+            ax.set_ylim(0, 100)
+            ax.set_title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
             plt.tight_layout()
 
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=150)
+            plt.savefig(buf, format='png')
             buf.seek(0)
-            grafico_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
             plt.close()
 
-        parecer_ia = {
-            "titulo": "PARECER DE ARQUÉTIPOS",
-            "subtitulo": f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%d/%m/%Y')}",
-            "texto_parte1": partes[0].strip() if len(partes) == 2 else guia,
-            "marcador": marcador,
-            "grafico_base64": grafico_base64,
-            "texto_parte2": partes[1].strip() if len(partes) == 2 else "",
-            "n_avaliacoes": json_grafico.get("n_avaliacoes") if json_grafico else None,
-            "dados_analiticos": json_analitico.get("dados") if json_analitico else []
+        bloco_html = partes[0] + f'<br><br><img src="data:image/png;base64,{imagem_base64}" style="width:100%;max-width:800px;"><br><br>' + partes[1] if len(partes) == 2 else guia
+
+        dados_retorno = {
+            "titulo": "ARQUÉTIPOS DE GESTÃO",
+            "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
+            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "conteudo_html": bloco_html
         }
 
-        salvar_relatorio_analitico_no_supabase(parecer_ia, empresa, rodada, email_lider, tipo_relatorio)
+        # Salvar no Supabase
+        payload = {
+            "empresa": empresa,
+            "codrodada": rodada,
+            "emaillider": email_lider,
+            "tipo_relatorio": tipo_relatorio,
+            "dados_json": dados_retorno,
+            "data_criacao": datetime.now().isoformat()
+        }
+        requests.post(f"{SUPABASE_REST_URL}/relatorios_gerados", headers=headers, json=payload)
 
-        return jsonify(parecer_ia), 200
+        return jsonify(dados_retorno), 200
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print("Erro no parecer IA arquetipos:", e)
         return jsonify({"erro": str(e)}), 500
 
 
