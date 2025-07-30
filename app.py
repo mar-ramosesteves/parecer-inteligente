@@ -76,6 +76,13 @@ def emitir_parecer_arquetipos():
         response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
         return response
 
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
     try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
@@ -167,11 +174,17 @@ def emitir_parecer_arquetipos():
         }
         requests.post(f"{SUPABASE_REST_URL}/relatorios_gerados", headers=headers, json=payload)
 
-        return jsonify(dados_retorno), 200
+        response = jsonify(dados_retorno)
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
 
     except Exception as e:
         print("Erro no parecer IA arquetipos:", e)
-        return jsonify({"erro": str(e)}), 500
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
 
 
 
