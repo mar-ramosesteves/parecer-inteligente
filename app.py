@@ -34,6 +34,37 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 
 
+from flask import Flask, request, jsonify
+import json, os
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import base64
+import io
+
+app = Flask(__name__)
+
+SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
+    import requests
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "empresa": empresa,
+        "codrodada": codrodada,
+        "emaillider": email_lider,
+        "tipo_relatorio": tipo,
+        "dados_json": dados,
+        "data_criacao": datetime.utcnow().isoformat()
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+
 @app.route("/emitir-parecer-arquetipos", methods=["POST"])
 def emitir_parecer_arquetipos():
     try:
@@ -42,41 +73,28 @@ def emitir_parecer_arquetipos():
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
 
-        tipo_relatorio = "arquetipos_parecer"
+        tipo_relatorio = "arquetipos_ia"
 
-        # --- BUSCA JSON DO SUPABASE ---
-        url_json = f"{SUPABASE_REST_URL}/relatorios_gerados"
+        # Buscar JSONs salvos no Supabase
+        import requests
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
-        params_json = {
-            "empresa": f"eq.{empresa}",
-            "codrodada": f"eq.{rodada}",
-            "emaillider": f"eq.{email_lider}",
-            "tipo_relatorio": "eq.arquetipos_analitico"
-        }
-        res_json = requests.get(url_json, headers=headers, params=params_json)
-        res_json.raise_for_status()
-        json_analitico = res_json.json()
 
-        params_grafico = {
-            "empresa": f"eq.{empresa}",
-            "codrodada": f"eq.{rodada}",
-            "emaillider": f"eq.{email_lider}",
-            "tipo_relatorio": "eq.arquetipos_grafico_comparativo"
-        }
-        res_grafico = requests.get(url_json, headers=headers, params=params_grafico)
-        res_grafico.raise_for_status()
-        json_grafico = res_grafico.json()
+        filtro1 = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.arquetipos_grafico_comparativo&select=dados_json"
+        url1 = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro1}"
+        r1 = requests.get(url1, headers=headers)
+        json_grafico = r1.json()[0]["dados_json"] if r1.ok and r1.json() else None
 
-        if not json_analitico or not json_grafico:
-            return jsonify({"erro": "Dados insuficientes para gerar parecer."}), 400
+        filtro2 = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.arquetipos_analitico&select=dados_json"
+        url2 = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro2}"
+        r2 = requests.get(url2, headers=headers)
+        json_analitico = r2.json()[0]["dados_json"] if r2.ok and r2.json() else None
 
-        guia_path = "guias_completos_unificados.txt"
-        with open(guia_path, "r", encoding="utf-8") as f:
+        # Lê o conteúdo da base textual
+        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
-
         inicio = texto.find("##### INICIO ARQUETIPOS #####")
         fim = texto.find("##### FIM ARQUETIPOS #####")
         guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
@@ -84,47 +102,54 @@ def emitir_parecer_arquetipos():
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
         partes = guia.split(marcador)
 
-        # --- GERA O GRÁFICO COMPARATIVO ---
-        labels = list(json_grafico[0]["dados_json"]["autoavaliacao"].keys())
-        auto = list(json_grafico[0]["dados_json"]["autoavaliacao"].values())
-        equipe = list(json_grafico[0]["dados_json"]["mediaEquipe"].values())
-        x = range(len(labels))
-        plt.figure(figsize=(10, 5))
-        plt.bar(x, auto, width=0.4, label="Autoavaliação", color="#3498db")
-        plt.bar([i + 0.4 for i in x], equipe, width=0.4, label="Equipe", color="#f39c12")
-        for i, (a, e) in enumerate(zip(auto, equipe)):
-            plt.text(i, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
-            plt.text(i + 0.4, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
-        plt.xticks([i + 0.2 for i in x], labels, rotation=45)
-        plt.axhline(50, color="gray", linestyle="--", linewidth=1)
-        plt.text(len(labels) - 0.5, 51, "Suporte", color="gray", fontsize=8, ha='right')
-        plt.axhline(60, color="gray", linestyle="--", linewidth=1)
-        plt.text(len(labels) - 0.5, 61, "Dominante", color="gray", fontsize=8, ha='right')
-        plt.title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
-        plt.ylim(0, 100)
-        plt.legend()
-        plt.tight_layout()
+        # Gerar gráfico como base64
+        grafico_base64 = None
+        if json_grafico:
+            labels = list(json_grafico["autoavaliacao"].keys())
+            auto = list(json_grafico["autoavaliacao"].values())
+            equipe = list(json_grafico["mediaEquipe"].values())
 
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-        plt.close()
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+            x = range(len(labels))
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.bar([i - 0.2 for i in x], auto, width=0.4, label="Autoavaliação", color='skyblue')
+            ax.bar([i + 0.2 for i in x], equipe, width=0.4, label="Equipe", color='orange')
 
-        dados_json = {
-            "titulo": "PARECER DE ARQUÉTIPOS DE GESTÃO",
-            "subtitulo": f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%d/%m/%Y')} ",
-            "texto_intro": partes[0].strip(),
+            for i, (a, e) in enumerate(zip(auto, equipe)):
+                ax.text(i - 0.2, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
+                ax.text(i + 0.2, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
+
+            ax.set_xticks(list(x))
+            ax.set_xticklabels(labels, rotation=45)
+            ax.set_ylim(0, 100)
+            ax.axhline(50, color="gray", linestyle="--")
+            ax.axhline(60, color="gray", linestyle=":")
+            ax.legend()
+            plt.tight_layout()
+
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=150)
+            buf.seek(0)
+            grafico_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            plt.close()
+
+        parecer_ia = {
+            "titulo": "PARECER DE ARQUÉTIPOS",
+            "subtitulo": f"{empresa.upper()} / {email_lider} / {rodada.upper()} / {datetime.now().strftime('%d/%m/%Y')}",
+            "texto_parte1": partes[0].strip() if len(partes) == 2 else guia,
             "marcador": marcador,
-            "imagemBase64": f"data:image/png;base64,{imagem_base64}",
-            "texto_final": partes[1].strip()
+            "grafico_base64": grafico_base64,
+            "texto_parte2": partes[1].strip() if len(partes) == 2 else "",
+            "n_avaliacoes": json_grafico.get("n_avaliacoes") if json_grafico else None,
+            "dados_analiticos": json_analitico.get("dados") if json_analitico else []
         }
 
-        salvar_json_no_supabase(dados_json, empresa, rodada, email_lider, tipo_relatorio)
+        salvar_relatorio_analitico_no_supabase(parecer_ia, empresa, rodada, email_lider, tipo_relatorio)
 
-        return jsonify(dados_json), 200
+        return jsonify(parecer_ia), 200
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
 
 
