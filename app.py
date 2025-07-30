@@ -11,6 +11,10 @@ from busca_arquivos_drive import buscar_id
 import matplotlib.pyplot as plt
 from PyPDF2 import PdfMerger
 import requests
+import base64
+import io
+
+
 
 
 app = Flask(__name__)
@@ -20,11 +24,9 @@ PASTA_RAIZ = "1ekQKwPchEN_fO4AK0eyDd_JID5YO3hAF"
 
 from flask import request, jsonify
 from datetime import datetime
-import base64
-import matplotlib.pyplot as plt
-import io
-import json
-import os
+
+
+
 
 
 
@@ -67,6 +69,9 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST"])
 def emitir_parecer_arquetipos():
+    if request.method == "OPTIONS":
+        return '', 204
+    
     try:
         dados = request.get_json()
         empresa = dados["empresa"].lower()
