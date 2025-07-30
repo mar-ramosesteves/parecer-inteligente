@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import json
-from datetime import datetime
-import matplotlib.pyplot as plt
+import requests
 import base64
 import io
+import json
 import numpy as np
-import requests
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -15,40 +15,8 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "empresa": empresa,
-        "codrodada": codrodada,
-        "emaillider": email_lider,
-        "tipo_relatorio": tipo,
-        "dados_json": dados,
-        "data_criacao": datetime.utcnow().isoformat()
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    response.raise_for_status()
-
-def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}"
-    }
-    filtro = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.{tipo_relatorio}&order=data_criacao.desc&limit=1"
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro}"
-    resp = requests.get(url, headers=headers)
-    if resp.status_code == 200:
-        dados = resp.json()
-        if dados:
-            return dados[0].get("dados_json")
-    return None
-
-@app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
-def emitir_parecer_arquetipos():
+@app.route("/gerar-graficos-comparativos", methods=["POST", "OPTIONS"])
+def gerar_graficos_comparativos():
     if request.method == "OPTIONS":
         response = jsonify({'status': 'CORS preflight OK'})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
@@ -58,86 +26,57 @@ def emitir_parecer_arquetipos():
 
     try:
         dados = request.get_json()
-        empresa = dados["empresa"].lower()
-        rodada = dados["codrodada"].lower()
-        email_lider = dados["emailLider"].lower()
-
-        tipo_relatorio = "arquetipos_parecer_ia"
+        empresa = dados.get("empresa")
+        codrodada = dados.get("codrodada")
+        email_lider = dados.get("emailLider")
 
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
 
-        def buscar_json(tipo):
-            url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-            params = {
-                "empresa": f"eq.{empresa}",
-                "codrodada": f"eq.{rodada}",
-                "emaillider": f"eq.{email_lider}",
-                "tipo_relatorio": f"eq.{tipo}",
-                "order": "data_criacao.desc",
-                "limit": 1
-            }
-            resp = requests.get(url, headers=headers, params=params)
-            if resp.status_code == 200 and resp.json():
-                return resp.json()[0]["dados_json"]
-            return None
+        filtro = f"?empresa=eq.{empresa}&codrodada=eq.{codrodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.arquetipos_grafico_comparativo&order=data_criacao.desc&limit=1"
+        url = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro}"
 
-        json_auto_vs_equipe = buscar_json("arquetipos_grafico_comparativo")
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        dados_json = resp.json()
 
-        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            texto = f.read()
-        inicio = texto.find("##### INICIO ARQUETIPOS #####")
-        fim = texto.find("##### FIM ARQUETIPOS #####")
-        guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
+        if not dados_json:
+            return jsonify({"erro": "Dados do gráfico não encontrados."}), 404
 
-        marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
-        partes = guia.split(marcador)
+        dados_grafico = dados_json[0]["dados_json"]
+        arquetipos = dados_grafico["arquetipos"]
+        auto = [dados_grafico["autoavaliacao"].get(a, 0) for a in arquetipos]
+        equipe = [dados_grafico["mediaEquipe"].get(a, 0) for a in arquetipos]
 
-        imagem_base64 = ""
-        if json_auto_vs_equipe:
-            labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
-            auto = list(json_auto_vs_equipe["autoavaliacao"].values())
-            equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
-            x = np.arange(len(labels))
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color="royalblue")
-            ax.bar(x + 0.2, equipe, width=0.4, label="Equipe", color="darkorange")
-            for i in range(len(labels)):
-                ax.text(x[i] - 0.2, auto[i] + 1, f"{auto[i]:.0f}%", ha='center', fontsize=8)
-                ax.text(x[i] + 0.2, equipe[i] + 1, f"{equipe[i]:.0f}%", ha='center', fontsize=8)
-            ax.set_xticks(x)
-            ax.set_xticklabels(labels, rotation=45)
-            ax.axhline(50, color="gray", linestyle="--")
-            ax.axhline(60, color="gray", linestyle=":")
-            ax.set_ylim(0, 100)
-            ax.set_title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
-            plt.tight_layout()
+        x = np.arange(len(arquetipos))
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color='#00b0f0')
+        ax.bar(x + 0.2, equipe, width=0.4, label="Média da Equipe", color='#f7931e')
 
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png')
-            buf.seek(0)
-            imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-            plt.close()
+        for i, (a, e) in enumerate(zip(auto, equipe)):
+            ax.text(i - 0.2, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
+            ax.text(i + 0.2, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
 
-        bloco_html = partes[0] + f"<br><br>{marcador}<br><br><img src='data:image/png;base64,{imagem_base64}' style='width:100%;max-width:800px;'><br><br>" + partes[1] if len(partes) == 2 else guia
+        ax.set_xticks(x)
+        ax.set_xticklabels(arquetipos, rotation=45)
+        ax.set_ylim(0, 100)
+        ax.axhline(50, color='gray', linestyle=':', linewidth=1)
+        ax.axhline(60, color='gray', linestyle='--', linewidth=1)
+        ax.set_title(dados_grafico.get("titulo", ""), fontsize=12, weight='bold')
+        ax.legend()
+        plt.tight_layout()
 
-        dados_retorno = {
-            "titulo": "ARQUÉTIPOS DE GESTÃO",
-            "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
-            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "conteudo_html": bloco_html
-        }
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close()
+        buf.seek(0)
+        img_base64 = base64.b64encode(buf.read()).decode('utf-8')
 
-        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
-
-        response = jsonify(dados_retorno)
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        return response, 200
+        return jsonify({"graficoBase64": img_base64}), 200
 
     except Exception as e:
-        print("Erro no parecer IA arquetipos:", e)
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
