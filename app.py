@@ -15,72 +15,239 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-@app.route("/gerar-graficos-comparativos", methods=["POST", "OPTIONS"])
-def gerar_graficos_comparativos():
-    if request.method == "OPTIONS":
-        response = jsonify({'status': 'CORS preflight OK'})
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-        return response
+@app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
 
-    try:
-        dados = request.get_json()
-        empresa = dados.get("empresa")
-        codrodada = dados.get("codrodada")
-        email_lider = dados.get("emailLider")
+def emitir_parecer_arquetipos():
 
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}"
-        }
+    if request.method == "OPTIONS":
 
-        filtro = f"?empresa=eq.{empresa}&codrodada=eq.{codrodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.arquetipos_grafico_comparativo&order=data_criacao.desc&limit=1"
-        url = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro}"
+        response = jsonify({'status': 'CORS preflight OK'})
 
-        resp = requests.get(url, headers=headers)
-        resp.raise_for_status()
-        dados_json = resp.json()
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
 
-        if not dados_json:
-            return jsonify({"erro": "Dados do gráfico não encontrados."}), 404
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
 
-        dados_grafico = dados_json[0]["dados_json"]
-        arquetipos = dados_grafico["arquetipos"]
-        auto = [dados_grafico["autoavaliacao"].get(a, 0) for a in arquetipos]
-        equipe = [dados_grafico["mediaEquipe"].get(a, 0) for a in arquetipos]
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
 
-        x = np.arange(len(arquetipos))
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color='#00b0f0')
-        ax.bar(x + 0.2, equipe, width=0.4, label="Média da Equipe", color='#f7931e')
+        return response
 
-        for i, (a, e) in enumerate(zip(auto, equipe)):
-            ax.text(i - 0.2, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
-            ax.text(i + 0.2, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(arquetipos, rotation=45)
-        ax.set_ylim(0, 100)
-        ax.axhline(50, color='gray', linestyle=':', linewidth=1)
-        ax.axhline(60, color='gray', linestyle='--', linewidth=1)
-        ax.set_title(dados_grafico.get("titulo", ""), fontsize=12, weight='bold')
-        ax.legend()
-        plt.tight_layout()
 
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png')
-        plt.close()
-        buf.seek(0)
-        img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    if request.method == "OPTIONS":
 
-        return jsonify({"graficoBase64": img_base64}), 200
+        response = jsonify({'status': 'CORS preflight OK'})
 
-    except Exception as e:
-        response = jsonify({"erro": str(e)})
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        return response, 500
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
 
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+
+        return response
+
+
+
+    try:
+
+        dados = request.get_json()
+
+        empresa = dados["empresa"].lower()
+
+        rodada = dados["codrodada"].lower()
+
+        email_lider = dados["emailLider"].lower()
+
+
+
+        tipo_relatorio = "arquetipos_parecer_ia"
+
+
+
+        # Buscar JSONs no Supabase
+
+        headers = {
+
+            "apikey": SUPABASE_KEY,
+
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+
+        }
+
+
+
+        def buscar_json(tipo):
+
+            url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+
+            params = {
+
+                "empresa": f"eq.{empresa}",
+
+                "codrodada": f"eq.{rodada}",
+
+                "emaillider": f"eq.{email_lider}",
+
+                "tipo_relatorio": f"eq.{tipo}",
+
+                "order": "data_criacao.desc",
+
+                "limit": 1
+
+            }
+
+            resp = requests.get(url, headers=headers, params=params)
+
+            if resp.status_code == 200 and resp.json():
+
+                return resp.json()[0]["dados_json"]
+
+            return None
+
+
+
+        json_auto_vs_equipe = buscar_json("arquetipos_grafico_comparativo")
+
+
+
+        # Carregar o guia base
+
+        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
+
+            texto = f.read()
+
+        inicio = texto.find("##### INICIO ARQUETIPOS #####")
+
+        fim = texto.find("##### FIM ARQUETIPOS #####")
+
+        guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
+
+
+
+        marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
+
+        partes = guia.split(marcador)
+
+
+
+        imagem_base64 = ""
+
+        if json_auto_vs_equipe:
+
+            import matplotlib.pyplot as plt
+
+            import io, base64
+
+            import numpy as np
+
+
+
+            labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
+
+            auto = list(json_auto_vs_equipe["autoavaliacao"].values())
+
+            equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
+
+            x = np.arange(len(labels))
+
+            fig, ax = plt.subplots(figsize=(10, 5))
+
+            ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color="royalblue")
+
+            ax.bar(x + 0.2, equipe, width=0.4, label="Equipe", color="darkorange")
+
+            for i in range(len(labels)):
+
+                ax.text(x[i] - 0.2, auto[i] + 1, f"{auto[i]:.0f}%", ha='center', fontsize=8)
+
+                ax.text(x[i] + 0.2, equipe[i] + 1, f"{equipe[i]:.0f}%", ha='center', fontsize=8)
+
+            ax.set_xticks(x)
+
+            ax.set_xticklabels(labels, rotation=45)
+
+            ax.axhline(50, color="gray", linestyle="--")
+
+            ax.axhline(60, color="gray", linestyle=":")
+
+            ax.set_ylim(0, 100)
+
+            ax.set_title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
+
+            plt.tight_layout()
+
+
+
+            buf = io.BytesIO()
+
+            plt.savefig(buf, format='png')
+
+            buf.seek(0)
+
+            imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+            plt.close()
+
+
+
+        bloco_html = partes[0] + f'<br><br><img src="data:image/png;base64,{imagem_base64}" style="width:100%;max-width:800px;"><br><br>' + partes[1] if len(partes) == 2 else guia
+
+
+
+        dados_retorno = {
+
+            "titulo": "ARQUÉTIPOS DE GESTÃO",
+
+            "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
+
+            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+
+            "conteudo_html": bloco_html
+
+        }
+
+
+
+        # Salvar no Supabase
+
+        payload = {
+
+            "empresa": empresa,
+
+            "codrodada": rodada,
+
+            "emaillider": email_lider,
+
+            "tipo_relatorio": tipo_relatorio,
+
+            "dados_json": dados_retorno,
+
+            "data_criacao": datetime.now().isoformat()
+
+        }
+
+        requests.post(f"{SUPABASE_REST_URL}/relatorios_gerados", headers=headers, json=payload)
+
+
+
+        response = jsonify(dados_retorno)
+
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+
+        return response, 200
+
+
+
+
+
+    except Exception as e:
+
+        print("Erro no parecer IA arquetipos:", e)
+
+        response = jsonify({"erro": str(e)})
+
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+
+        return response, 500
 
 
 
