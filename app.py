@@ -77,6 +77,7 @@ def gerar_grafico_base64(dados):
     plt.close()
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    print("🧪 Tamanho do gráfico gerado (base64):", len(img_base64))
     return img_base64
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
