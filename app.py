@@ -156,58 +156,10 @@ def emitir_parecer_arquetipos():
 
 
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os
-import json
-from datetime import datetime
-import requests
 
-app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
-SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# ---------- Funções utilitárias ----------
-def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}"
-    }
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    params = {
-        "empresa": f"eq.{empresa}",
-        "codrodada": f"eq.{rodada}",
-        "emaillider": f"eq.{email_lider}",
-        "tipo_relatorio": f"eq.{tipo_relatorio}",
-        "order": "data_criacao.desc",
-        "limit": 1
-    }
-    resp = requests.get(url, headers=headers, params=params)
-    if resp.status_code == 200:
-        dados = resp.json()
-        if dados:
-            return dados[0].get("dados_json")
-    return None
 
-def salvar_relatorio_no_supabase(dados, empresa, rodada, email_lider, tipo):
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "empresa": empresa,
-        "codrodada": rodada,
-        "emaillider": email_lider,
-        "tipo_relatorio": tipo,
-        "dados_json": dados,
-        "data_criacao": datetime.utcnow().isoformat()
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    response.raise_for_status()
 
 # ---------- ROTA PRINCIPAL ----------
 @app.route("/emitir-parecer-microambiente", methods=["POST", "OPTIONS"])
