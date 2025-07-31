@@ -188,24 +188,37 @@ def emitir_parecer_microambiente():
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
-
         inicio = texto.find("##### INICIO MICROAMBIENTE #####")
         fim = texto.find("##### FIM MICROAMBIENTE #####")
         guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
 
         conteudo_html = guia
 
+        # Frases que serão substituídas por iframes com as rotas reais
         frases_graficos = {
-            "dimensao_equipe": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
-            "dimensao_lider": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
-            "gaps_dimensao": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
-            "termometro": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
-            "relatorio_analitico": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
+            "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:":
+                [
+                    "salvar-grafico-media-equipe-dimensao",
+                    "salvar-grafico-media-equipe-subdimensao"
+                ],
+            "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:":
+                [
+                    "salvar-grafico-autoavaliacao",
+                    "salvar-grafico-autoavaliacao-subdimensao"
+                ],
+            "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:":
+                ["salvar-grafico-waterfall-gaps"],
+            "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.":
+                ["salvar-grafico-termometro-gaps"],
+            "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!":
+                ["relatorio-analitico-microambiente-supabase"]
         }
 
-        for chave, frase in frases_graficos.items():
-            iframe = f'<br><iframe src="https://microambiente-avaliacao.onrender.com/{chave}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
-            conteudo_html = conteudo_html.replace(frase, f"{frase}\n{iframe}")
+        for frase, rotas in frases_graficos.items():
+            blocos_iframe = ""
+            for rota in rotas:
+                blocos_iframe += f'<br><iframe src="https://api-microambiente.onrender.com/{rota}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
+            conteudo_html = conteudo_html.replace(frase, f"{frase}\n{blocos_iframe}")
 
         dados_retorno = {
             "titulo": "PARECER MICROAMBIENTE",
@@ -225,5 +238,6 @@ def emitir_parecer_microambiente():
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
+
 
 
