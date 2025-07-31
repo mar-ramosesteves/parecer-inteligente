@@ -195,21 +195,18 @@ def emitir_parecer_microambiente():
 
         conteudo_html = guia
 
-        # 🔍 Substituições com as frases exatas do guia
         frases_graficos = {
-            "salvar-grafico-media-equipe-dimensao": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
-            "salvar-grafico-autoavaliacao": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
-            "salvar-grafico-waterfall-gaps": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
-            "salvar-grafico-termometro-gaps": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
-            "relatorio-analitico-microambiente-supabase": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
+            "dimensao_equipe": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
+            "dimensao_lider": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
+            "gaps_dimensao": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
+            "termometro": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
+            "relatorio_analitico": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
         }
 
-        # Substitui cada frase pelo iframe correspondente
-        for rota, frase in frases_graficos.items():
-            iframe = f'<br><iframe src="https://microambiente-avaliacao.onrender.com/{rota}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:520px;border:none;"></iframe><br>'
+        for chave, frase in frases_graficos.items():
+            iframe = f'<br><iframe src="https://microambiente-avaliacao.onrender.com/{chave}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
             conteudo_html = conteudo_html.replace(frase, f"{frase}\n{iframe}")
 
-        # Salvar no Supabase
         dados_retorno = {
             "titulo": "PARECER MICROAMBIENTE",
             "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
