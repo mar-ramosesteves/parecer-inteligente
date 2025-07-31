@@ -209,7 +209,7 @@ def emitir_parecer_microambiente():
         }
 
         # 🧠 Salvar parecer
-        salvar_relatorio_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
+        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
 
         response = jsonify(dados_retorno)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
