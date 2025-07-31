@@ -184,48 +184,54 @@ def emitir_parecer_microambiente():
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
-        tipo_relatorio = "microambiente_parecer_ia"
+        
+        tipo_parecer_microambiente = "microambiente_parecer_ia"
+        tipo_grafico_dimensoes = "microambiente_grafico_mediaequipe_dimensao"
 
-        # 🟡 Carregar guia do parecer
-        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-            texto = f.read()
-        inicio = texto.find("##### INICIO MICROAMBIENTE #####")
-        fim = texto.find("##### FIM MICROAMBIENTE #####")
-        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
-
-        conteudo_html = guia
-
-        # 🔍 Ponto de inserção dos gráficos
-        frases_graficos = {
-            "salvar-grafico-media-equipe-dimensao": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
-            "salvar-grafico-autoavaliacao-dimensao": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
-            "salvar-grafico-waterfall-gaps": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
-            "salvar-grafico-termometro-gaps": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
-            "relatorio-analitico-microambiente-supabase": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
         }
 
+        # --- FUNÇÃO AUXILIAR PARA BUSCAR JSONS NO SUPABASE ---
+        def buscar_json_supabase(tipo):
+            url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+            params = {
+                "empresa": f"eq.{empresa}",
+                "codrodada": f"eq.{rodada}",
+                "emaillider": f"eq.{email_lider}",
+                "tipo_relatorio": f"eq.{tipo}",
+                "order": "data_criacao.desc",
+                "limit": 1
+            }
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200 and resp.json():
+                # Retorna os dados_json, que é o que precisamos
+                return resp.json()[0]["dados_json"]
+            return None
 
-        # 🟠 Inserção de iframes (gráficos)
-        for chave, frase in frases_graficos.items():
-            iframe = f'<br><iframe src="https://microambiente-avaliacao.onrender.com/{chave}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
+        # 1. Busca o JSON do Parecer (texto)
+        json_do_parecer = buscar_json_supabase(tipo_parecer_microambiente)
+        if not json_do_parecer:
+            return jsonify({"erro": "Parecer de Microambiente não encontrado no Supabase."}), 404
 
+        # 2. Busca o JSON do Gráfico de Dimensões
+        json_do_grafico_dimensoes = buscar_json_supabase(tipo_grafico_dimensoes)
 
+        # Montar a resposta final
         dados_retorno = {
-            "titulo": "PARECER MICROAMBIENTE",
-            "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
-            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "conteudo_html": conteudo_html
+            "titulo": json_do_parecer.get("titulo", "PARECER MICROAMBIENTE"),
+            "subtitulo": json_do_parecer.get("subtitulo", f"{empresa.upper()} / {rodada.upper()} / {email_lider}"),
+            "data": json_do_parecer.get("data", datetime.now().strftime("%d/%m/%Y %H:%M")),
+            "conteudo_html": json_do_parecer.get("conteudo_html", "Conteúdo do parecer não encontrado."),
+            "grafico_dimensoes": json_do_grafico_dimensoes # Inclui o JSON do gráfico na resposta
         }
 
-        # 🧠 Salvar parecer
-        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
-
-        response = jsonify(dados_retorno)
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        return response, 200
+        return jsonify(dados_retorno), 200
 
     except Exception as e:
-        print("❌ Erro no parecer IA microambiente:", e)
-        response = jsonify({"erro": str(e)})
+        detailed_traceback = traceback.format_exc()
+        print("Erro no parecer IA microambiente:", e)
+        response = jsonify({"erro": str(e), "debug_info": "Verifique os logs para detalhes."})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
