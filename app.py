@@ -189,17 +189,18 @@ def emitir_parecer_microambiente():
 
         # 🔍 Ponto de inserção dos gráficos
         frases_graficos = {
-            "microambiente_grafico_mediaequipe_dimensao": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
-            "microambiente_grafico_autoavaliacao_dimensao": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
-            "microambiente_waterfall_gaps": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
-            "microambiente_termometro_gaps": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
-            "microambiente_analitico": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
+            "salvar-grafico-media-equipe-dimensao": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
+            "salvar-grafico-autoavaliacao-dimensao": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
+            "salvar-grafico-waterfall-gaps": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
+            "salvar-grafico-termometro-gaps": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
+            "relatorio-analitico-microambiente-supabase": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
         }
+
 
         # 🟠 Inserção de iframes (gráficos)
         for chave, frase in frases_graficos.items():
             iframe = f'<br><iframe src="https://microambiente-avaliacao.onrender.com/{chave}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
-            conteudo_html = conteudo_html.replace(frase, f"{frase}\n{iframe}")
+
 
         dados_retorno = {
             "titulo": "PARECER MICROAMBIENTE",
