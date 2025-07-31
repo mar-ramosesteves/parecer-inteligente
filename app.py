@@ -15,6 +15,14 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+
+from flask import render_template
+
+@app.route("/microambiente_grafico_autoavaliacao_dimensao")
+def microambiente_grafico_autoavaliacao_dimensao():
+    return render_template("microambiente_grafico_autoavaliacao_dimensao.html")
+
+
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
     headers = {
