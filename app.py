@@ -184,79 +184,47 @@ def emitir_parecer_microambiente():
         empresa = dados["empresa"].lower()
         rodada = dados["codrodada"].lower()
         email_lider = dados["emailLider"].lower()
+        tipo_relatorio = "microambiente_parecer_ia"
 
-        # --- 1. Carregar o guia base do arquivo local ---
-        try:
-            with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-                guia_texto_completo = f.read()
-            
-            marcador_inicio = "##### INICIO MICROAMBIENTE #####"
-            marcador_fim = "##### FIM MICROAMBIENTE #####"
-            inicio = guia_texto_completo.find(marcador_inicio)
-            fim = guia_texto_completo.find(marcador_fim)
-            
-            conteudo_parecer = guia_texto_completo[inicio + len(marcador_inicio):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
+        # Carregar o texto do guia
+        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
+            texto = f.read()
+        inicio = texto.find("##### INICIO MICROAMBIENTE #####")
+        fim = texto.find("##### FIM MICROAMBIENTE #####")
+        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
+        conteudo_html = guia
 
-        except FileNotFoundError:
-            conteudo_parecer = "Erro: Arquivo 'guias_completos_unificados.txt' não encontrado no servidor."
-            print(f"ERRO: Arquivo 'guias_completos_unificados.txt' não encontrado.")
-        except Exception as e:
-            conteudo_parecer = f"Erro ao carregar o guia de microambiente: {str(e)}"
-            print(f"ERRO: Ao carregar guia de microambiente: {str(e)}")
-        
-        # --- 2. Preparar o HTML do IFRAME para o gráfico de Dimensões (linhas) ---
-        # Foco apenas neste gráfico, como você solicitou.
-        graficos_endpoints_para_injetar = [
-            "salvar-grafico-media-equipe-dimensao" # Apenas este para começar
-        ]
-
-        base_url_graficos = "https://microambiente-avaliacao.onrender.com/"
-        
-        todos_iframes_html = "" # String para concatenar os iframes
-        for endpoint_grafico in graficos_endpoints_para_injetar:
-            url_iframe_completa = f"{base_url_graficos}{endpoint_grafico}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}"
-            todos_iframes_html += f'<br><iframe src="{url_iframe_completa}" style="width:100%;height:500px;border:none;"></iframe><br>'
-
-        # --- Injetar os IFRAMES no conteúdo do parecer ---
-        # Este é o marcador no texto do guia onde o gráfico será inserido.
-        marcador_no_texto = "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:"
-        
-        # Verifica se o marcador existe no texto antes de substituir
-        if marcador_no_texto in conteudo_parecer:
-            conteudo_parecer_final = conteudo_parecer.replace(marcador_no_texto, f"{marcador_no_texto}{todos_iframes_html}")
-        else:
-            # Se o marcador não for encontrado, adiciona os gráficos no final do parecer
-            conteudo_parecer_final = conteudo_parecer + todos_iframes_html
-            print(f"AVISO: Marcador '{marcador_no_texto}' não encontrado no guia. Gráficos adicionados ao final do parecer.")
-
-
-        # --- 3. Montar a resposta final para o frontend ---
-        dados_retorno = {
-            "titulo": "PARECER INTELIGENTE - MICROAMBIENTE",
-            "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
-            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "conteudo_html": conteudo_parecer_final # O texto do parecer COM o iframe injetado
+        # Inserção dos iframes nas frases-chave
+        frases_graficos = {
+            "dimensao_equipe": "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:",
+            "dimensao_lider": "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:",
+            "gaps_dimensao": "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:",
+            "termometro": "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.",
+            "relatorio_analitico": "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!"
         }
 
-        # --- 4. Salvar o parecer no Supabase ---
-        tipo_relatorio_parecer = "microambiente_parecer_ia"
-        salvar_json_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio_parecer)
+        for chave, frase in frases_graficos.items():
+            iframe = f'<br><iframe src="https://microambiente-avaliacao.onrender.com/{chave}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
+            conteudo_html = conteudo_html.replace(frase, f"{frase}\n{iframe}")
+
+        # Conteúdo final a retornar
+        dados_retorno = {
+            "titulo": "PARECER MICROAMBIENTE",
+            "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
+            "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "conteudo_html": conteudo_html
+        }
+
+        # Salvar no Supabase
+        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
 
         response = jsonify(dados_retorno)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 200
 
-    except requests.exceptions.RequestException as e:
-        print(f"Erro de comunicação com o Supabase ao buscar ou salvar parecer: {str(e)}")
-        detailed_traceback = traceback.format_exc()
-        print(f"TRACEBACK COMPLETO:\n{detailed_traceback}")
-        response = jsonify({"erro": f"Erro de comunicação com o Supabase: {str(e)}", "debug_info": "Verifique os logs."})
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        return response, 500
     except Exception as e:
-        print("Erro geral no parecer IA microambiente:", e)
-        detailed_traceback = traceback.format_exc()
-        print(f"TRACEBACK COMPLETO:\n{detailed_traceback}")
-        response = jsonify({"erro": str(e), "debug_info": "Verifique os logs para detalhes."})
+        print("❌ Erro no parecer IA microambiente:", e)
+        response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
+
