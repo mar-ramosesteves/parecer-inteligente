@@ -196,28 +196,29 @@ def emitir_parecer_microambiente():
 
         # Frases que serão substituídas por iframes com as rotas reais
         frases_graficos = {
-            "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:":
-                [
-                    "salvar-grafico-media-equipe-dimensao",
-                    "salvar-grafico-media-equipe-subdimensao"
-                ],
-            "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:":
-                [
-                    "salvar-grafico-autoavaliacao",
-                    "salvar-grafico-autoavaliacao-subdimensao"
-                ],
-            "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:":
-                ["salvar-grafico-waterfall-gaps"],
-            "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.":
-                ["salvar-grafico-termometro-gaps"],
-            "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!":
-                ["relatorio-analitico-microambiente-supabase"]
-        }
+    "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:":
+        [
+            "microambiente_grafico_mediaequipe_dimensao",
+            "microambiente_grafico_mediaequipe_subdimensao"
+        ],
+    "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:":
+        [
+            "microambiente_grafico_autoavaliacao_dimensao",
+            "microambiente_grafico_autoavaliacao_subdimensao"
+        ],
+    "Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe:":
+        ["microambiente_waterfall_gaps"],
+    "Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe.":
+        ["microambiente_termometro_gaps"],
+    "A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!":
+        ["microambiente_analitico"]
+}
 
         for frase, rotas in frases_graficos.items():
             blocos_iframe = ""
             for rota in rotas:
-                blocos_iframe += f'<br><iframe src="https://api-microambiente.onrender.com/{rota}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}" style="width:100%;height:500px;border:none;"></iframe><br>'
+                blocos_iframe += f'<br><div class="grafico" data-tipo="{rota}" data-empresa="{empresa}" data-rodada="{rodada}" data-email="{email_lider}"></div><br>'
+
             conteudo_html = conteudo_html.replace(frase, f"{frase}\n{blocos_iframe}")
 
         dados_retorno = {
