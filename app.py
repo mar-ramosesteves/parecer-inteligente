@@ -57,6 +57,8 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     }
     resp = requests.get(url, headers=headers, params=params)
     print("📦 JSON buscado:", resp.status_code, resp.text)
+    
+
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
