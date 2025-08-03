@@ -8,6 +8,7 @@ import base64
 import io
 import matplotlib.pyplot as plt
 import numpy as np
+import traceback
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -21,6 +22,38 @@ from flask import render_template
 @app.route("/microambiente_grafico_autoavaliacao_dimensao")
 def microambiente_grafico_autoavaliacao_dimensao():
     return render_template("microambiente_grafico_autoavaliacao_dimensao.html")
+
+@app.route("/visualizar-parecer-microambiente")
+def visualizar_parecer_microambiente():
+    # Pegar parâmetros da URL
+    empresa = request.args.get('empresa', '')
+    rodada = request.args.get('codrodada', '')
+    email_lider = request.args.get('emailLider', '')
+    
+    if not empresa or not rodada or not email_lider:
+        return "Parâmetros obrigatórios: empresa, codrodada, emailLider", 400
+    
+    try:
+        # Buscar o parecer salvo no Supabase
+        tipo_relatorio = "microambiente_parecer_ia"
+        dados_parecer = buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider)
+        
+        if dados_parecer:
+            return render_template("parecer_microambiente.html", 
+                                titulo=dados_parecer.get("titulo", "Parecer Microambiente"),
+                                subtitulo=dados_parecer.get("subtitulo", ""),
+                                data=dados_parecer.get("data", ""),
+                                conteudo_html=dados_parecer.get("conteudo_html", ""))
+        else:
+            return "Parecer não encontrado. Gere o parecer primeiro.", 404
+            
+    except Exception as e:
+        print(f"Erro ao visualizar parecer: {e}")
+        return f"Erro ao carregar parecer: {str(e)}", 500
+
+@app.route("/teste-parecer")
+def teste_parecer():
+    return render_template("teste_parecer.html")
 
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
@@ -248,7 +281,7 @@ def emitir_parecer_microambiente():
 
         # --- 5. Salvar o parecer (com a referência aos gráficos) no Supabase ---
         tipo_relatorio_parecer = "microambiente_parecer_ia"
-        salvar_json_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio_parecer)
+        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio_parecer)
 
         response = jsonify(dados_retorno)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
