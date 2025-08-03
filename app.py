@@ -303,3 +303,83 @@ def emitir_parecer_microambiente():
         return response, 500
 
 
+def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
+    """
+    Função específica para buscar dados de microambiente no Supabase
+    """
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "empresa": f"eq.{empresa}",
+        "codrodada": f"eq.{rodada}",
+        "emaillider": f"eq.{email_lider}",
+        "tipo_relatorio": f"eq.{tipo_relatorio}",
+        "order": "data_criacao.desc",
+        "limit": 1
+    }
+    
+    print(f"🔍 MICROAMBIENTE - Buscando no Supabase:")
+    print(f"   URL: {url}")
+    print(f"   Parâmetros: {params}")
+    
+    resp = requests.get(url, headers=headers, params=params)
+    print(f"📦 MICROAMBIENTE - Status: {resp.status_code}")
+    print(f"📦 MICROAMBIENTE - Resposta: {resp.text}")
+
+    if resp.status_code == 200:
+        dados = resp.json()
+        if dados:
+            print(f"✅ MICROAMBIENTE - Dados encontrados: {dados[0].get('dados_json')}")
+            return dados[0].get("dados_json")
+        else:
+            print(f"❌ MICROAMBIENTE - Nenhum dado encontrado")
+    else:
+        print(f"❌ MICROAMBIENTE - Erro na requisição: {resp.status_code}")
+    
+    return None
+
+@app.route("/buscar-json-microambiente", methods=["POST", "OPTIONS"])
+def buscar_json_microambiente_rota():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json()
+        tipo_relatorio = dados["tipo_relatorio"]
+        empresa = dados["empresa"]
+        rodada = dados["rodada"]
+        email_lider = dados["email_lider"]
+
+        print(f"🔍 MICROAMBIENTE - Buscando dados: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+
+        # Usar a nova função específica para microambiente
+        dados_json = buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider)
+        
+        if dados_json:
+            print(f"✅ MICROAMBIENTE - Dados encontrados: {dados_json}")
+            response = jsonify(dados_json)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+        else:
+            print(f"❌ MICROAMBIENTE - Dados não encontrados para: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+            response = jsonify({"erro": "Dados não encontrados"})
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+    except Exception as e:
+        print(f"❌ MICROAMBIENTE - Erro ao buscar JSON: {e}")
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
+
+
