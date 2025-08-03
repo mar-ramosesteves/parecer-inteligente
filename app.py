@@ -88,14 +88,29 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "order": "data_criacao.desc",
         "limit": 1
     }
-    resp = requests.get(url, headers=headers, params=params)
-    print("📦 JSON buscado:", resp.status_code, resp.text)
     
+    print(f"🔍 SUPABASE - Buscando dados:")
+    print(f"   URL: {url}")
+    print(f"   Parâmetros: {params}")
+    print(f"   Tipo: {tipo_relatorio}")
+    print(f"   Empresa: {empresa}")
+    print(f"   Rodada: {rodada}")
+    print(f"   Email: {email_lider}")
+    
+    resp = requests.get(url, headers=headers, params=params)
+    print(f"📦 SUPABASE - Status: {resp.status_code}")
+    print(f"📦 SUPABASE - Resposta: {resp.text}")
 
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
+            print(f"✅ SUPABASE - Dados encontrados: {dados[0].get('dados_json')}")
             return dados[0].get("dados_json")
+        else:
+            print(f"❌ SUPABASE - Nenhum dado encontrado")
+    else:
+        print(f"❌ SUPABASE - Erro na requisição: {resp.status_code}")
+    
     return None
 
 def gerar_grafico_base64(dados):
