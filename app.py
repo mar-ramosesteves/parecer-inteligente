@@ -8,6 +8,7 @@ import base64
 import io
 import matplotlib.pyplot as plt
 import numpy as np
+import traceback
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -21,6 +22,14 @@ from flask import render_template
 @app.route("/microambiente_grafico_autoavaliacao_dimensao")
 def microambiente_grafico_autoavaliacao_dimensao():
     return render_template("microambiente_grafico_autoavaliacao_dimensao.html")
+
+@app.route("/microambiente_grafico_mediaequipe_dimensao")
+def microambiente_grafico_mediaequipe_dimensao():
+    return render_template("microambiente_grafico_mediaequipe_dimensao.html")
+
+@app.route("/microambiente_grafico_comparativo")
+def microambiente_grafico_comparativo():
+    return render_template("microambiente_grafico_comparativo.html")
 
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
@@ -96,6 +105,122 @@ def gerar_grafico_base64(dados):
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     print("🧪 Tamanho do gráfico gerado (base64):", len(img_base64))
+    return img_base64
+
+def salvar_json_no_supabase(dados, empresa, codrodada, email_lider, tipo):
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "empresa": empresa,
+        "codrodada": codrodada,
+        "emaillider": email_lider,
+        "tipo_relatorio": tipo,
+        "dados_json": dados,
+        "data_criacao": datetime.utcnow().isoformat()
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+
+def buscar_dados_microambiente_supabase(empresa, rodada, email_lider):
+    """Busca dados de microambiente do Supabase"""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    
+    # Buscar dados da equipe
+    url_equipe = f"{SUPABASE_REST_URL}/microambiente_equipe"
+    params_equipe = {
+        "empresa": f"eq.{empresa}",
+        "codrodada": f"eq.{rodada}",
+        "emaillider": f"eq.{email_lider}"
+    }
+    
+    try:
+        resp_equipe = requests.get(url_equipe, headers=headers, params=params_equipe)
+        dados_equipe = resp_equipe.json() if resp_equipe.status_code == 200 else []
+        
+        # Buscar dados da autoavaliação
+        url_auto = f"{SUPABASE_REST_URL}/microambiente_autoavaliacao"
+        params_auto = {
+            "empresa": f"eq.{empresa}",
+            "codrodada": f"eq.{rodada}",
+            "emaillider": f"eq.{email_lider}"
+        }
+        
+        resp_auto = requests.get(url_auto, headers=headers, params=params_auto)
+        dados_auto = resp_auto.json() if resp_auto.status_code == 200 else []
+        
+        return {
+            "equipe": dados_equipe,
+            "autoavaliacao": dados_auto
+        }
+    except Exception as e:
+        print(f"Erro ao buscar dados de microambiente: {e}")
+        return {"equipe": [], "autoavaliacao": []}
+
+def gerar_grafico_microambiente_base64(dados_equipe, dados_auto, tipo_grafico="comparativo"):
+    """Gera gráfico de microambiente em base64"""
+    dimensoes = ['Adaptabilidade', 'Responsabilidade', 'Performance', 'Reconhecimento', 'Clareza', 'Equipe']
+    
+    # Calcular médias da equipe
+    medias_equipe = []
+    for dimensao in dimensoes:
+        valores = [item.get(dimensao.lower(), 0) for item in dados_equipe if item.get(dimensao.lower())]
+        media = sum(valores) / len(valores) if valores else 0
+        medias_equipe.append(media)
+    
+    # Calcular médias da autoavaliação
+    medias_auto = []
+    for dimensao in dimensoes:
+        valores = [item.get(dimensao.lower(), 0) for item in dados_auto if item.get(dimensao.lower())]
+        media = sum(valores) / len(valores) if valores else 0
+        medias_auto.append(media)
+    
+    # Criar gráfico
+    fig, ax = plt.subplots(figsize=(12, 8))
+    x = np.arange(len(dimensoes))
+    width = 0.35
+    
+    if tipo_grafico == "comparativo":
+        ax.bar(x - width/2, medias_equipe, width, label='Equipe', color='#36A2EB', alpha=0.7)
+        ax.bar(x + width/2, medias_auto, width, label='Autoavaliação', color='#FF6384', alpha=0.7)
+        ax.set_ylabel('Pontuação (%)')
+        ax.set_title('Comparativo: Equipe vs Autoavaliação')
+        ax.legend()
+    elif tipo_grafico == "equipe":
+        ax.bar(x, medias_equipe, color='#36A2EB', alpha=0.7)
+        ax.set_ylabel('Pontuação (%)')
+        ax.set_title('Percepção da Equipe')
+    elif tipo_grafico == "auto":
+        ax.bar(x, medias_auto, color='#FF6384', alpha=0.7)
+        ax.set_ylabel('Pontuação (%)')
+        ax.set_title('Sua Autoavaliação')
+    
+    ax.set_xticks(x)
+    ax.set_xticklabels(dimensoes, rotation=45, ha='right')
+    ax.set_ylim(0, 100)
+    
+    # Adicionar valores nas barras
+    for i, v in enumerate(medias_equipe if tipo_grafico in ["equipe", "comparativo"] else medias_auto):
+        ax.text(i, v + 1, f'{v:.1f}%', ha='center', va='bottom', fontsize=10)
+    
+    if tipo_grafico == "comparativo":
+        for i, v in enumerate(medias_auto):
+            ax.text(i + width/2, v + 1, f'{v:.1f}%', ha='center', va='bottom', fontsize=10)
+    
+    plt.tight_layout()
+    
+    # Converter para base64
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+    plt.close()
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     return img_base64
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
@@ -206,36 +331,71 @@ def emitir_parecer_microambiente():
             conteudo_parecer = f"Erro ao carregar o guia de microambiente: {str(e)}"
             print(f"ERRO: Ao carregar guia de microambiente: {str(e)}")
         
-        # --- 2. Preparar o HTML do IFRAME para o gráfico de Dimensões (linhas) ---
-        # Foco APENAS neste gráfico, como você solicitou.
-        endpoint_pagina_grafico_dimensoes = "microambiente_grafico_mediaequipe_dimensao" 
-        base_url_graficos = "https://microambiente-avaliacao.onrender.com/"
+        # --- 2. Buscar dados reais e gerar gráficos dinâmicos ---
+        dados_microambiente = buscar_dados_microambiente_supabase(empresa, rodada, email_lider)
         
-        # Constrói a URL completa para o iframe do gráfico de dimensões
-        url_iframe_dimensoes = f"{base_url_graficos}{endpoint_pagina_grafico_dimensoes}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}"
+        # Gerar gráficos base64
+        grafico_equipe_base64 = gerar_grafico_microambiente_base64(
+            dados_microambiente["equipe"], 
+            dados_microambiente["autoavaliacao"], 
+            "equipe"
+        )
         
-        # Cria a tag <iframe> com estilos de DEBUG visual FORTE
-        # Esses estilos devem ser removidos APÓS o gráfico aparecer.
+        grafico_auto_base64 = gerar_grafico_microambiente_base64(
+            dados_microambiente["equipe"], 
+            dados_microambiente["autoavaliacao"], 
+            "auto"
+        )
+        
+        grafico_comparativo_base64 = gerar_grafico_microambiente_base64(
+            dados_microambiente["equipe"], 
+            dados_microambiente["autoavaliacao"], 
+            "comparativo"
+        )
+        
+        # Criar HTML dos gráficos
         iframe_html_dimensoes = f'''
-        <br>
-        <iframe src="{url_iframe_dimensoes}" 
-                style="width:100%;height:500px;border:5px solid red !important; display:block !important; background-color:yellow !important;"
-                title="Gráfico de Dimensões da Equipe">
-        </iframe>
-        <br>
+        <div style="margin: 20px 0; text-align: center;">
+            <h3 style="color: #333; margin-bottom: 10px;">Gráfico de Dimensões - Percepção da Equipe</h3>
+            <img src="data:image/png;base64,{grafico_equipe_base64}" 
+                 style="width:100%;max-width:800px;border:2px solid #ddd; border-radius:8px;">
+        </div>
+        '''
+        
+        iframe_html_autoavaliacao = f'''
+        <div style="margin: 20px 0; text-align: center;">
+            <h3 style="color: #333; margin-bottom: 10px;">Gráfico de Dimensões - Sua Autoavaliação</h3>
+            <img src="data:image/png;base64,{grafico_auto_base64}" 
+                 style="width:100%;max-width:800px;border:2px solid #ddd; border-radius:8px;">
+        </div>
+        '''
+        
+        iframe_html_comparativo = f'''
+        <div style="margin: 20px 0; text-align: center;">
+            <h3 style="color: #333; margin-bottom: 10px;">Comparativo: Equipe vs Sua Percepção</h3>
+            <img src="data:image/png;base64,{grafico_comparativo_base64}" 
+                 style="width:100%;max-width:800px;border:2px solid #ddd; border-radius:8px;">
+        </div>
         '''
 
-        # --- 3. Injetar o IFRAME no conteúdo do parecer no LOCAL EXATO ---
-        # Este é o marcador no texto do guia onde o gráfico será inserido.
-        marcador_no_texto = "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:"
+        # --- 3. Inserir gráficos nos pontos estratégicos do texto ---
+        marcadores_graficos = {
+            "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:": iframe_html_dimensoes,
+            "O inventário de Microambiente de Equipe é baseado nos conceitos de inteligência emocional.": iframe_html_comparativo,
+            "E abaixo, os gráficos de dimensões e subdimensões de microambiente na sua percepção:": iframe_html_autoavaliacao
+        }
         
-        # Substitui o marcador no texto pelo marcador + o iframe.
-        if marcador_no_texto in conteudo_parecer:
-            conteudo_parecer_final = conteudo_parecer.replace(marcador_no_texto, f"{marcador_no_texto}{iframe_html_dimensoes}")
-        else:
-            # Se o marcador não for encontrado, adiciona o gráfico no final do parecer para depuração
-            conteudo_parecer_final = conteudo_parecer + iframe_html_dimensoes
-            print(f"AVISO: Marcador '{marcador_no_texto}' não encontrado no guia. Gráfico adicionado ao final do parecer.")
+        conteudo_parecer_final = conteudo_parecer
+        for marcador, iframe_html in marcadores_graficos.items():
+            if marcador in conteudo_parecer_final:
+                conteudo_parecer_final = conteudo_parecer_final.replace(marcador, f"{marcador}\n{iframe_html}")
+            else:
+                print(f"AVISO: Marcador '{marcador}' não encontrado no guia.")
+        
+        # Se nenhum marcador foi encontrado, adiciona os gráficos no final
+        if conteudo_parecer_final == conteudo_parecer:
+            conteudo_parecer_final += f"\n\n{iframe_html_dimensoes}\n{iframe_html_autoavaliacao}\n{iframe_html_comparativo}"
+            print("AVISO: Nenhum marcador encontrado. Gráficos adicionados ao final do parecer.")
 
 
         # --- 4. Montar a resposta final para o frontend ---
