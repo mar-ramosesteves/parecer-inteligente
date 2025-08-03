@@ -65,6 +65,35 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         if dados:
             return dados[0].get("dados_json")
     return None
+def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "empresa": f"eq.{empresa}",
+        "codrodada": f"eq.{rodada}",
+        "emaillider": f"eq.{email_lider}",
+        "tipo_relatorio": f"eq.{tipo_relatorio}",
+        "order": "data_criacao.desc",
+        "limit": 1
+    }
+    
+    print(f"🔍 MICROAMBIENTE - URL: {url}")
+    print(f"🔍 MICROAMBIENTE - Params: {params}")
+    
+    resp = requests.get(url, headers=headers, params=params)
+    print(f"📦 MICROAMBIENTE - JSON buscado: {resp.status_code} {resp.text}")
+    
+    if resp.status_code == 200:
+        dados = resp.json()
+        print(f"📦 MICROAMBIENTE - Dados retornados: {dados}")
+        if dados:
+            return dados[0].get("dados_json")
+    return None
+
+
 
 def gerar_grafico_base64(dados):
     arquetipos = dados.get("arquetipos", [])
