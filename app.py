@@ -23,6 +23,38 @@ from flask import render_template
 def microambiente_grafico_autoavaliacao_dimensao():
     return render_template("microambiente_grafico_autoavaliacao_dimensao.html")
 
+@app.route("/visualizar-parecer-microambiente")
+def visualizar_parecer_microambiente():
+    # Pegar parâmetros da URL
+    empresa = request.args.get('empresa', '')
+    rodada = request.args.get('codrodada', '')
+    email_lider = request.args.get('emailLider', '')
+    
+    if not empresa or not rodada or not email_lider:
+        return "Parâmetros obrigatórios: empresa, codrodada, emailLider", 400
+    
+    try:
+        # Buscar o parecer salvo no Supabase
+        tipo_relatorio = "microambiente_parecer_ia"
+        dados_parecer = buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider)
+        
+        if dados_parecer:
+            return render_template("parecer_microambiente.html", 
+                                titulo=dados_parecer.get("titulo", "Parecer Microambiente"),
+                                subtitulo=dados_parecer.get("subtitulo", ""),
+                                data=dados_parecer.get("data", ""),
+                                conteudo_html=dados_parecer.get("conteudo_html", ""))
+        else:
+            return "Parecer não encontrado. Gere o parecer primeiro.", 404
+            
+    except Exception as e:
+        print(f"Erro ao visualizar parecer: {e}")
+        return f"Erro ao carregar parecer: {str(e)}", 500
+
+@app.route("/teste-parecer")
+def teste_parecer():
+    return render_template("teste_parecer.html")
+
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
@@ -48,6 +80,14 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "Authorization": f"Bearer {SUPABASE_KEY}"
     }
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    
+    # PRIMEIRO: Buscar TODOS os dados para ver o que existe
+    print(f"🔍 SUPABASE - Buscando TODOS os dados para debug:")
+    resp_todos = requests.get(url, headers=headers, params={"limit": 10})
+    print(f"📦 SUPABASE - Todos os dados: {resp_todos.status_code}")
+    print(f"📦 SUPABASE - Resposta completa: {resp_todos.text}")
+    
+    # DEPOIS: Buscar com filtros
     params = {
         "empresa": f"eq.{empresa}",
         "codrodada": f"eq.{rodada}",
@@ -56,14 +96,29 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "order": "data_criacao.desc",
         "limit": 1
     }
-    resp = requests.get(url, headers=headers, params=params)
-    print("📦 JSON buscado:", resp.status_code, resp.text)
     
+    print(f"🔍 SUPABASE - Buscando dados com filtros:")
+    print(f"   URL: {url}")
+    print(f"   Parâmetros: {params}")
+    print(f"   Tipo: {tipo_relatorio}")
+    print(f"   Empresa: {empresa}")
+    print(f"   Rodada: {rodada}")
+    print(f"   Email: {email_lider}")
+    
+    resp = requests.get(url, headers=headers, params=params)
+    print(f"📦 SUPABASE - Status: {resp.status_code}")
+    print(f"📦 SUPABASE - Resposta: {resp.text}")
 
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
+            print(f"✅ SUPABASE - Dados encontrados: {dados[0].get('dados_json')}")
             return dados[0].get("dados_json")
+        else:
+            print(f"❌ SUPABASE - Nenhum dado encontrado")
+    else:
+        print(f"❌ SUPABASE - Erro na requisição: {resp.status_code}")
+    
     return None
 def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
     headers = {
@@ -334,5 +389,123 @@ def emitir_parecer_microambiente():
         response = jsonify({"erro": str(e), "debug_info": "Verifique os logs para detalhes."})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
+
+
+@app.route("/buscar-json-supabase", methods=["POST", "OPTIONS"])
+def buscar_json_supabase_rota():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json()
+        tipo_relatorio = dados["tipo_relatorio"]
+        empresa = dados["empresa"]
+        rodada = dados["rodada"]
+        email_lider = dados["email_lider"]
+
+        print(f"🔍 SUPABASE - Buscando dados: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+
+        # Usar a função existente
+        dados_json = buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider)
+        
+        if dados_json:
+            print(f"✅ SUPABASE - Dados encontrados: {dados_json}")
+            response = jsonify(dados_json)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+        else:
+            print(f"❌ SUPABASE - Dados não encontrados para: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+            response = jsonify({"erro": "Dados não encontrados"})
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+    except Exception as e:
+        print(f"❌ SUPABASE - Erro ao buscar JSON: {e}")
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
+    """
+    Função específica para buscar dados de microambiente no Supabase
+    """
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "empresa": f"eq.{empresa}",
+        "codrodada": f"eq.{rodada}",
+        "emaillider": f"eq.{email_lider}",
+        "tipo_relatorio": f"eq.{tipo_relatorio}",
+        "order": "data_criacao.desc",
+        "limit": 1
+    }
+    
+    print(f"🔍 MICROAMBIENTE - Buscando no Supabase:")
+    print(f"   URL: {url}")
+    print(f"   Parâmetros: {params}")
+    
+    resp = requests.get(url, headers=headers, params=params)
+    print(f"📦 MICROAMBIENTE - Status: {resp.status_code}")
+    print(f"📦 MICROAMBIENTE - Resposta: {resp.text}")
+
+    if resp.status_code == 200:
+        dados = resp.json()
+        if dados:
+            print(f"✅ MICROAMBIENTE - Dados encontrados: {dados[0].get('dados_json')}")
+            return dados[0].get("dados_json")
+        else:
+            print(f"❌ MICROAMBIENTE - Nenhum dado encontrado")
+    else:
+        print(f"❌ MICROAMBIENTE - Erro na requisição: {resp.status_code}")
+    
+    return None
+
+@app.route("/buscar-json-microambiente", methods=["POST", "OPTIONS"])
+def buscar_json_microambiente_rota():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json()
+        tipo_relatorio = dados["tipo_relatorio"]
+        empresa = dados["empresa"]
+        rodada = dados["rodada"]
+        email_lider = dados["email_lider"]
+
+        print(f"🔍 MICROAMBIENTE - Buscando dados: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+
+        # Usar a nova função específica para microambiente
+        dados_json = buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider)
+        
+        if dados_json:
+            print(f"✅ MICROAMBIENTE - Dados encontrados: {dados_json}")
+            response = jsonify(dados_json)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+        else:
+            print(f"❌ MICROAMBIENTE - Dados não encontrados para: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+            response = jsonify({"erro": "Dados não encontrados"})
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+    except Exception as e:
+        print(f"❌ MICROAMBIENTE - Erro ao buscar JSON: {e}")
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
 
 
