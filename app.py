@@ -74,6 +74,12 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
+def salvar_json_no_supabase(dados, empresa, codrodada, email_lider, tipo):
+    """
+    Função para salvar dados JSON no Supabase (alias para salvar_relatorio_analitico_no_supabase)
+    """
+    return salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo)
+
 def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     headers = {
         "apikey": SUPABASE_KEY,
