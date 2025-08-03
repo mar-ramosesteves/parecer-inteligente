@@ -8,6 +8,7 @@ import base64
 import io
 import matplotlib.pyplot as plt
 import numpy as np
+import traceback
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
