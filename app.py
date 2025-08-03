@@ -80,6 +80,14 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "Authorization": f"Bearer {SUPABASE_KEY}"
     }
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    
+    # PRIMEIRO: Buscar TODOS os dados para ver o que existe
+    print(f"🔍 SUPABASE - Buscando TODOS os dados para debug:")
+    resp_todos = requests.get(url, headers=headers, params={"limit": 10})
+    print(f"📦 SUPABASE - Todos os dados: {resp_todos.status_code}")
+    print(f"📦 SUPABASE - Resposta completa: {resp_todos.text}")
+    
+    # DEPOIS: Buscar com filtros
     params = {
         "empresa": f"eq.{empresa}",
         "codrodada": f"eq.{rodada}",
@@ -89,7 +97,7 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "limit": 1
     }
     
-    print(f"🔍 SUPABASE - Buscando dados:")
+    print(f"🔍 SUPABASE - Buscando dados com filtros:")
     print(f"   URL: {url}")
     print(f"   Parâmetros: {params}")
     print(f"   Tipo: {tipo_relatorio}")
