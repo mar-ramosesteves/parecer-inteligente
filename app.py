@@ -206,8 +206,8 @@ def emitir_parecer_microambiente():
             conteudo_parecer = f"Erro ao carregar o guia de microambiente: {str(e)}"
             print(f"ERRO: Ao carregar guia de microambiente: {str(e)}")
         
-        # --- 2. Preparar o HTML do IFRAME para o Gráfico de Dimensões (linhas) ---
-        # Foco APENAS neste gráfico.
+        # --- 2. Preparar o HTML do IFRAME para o gráfico de Dimensões (linhas) ---
+        # Foco APENAS neste gráfico, como você solicitou.
         endpoint_pagina_grafico_dimensoes = "microambiente_grafico_mediaequipe_dimensao" 
         base_url_graficos = "https://microambiente-avaliacao.onrender.com/"
         
@@ -215,6 +215,7 @@ def emitir_parecer_microambiente():
         url_iframe_dimensoes = f"{base_url_graficos}{endpoint_pagina_grafico_dimensoes}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}"
         
         # Cria a tag <iframe> com estilos de DEBUG visual FORTE
+        # Esses estilos devem ser removidos APÓS o gráfico aparecer.
         iframe_html_dimensoes = f'''
         <br>
         <iframe src="{url_iframe_dimensoes}" 
@@ -225,6 +226,7 @@ def emitir_parecer_microambiente():
         '''
 
         # --- 3. Injetar o IFRAME no conteúdo do parecer no LOCAL EXATO ---
+        # Este é o marcador no texto do guia onde o gráfico será inserido.
         marcador_no_texto = "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:"
         
         # Substitui o marcador no texto pelo marcador + o iframe.
@@ -241,7 +243,7 @@ def emitir_parecer_microambiente():
             "titulo": "PARECER INTELIGENTE - MICROAMBIENTE",
             "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
             "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "conteudo_html": conteudo_parecer_final # O texto do parecer AGORA COM O IFRAME INJETADO
+            "conteudo_html": conteudo_parecer_final # O texto do parecer COM o iframe injetado
         }
 
         # --- 5. Salvar o parecer (com a referência aos gráficos) no Supabase ---
@@ -252,9 +254,17 @@ def emitir_parecer_microambiente():
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 200
 
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        print(f"Erro de comunicação com o Supabase ao buscar ou salvar parecer: {str(e)}")
         detailed_traceback = traceback.format_exc()
+        print(f"TRACEBACK COMPLETO:\n{detailed_traceback}")
+        response = jsonify({"erro": f"Erro de comunicação com o Supabase: {str(e)}", "debug_info": "Verifique os logs."})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+    except Exception as e:
         print("Erro geral no parecer IA microambiente:", e)
+        detailed_traceback = traceback.format_exc()
+        print(f"TRACEBACK COMPLETO:\n{detailed_traceback}")
         response = jsonify({"erro": str(e), "debug_info": "Verifique os logs para detalhes."})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
