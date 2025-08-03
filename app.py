@@ -249,7 +249,7 @@ def emitir_parecer_microambiente():
 
         # --- 5. Salvar o parecer (com a referência aos gráficos) no Supabase ---
         tipo_relatorio_parecer = "microambiente_parecer_ia"
-        salvar_json_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio_parecer)
+        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio_parecer)
 
         response = jsonify(dados_retorno)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
