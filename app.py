@@ -93,11 +93,11 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     print(f"📦 SUPABASE - Todos os dados: {resp_todos.status_code}")
     print(f"📦 SUPABASE - Resposta completa: {resp_todos.text}")
     
-    # DEPOIS: Buscar com filtros
+    # DEPOIS: Buscar com filtros (case insensitive)
     params = {
-        "empresa": f"eq.{empresa}",
-        "codrodada": f"eq.{rodada}",
-        "emaillider": f"eq.{email_lider}",
+        "empresa": f"ilike.{empresa}",
+        "codrodada": f"ilike.{rodada}",
+        "emaillider": f"ilike.{email_lider}",
         "tipo_relatorio": f"eq.{tipo_relatorio}",
         "order": "data_criacao.desc",
         "limit": 1
