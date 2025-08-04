@@ -149,8 +149,8 @@ def emitir_parecer_arquetipos():
             equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
             x = np.arange(len(labels))
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color="royalblue")
-            ax.bar(x + 0.2, equipe, width=0.4, label="Equipe", color="darkorange")
+            ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color="orange")
+            ax.bar(x + 0.2, equipe, width=0.4, label="Equipe", color="lightblue")
             for i in range(len(labels)):
                 ax.text(x[i] - 0.2, auto[i] + 1, f"{auto[i]:.0f}%", ha='center', fontsize=8)
                 ax.text(x[i] + 0.2, equipe[i] + 1, f"{equipe[i]:.0f}%", ha='center', fontsize=8)
