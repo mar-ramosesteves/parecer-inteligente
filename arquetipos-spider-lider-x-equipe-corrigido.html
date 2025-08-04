@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gráfico de Teia de Aranha - Arquétipos de Gestão</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        input[type="text"],
+        input[type="email"] {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: block;
+            width: calc(100% - 22px);
+            box-sizing: border-box;
+        }
+        button {
+            padding: 12px 20px;
+            background-color: #f7931e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #e07b00;
+        }
+        .message {
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        #graficoArquetiposContainer {
+            width: 100%;
+            max-width: 750px;
+            margin: 30px auto;
+            display: none;
+            background-color: #ffffff;
+            padding: 25px;
+            padding-bottom: 120px;
+            border-radius: 10px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        #graficoArquetiposContainer button {
+            background-color: #28a745;
+            margin-right: 15px;
+        }
+        #graficoArquetiposContainer button:last-child {
+            background-color: #007bff;
+            margin-right: 0;
+        }
+        #graficoArquetiposContainer button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Gerar Gráfico de Teia de Aranha - Arquétipos de Gestão</h2>
+
+        <input id="empresa" type="text" placeholder="Empresa" />
+        <input id="codrodada" type="text" placeholder="Rodada" />
+        <input id="emailLider" type="email" placeholder="E-mail do Líder" />
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button id="gerarGraficoArquetiposBtn">📊 Gerar Gráfico de Teia de Aranha</button>
+        </div>
+
+        <p id="loadingMessageArquetipos" class="message" style="color: #0056b3; display: none;">⏳ Carregando dados e gerando gráfico...</p>
+        <p id="errorMessageArquetipos" class="message" style="color: #dc3545; display: none;"></p>
+
+        <div id="graficoArquetiposContainer">
+            <h3 id="graficoArquetiposTitulo" style="text-align: center; color: #333; margin-bottom: 10px; font-size: 1.5em;"></h3>
+            <p id="graficoArquetiposSubtitulo" style="text-align: center; color: #666; font-size: 1em; margin-bottom: 20px;"></p>
+            <canvas id="arquetiposRadarChart"></canvas>
+            <div style="text-align: center; margin-top: 30px;">
+                <button id="salvarGraficoArquetiposBtn">Salvar Gráfico (PNG)</button>
+                <button id="imprimirGraficoArquetiposBtn">Imprimir Gráfico</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Carregamento das bibliotecas Chart.js de forma não-bloqueadora
+        function loadScript(src, callback) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = callback;
+            script.onerror = () => console.error(`Failed to load script: ${src}`);
+            document.head.appendChild(script);
+        }
+
+        // Variável global para armazenar a instância do gráfico de Teia de Aranha
+        let arquetiposChartInstance = null;
+
+        // Função para obter os valores dos campos de entrada
+        function getCampos() {
+            return {
+                empresa: document.getElementById("empresa")?.value.trim(),
+                codrodada: document.getElementById("codrodada")?.value.trim(),
+                emailLider: document.getElementById("emailLider")?.value.trim()
+            };
+        }
+
+        // --- FUNÇÃO DO GRÁFICO DE TEIA DE ARANHA NA TELA ---
+        async function gerarGraficoArquetiposNaTela() {
+            const { empresa, codrodada, emailLider } = getCampos();
+            const graficoContainer = document.getElementById("graficoArquetiposContainer");
+            const loadingMessage = document.getElementById("loadingMessageArquetipos");
+            const errorMessage = document.getElementById("errorMessageArquetipos");
+            const graficoTitulo = document.getElementById("graficoArquetiposTitulo");
+            const graficoSubtitulo = document.getElementById("graficoArquetiposSubtitulo");
+
+            // Esconde mensagens antigas e o gráfico
+            loadingMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+            graficoContainer.style.display = 'none';
+            graficoTitulo.innerText = '';
+            graficoSubtitulo.innerText = '';
+
+            if (!empresa || !codrodada || !emailLider) {
+                errorMessage.innerText = "❗ Por favor, preencha Empresa, Rodada e E-mail do Líder para gerar o gráfico.";
+                errorMessage.style.display = 'block';
+                loadingMessage.style.display = 'none';
+                return;
+            }
+
+            // Antes de tentar desenhar o gráfico, garantir que Chart.js e seu plugin estão carregados
+            if (typeof Chart === 'undefined' || typeof ChartDataLabels === 'undefined') {
+                errorMessage.innerText = "❌ Bibliotecas de gráfico não carregadas. Por favor, recarregue a página.";
+                errorMessage.style.display = 'block';
+                loadingMessage.style.display = 'none';
+                console.error("Chart.js ou ChartDataLabels não definidos.");
+                return;
+            }
+
+            try {
+                console.log("🚀 Chamando a API para gerar o gráfico de Perfis...");
+                const response = await fetch("https://hrkey-v2-grafico.onrender.com/gerar-graficos-comparativos", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ empresa, codrodada, emailLider })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || "Erro desconhecido da API.");
+                }
+
+                const data = await response.json();
+                console.log("✅ Dados recebidos da API:", data);
+
+                // 🔧 CORREÇÃO: Verificar se os dados necessários existem
+                if (!data.arquetipos || !Array.isArray(data.arquetipos)) {
+                    throw new Error("Dados de arquétipos inválidos ou ausentes na resposta da API.");
+                }
+
+                if (!data.autoavaliacao || !data.mediaEquipe) {
+                    throw new Error("Dados de autoavaliação ou média da equipe ausentes na resposta da API.");
+                }
+
+                // Destroi a instância anterior do gráfico se existir
+                if (arquetiposChartInstance) {
+                    arquetiposChartInstance.destroy();
+                }
+
+                // --- Labels (nomes dos eixos) baseados no seu JSON ---
+                const labels = data.arquetipos;
+
+                // --- Dados para o gráfico, lendo do seu JSON ---
+                const autoavaliacaoData = labels.map(label => data.autoavaliacao[label] || 0);
+                const mediaEquipeData = labels.map(label => data.mediaEquipe[label] || 0);
+
+                const ctx = document.getElementById('arquetiposRadarChart').getContext('2d');
+
+                graficoTitulo.innerText = data.titulo || "Arquétipos de Gestão";
+                graficoSubtitulo.innerText = (data.subtitulo || "") + ` (${data.n_avaliacoes || 0} Avaliações de Equipe)`;
+
+                // --- DEFINIÇÃO DO PLUGIN PERSONALIZADO PARA AS LINHAS DE REFERÊNCIA ---
+                const referenceLinesPlugin = {
+                    id: 'referenceLines',
+                    beforeDraw: (chart) => {
+                        const ctx = chart.canvas.getContext('2d');
+                        const scale = chart.scales.r;
+                        const chartArea = chart.chartArea;
+
+                        const centerX = (chartArea.left + chartArea.right) / 2;
+                        const centerY = (chartArea.top + chartArea.bottom) / 2;
+
+                        const drawReferenceCircle = (value, color, dash, label) => {
+                            const radius = scale.getDistanceFromCenterForValue(value);
+
+                            if (radius <= 0 || isNaN(radius)) {
+                                return;
+                            }
+
+                            ctx.beginPath();
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = 3;
+                            ctx.setLineDash(dash);
+                            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+
+                            ctx.fillStyle = color;
+                            ctx.font = 'bold 10px Arial';
+                            ctx.textAlign = 'left';
+                            ctx.fillText(label, centerX + radius + 5, centerY);
+                        };
+
+                        drawReferenceCircle(60, 'red', [5, 5], 'Dominante (60%)');
+                        drawReferenceCircle(50, 'blue', [2, 2], 'Suporte (50%)');
+                    }
+                };
+
+                arquetiposChartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Autoavaliação (Líder)',
+                                data: autoavaliacaoData,
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 2
+                            },
+                            {
+                                label: 'Média da Equipe',
+                                data: mediaEquipeData,
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        aspectRatio: 1,
+                        plugins: {
+                            title: {
+                                display: false
+                            },
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.raw.toFixed(1) + '%';
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                color: '#555',
+                                font: {
+                                    weight: 'bold'
+                                },
+                                formatter: function(value) {
+                                    return value.toFixed(1) + '%';
+                                }
+                            }
+                        },
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    color: 'rgba(0,0,0,0.1)'
+                                },
+                                grid: {
+                                    color: 'rgba(0,0,0,0.1)'
+                                },
+                                pointLabels: {
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    },
+                                    color: '#444'
+                                },
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    stepSize: 10,
+                                    beginAtZero: true,
+                                    color: '#777',
+                                    callback: function(value, index, values) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels, referenceLinesPlugin]
+                });
+
+                loadingMessage.style.display = 'none';
+                graficoContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error("❌ Erro ao gerar o gráfico de Perfis:", error);
+                errorMessage.innerText = `❌ Erro ao gerar o gráfico: ${error.message}. Verifique os dados e tente novamente.`;
+                loadingMessage.style.display = 'none';
+                errorMessage.style.display = 'block';
+                graficoContainer.style.display = 'none';
+            }
+        }
+
+        // --- FUNÇÕES PARA SALVAR/IMPRIMIR GRÁFICO DE TEIA DE ARANHA ---
+        function salvarGraficoArquetipos() {
+            if (arquetiposChartInstance) {
+                const link = document.createElement('a');
+                link.href = arquetiposChartInstance.toBase64Image();
+                link.download = `grafico_teia_arquetipos_${document.getElementById('empresa').value}_${document.getElementById('codrodada').value}.png`;
+                link.click();
+            } else {
+                alert("Nenhum gráfico para salvar.");
+            }
+        }
+
+        function imprimirGraficoArquetipos() {
+            if (arquetiposChartInstance) {
+                const chartImage = arquetiposChartInstance.toBase64Image();
+                const graficoTitulo = document.getElementById("graficoArquetiposTitulo").innerText;
+                const graficoSubtitulo = document.getElementById("graficoArquetiposSubtitulo").innerText;
+
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write('<html><head><title>Imprimir Gráfico de Teia de Aranha</title>');
+                printWindow.document.write('<style>');
+                printWindow.document.write('body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }');
+                printWindow.document.write('h3 { color: #333; margin-bottom: 10px; font-size: 1.5em; }');
+                printWindow.document.write('p { color: #666; font-size: 1em; margin-bottom: 20px; }');
+                printWindow.document.write('img { max-width: 90%; height: auto; display: block; margin: 0 auto; }');
+                printWindow.document.write('@media print { body { margin: 0; } img { max-width: 100%; page-break-after: always; } }');
+                printWindow.document.write('</style>');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(`<h3>${graficoTitulo}</h3>`);
+                printWindow.document.write(`<p>${graficoSubtitulo}</p>`);
+                printWindow.document.write(`<img src="${chartImage}" onload="window.print();window.close()" />`);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+            } else {
+                alert("Nenhum gráfico para imprimir.");
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadScript('https://cdn.jsdelivr.net/npm/chart.js', () => {
+                loadScript('https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0', () => {
+                    const gerarBtn = document.getElementById('gerarGraficoArquetiposBtn');
+                    if (gerarBtn) {
+                        gerarBtn.addEventListener('click', gerarGraficoArquetiposNaTela);
+                    }
+
+                    const salvarBtn = document.getElementById('salvarGraficoArquetiposBtn');
+                    if (salvarBtn) {
+                        salvarBtn.addEventListener('click', salvarGraficoArquetipos);
+                    }
+
+                    const imprimirBtn = document.getElementById('imprimirGraficoArquetiposBtn');
+                    if (imprimirBtn) {
+                        imprimirBtn.addEventListener('click', imprimirGraficoArquetipos);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
