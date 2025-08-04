@@ -127,11 +127,11 @@ def emitir_parecer_arquetipos():
             return None
 
         json_auto_vs_equipe = buscar_json("arquetipos_grafico_comparativo")
-if json_auto_vs_equipe and isinstance(json_auto_vs_equipe, str):
-    try:
-        json_auto_vs_equipe = json.loads(json_auto_vs_equipe)
-    except:
-        json_auto_vs_equipe = None
+        if json_auto_vs_equipe and isinstance(json_auto_vs_equipe, str):
+            try:
+                json_auto_vs_equipe = json.loads(json_auto_vs_equipe)
+            except:
+                json_auto_vs_equipe = None
 
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
