@@ -13,8 +13,8 @@ import traceback
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
-SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL", "https://seu-projeto.supabase.co/rest/v1")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sua-chave-supabase")
 
 
 from flask import render_template
@@ -33,6 +33,11 @@ def microambiente_grafico_comparativo():
 
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
+    # Verificar se as variáveis de ambiente estão configuradas
+    if SUPABASE_REST_URL == "https://seu-projeto.supabase.co/rest/v1" or SUPABASE_KEY == "sua-chave-supabase":
+        print("⚠️ AVISO: Variáveis de ambiente do Supabase não configuradas. Pulando salvamento.")
+        return
+    
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
     headers = {
         "apikey": SUPABASE_KEY,
@@ -51,6 +56,11 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response.raise_for_status()
 
 def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
+    # Verificar se as variáveis de ambiente estão configuradas
+    if SUPABASE_REST_URL == "https://seu-projeto.supabase.co/rest/v1" or SUPABASE_KEY == "sua-chave-supabase":
+        print("⚠️ AVISO: Variáveis de ambiente do Supabase não configuradas. Retornando None.")
+        return None
+    
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
@@ -108,6 +118,11 @@ def gerar_grafico_base64(dados):
     return img_base64
 
 def salvar_json_no_supabase(dados, empresa, codrodada, email_lider, tipo):
+    # Verificar se as variáveis de ambiente estão configuradas
+    if SUPABASE_REST_URL == "https://seu-projeto.supabase.co/rest/v1" or SUPABASE_KEY == "sua-chave-supabase":
+        print("⚠️ AVISO: Variáveis de ambiente do Supabase não configuradas. Pulando salvamento.")
+        return
+    
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
     headers = {
         "apikey": SUPABASE_KEY,
@@ -127,6 +142,11 @@ def salvar_json_no_supabase(dados, empresa, codrodada, email_lider, tipo):
 
 def buscar_dados_microambiente_supabase(empresa, rodada, email_lider):
     """Busca dados de microambiente do Supabase"""
+    # Verificar se as variáveis de ambiente estão configuradas
+    if SUPABASE_REST_URL == "https://seu-projeto.supabase.co/rest/v1" or SUPABASE_KEY == "sua-chave-supabase":
+        print("⚠️ AVISO: Variáveis de ambiente do Supabase não configuradas. Retornando dados vazios.")
+        return {"equipe": [], "autoavaliacao": []}
+    
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
