@@ -80,15 +80,26 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
-            print(f"✅ SUPABASE - Dados encontrados: {dados[0].get('dados_json')}")
-            return dados[0].get("dados_json")
+            dados_json = dados[0].get("dados_json")
+            print(f"✅ SUPABASE - Dados encontrados: {dados_json}")
+            
+            # CONVERTER STRING PARA OBJETO SE NECESSÁRIO
+            if isinstance(dados_json, str):
+                try:
+                    import json
+                    dados_json = json.loads(dados_json)
+                    print(f"✅ SUPABASE - String convertida para objeto")
+                except Exception as e:
+                    print(f"❌ SUPABASE - Erro ao converter string: {e}")
+                    return dados_json
+            
+            return dados_json
         else:
             print(f"❌ SUPABASE - Nenhum dado encontrado")
     else:
         print(f"❌ SUPABASE - Erro na requisição: {resp.status_code}")
     
     return None
-
 
 def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
     headers = {
