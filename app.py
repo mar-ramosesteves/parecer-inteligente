@@ -3,26 +3,17 @@ from flask_cors import CORS
 import os
 import json
 from datetime import datetime
-import requests
+import matplotlib.pyplot as plt
 import base64
 import io
-import matplotlib.pyplot as plt
 import numpy as np
-import traceback
+import requests
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-
-from flask import render_template
-
-@app.route("/microambiente_grafico_autoavaliacao_dimensao")
-def microambiente_grafico_autoavaliacao_dimensao():
-    return render_template("microambiente_grafico_autoavaliacao_dimensao.html")
-
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
@@ -42,113 +33,19 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
-import json
-
 def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
-    print(f"🔍 ARQUÉTIPOS - Buscando: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
-    
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
     }
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    params = {
-        "empresa": f"eq.{empresa}",
-        "codrodada": f"eq.{rodada}",
-        "emaillider": f"eq.{email_lider}",
-        "tipo_relatorio": f"eq.{tipo_relatorio}",
-        "order": "data_criacao.desc",
-        "limit": 1
-    }
-    
-    print(f"🔍 ARQUÉTIPOS - URL: {url}")
-    print(f"🔍 ARQUÉTIPOS - Params: {params}")
-    
-    resp = requests.get(url, headers=headers, params=params)
-    print(f"🔍 ARQUÉTIPOS - Status: {resp.status_code}")
-    print(f"🔍 ARQUÉTIPOS - Resposta: {resp.text}")
-    
+    filtro = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.{tipo_relatorio}&order=data_criacao.desc&limit=1"
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro}"
+    resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
         dados = resp.json()
-        print(f"🔍 ARQUÉTIPOS - Dados: {dados}")
-        if dados:
-            dados_json = dados[0].get("dados_json")
-            print(f"🔍 ARQUÉTIPOS - dados_json: {dados_json}")
-            
-            # CONVERTER STRING PARA OBJETO SE NECESSÁRIO
-            if isinstance(dados_json, str):
-                try:
-                    import json
-                    dados_json = json.loads(dados_json)
-                    print(f"🔍 ARQUÉTIPOS - Convertido para objeto")
-                except Exception as e:
-                    print(f"❌ ARQUÉTIPOS - Erro ao converter: {e}")
-                    return None
-            return dados_json
-    return None
-
-def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}"
-    }
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    params = {
-        "empresa": f"ilike.{empresa}",
-        "codrodada": f"ilike.{rodada}",
-        "emaillider": f"ilike.{email_lider}",
-        "tipo_relatorio": f"eq.{tipo_relatorio}",
-        "order": "data_criacao.desc",
-        "limit": 1
-    }
-    
-    print(f"🔍 MICROAMBIENTE - URL: {url}")
-    print(f"🔍 MICROAMBIENTE - Params: {params}")
-    
-    resp = requests.get(url, headers=headers, params=params)
-    print(f"📦 MICROAMBIENTE - JSON buscado: {resp.status_code} {resp.text}")
-    
-    if resp.status_code == 200:
-        dados = resp.json()
-        print(f"📦 MICROAMBIENTE - Dados retornados: {dados}")
         if dados:
             return dados[0].get("dados_json")
     return None
-
-
-
-def gerar_grafico_base64(dados):
-    arquetipos = dados.get("arquetipos", [])
-    auto = [dados["autoavaliacao"].get(a, 0) for a in arquetipos]
-    equipe = [dados["mediaEquipe"].get(a, 0) for a in arquetipos]
-    x = np.arange(len(arquetipos))
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color='#00b0f0')
-    ax.bar(x + 0.2, equipe, width=0.4, label="Média da Equipe", color='#f7931e')
-
-    for i, (a, e) in enumerate(zip(auto, equipe)):
-        ax.text(i - 0.2, a + 1, f"{a:.0f}%", ha='center', fontsize=8)
-        ax.text(i + 0.2, e + 1, f"{e:.0f}%", ha='center', fontsize=8)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(arquetipos, rotation=45)
-    ax.set_ylim(0, 100)
-    ax.axhline(50, color='gray', linestyle=':', linewidth=1)
-    ax.text(len(x)-0.5, 52, "Suporte", color='gray', fontsize=8, ha='right')
-    ax.axhline(60, color='gray', linestyle='--', linewidth=1)
-    ax.text(len(x)-0.5, 62, "Dominante", color='gray', fontsize=8, ha='right')
-    ax.set_title(dados.get("titulo", ""), fontsize=12, weight='bold')
-    ax.legend()
-    plt.tight_layout()
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close()
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    print("🧪 Tamanho do gráfico gerado (base64):", len(img_base64))
-    return img_base64
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
 def emitir_parecer_arquetipos():
@@ -172,36 +69,65 @@ def emitir_parecer_arquetipos():
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
 
+        def buscar_json(tipo):
+            url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+            params = {
+                "empresa": f"eq.{empresa}",
+                "codrodada": f"eq.{rodada}",
+                "emaillider": f"eq.{email_lider}",
+                "tipo_relatorio": f"eq.{tipo}",
+                "order": "data_criacao.desc",
+                "limit": 1
+            }
+            resp = requests.get(url, headers=headers, params=params)
+            if resp.status_code == 200 and resp.json():
+                return resp.json()[0]["dados_json"]
+            return None
+
+        json_auto_vs_equipe = buscar_json("arquetipos_grafico_comparativo")
+
         with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
             texto = f.read()
         inicio = texto.find("##### INICIO ARQUETIPOS #####")
         fim = texto.find("##### FIM ARQUETIPOS #####")
         guia = texto[inicio + len("##### INICIO ARQUETIPOS #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Arquétipos não encontrado."
 
-        conteudo_html = guia
-        print("GUIA CARREGADO:", conteudo_html[:500])
-
-
         marcador = "Abaixo, o resultado da análise de Arquétipos relativa ao modo como voce lidera em sua visão, comparado com a média da visão de sua equipe direta:"
         partes = guia.split(marcador)
 
-
         imagem_base64 = ""
-        grafico = buscar_json_supabase("arquetipos_grafico_comparativo", empresa, rodada, email_lider)
-        print("JSON DO GRÁFICO:", grafico)
+        if json_auto_vs_equipe:
+            labels = list(json_auto_vs_equipe["autoavaliacao"].keys())
+            auto = list(json_auto_vs_equipe["autoavaliacao"].values())
+            equipe = list(json_auto_vs_equipe["mediaEquipe"].values())
+            x = np.arange(len(labels))
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.bar(x - 0.2, auto, width=0.4, label="Autoavaliação", color="royalblue")
+            ax.bar(x + 0.2, equipe, width=0.4, label="Equipe", color="darkorange")
+            for i in range(len(labels)):
+                ax.text(x[i] - 0.2, auto[i] + 1, f"{auto[i]:.0f}%", ha='center', fontsize=8)
+                ax.text(x[i] + 0.2, equipe[i] + 1, f"{equipe[i]:.0f}%", ha='center', fontsize=8)
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, rotation=45)
+            ax.axhline(50, color="gray", linestyle="--")
+            ax.axhline(60, color="gray", linestyle=":")
+            ax.set_ylim(0, 100)
+            ax.set_title("ARQUÉTIPOS AUTO VS EQUIPE", fontsize=14, weight="bold")
+            plt.tight_layout()
 
-        if grafico:
-            imagem_base64 = gerar_grafico_base64(grafico)
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            plt.close()
 
-        if len(partes) == 2:
-            conteudo_html = partes[0] + f"{marcador}\n<br><br><img src=\"data:image/png;base64,{imagem_base64}\" style=\"width:100%;max-width:800px;\"><br><br>" + partes[1]
-
+        bloco_html = partes[0] + f"<br><br>{marcador}<br><br><img src='data:image/png;base64,{imagem_base64}' style='width:100%;max-width:800px;'><br><br>" + partes[1] if len(partes) == 2 else guia
 
         dados_retorno = {
             "titulo": "ARQUÉTIPOS DE GESTÃO",
             "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
             "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "conteudo_html": conteudo_html
+            "conteudo_html": bloco_html
         }
 
         salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
@@ -212,46 +138,6 @@ def emitir_parecer_arquetipos():
 
     except Exception as e:
         print("Erro no parecer IA arquetipos:", e)
-        response = jsonify({"erro": str(e)})
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        return response, 500
-
-
-
-@app.route("/buscar-json-supabase", methods=["POST", "OPTIONS"])
-def buscar_json_supabase_rota():
-    if request.method == "OPTIONS":
-        response = jsonify({'status': 'CORS preflight OK'})
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-        return response
-
-    try:
-        dados = request.get_json()
-        tipo_relatorio = dados["tipo_relatorio"]
-        empresa = dados["empresa"]
-        rodada = dados["rodada"]
-        email_lider = dados["email_lider"]
-
-        print(f"🔍 Buscando dados: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
-
-        # Usar a função que já existe
-        dados_json = buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider)
-        
-        if dados_json:
-            print(f"✅ Dados encontrados: {dados_json}")
-            response = jsonify(dados_json)
-            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-            return response, 200
-        else:
-            print(f"❌ Dados não encontrados para: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
-            response = jsonify({"erro": "Dados não encontrados"})
-            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-            return response, 404
-
-    except Exception as e:
-        print(f"❌ Erro ao buscar JSON: {e}")
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
