@@ -45,6 +45,8 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
 import json
 
 def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
+    print(f"🔍 ARQUÉTIPOS - Buscando: {tipo_relatorio}, {empresa}, {rodada}, {email_lider}")
+    
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
@@ -58,17 +60,29 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "order": "data_criacao.desc",
         "limit": 1
     }
+    
+    print(f"🔍 ARQUÉTIPOS - URL: {url}")
+    print(f"🔍 ARQUÉTIPOS - Params: {params}")
+    
     resp = requests.get(url, headers=headers, params=params)
+    print(f"🔍 ARQUÉTIPOS - Status: {resp.status_code}")
+    print(f"🔍 ARQUÉTIPOS - Resposta: {resp.text}")
+    
     if resp.status_code == 200:
         dados = resp.json()
+        print(f"🔍 ARQUÉTIPOS - Dados: {dados}")
         if dados:
             dados_json = dados[0].get("dados_json")
+            print(f"🔍 ARQUÉTIPOS - dados_json: {dados_json}")
+            
             # CONVERTER STRING PARA OBJETO SE NECESSÁRIO
             if isinstance(dados_json, str):
                 try:
+                    import json
                     dados_json = json.loads(dados_json)
+                    print(f"🔍 ARQUÉTIPOS - Convertido para objeto")
                 except Exception as e:
-                    print("Erro ao converter dados_json:", e)
+                    print(f"❌ ARQUÉTIPOS - Erro ao converter: {e}")
                     return None
             return dados_json
     return None
