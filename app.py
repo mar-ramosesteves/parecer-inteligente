@@ -38,13 +38,55 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
     }
-    filtro = f"?empresa=eq.{empresa}&codrodada=eq.{rodada}&emaillider=eq.{email_lider}&tipo_relatorio=eq.{tipo_relatorio}&order=data_criacao.desc&limit=1"
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados{filtro}"
-    resp = requests.get(url, headers=headers)
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "empresa": f"eq.{empresa}",
+        "codrodada": f"eq.{rodada}",
+        "emaillider": f"eq.{email_lider}",
+        "tipo_relatorio": f"eq.{tipo_relatorio}",
+        "order": "data_criacao.desc",
+        "limit": 1
+    }
+    resp = requests.get(url, headers=headers, params=params)
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
-            return dados[0].get("dados_json")
+            dados_json = dados[0].get("dados_json")
+            if isinstance(dados_json, str):
+                try:
+                    dados_json = json.loads(dados_json)
+                except Exception as e:
+                    print("Erro ao converter dados_json:", e)
+                    return None
+            return dados_json
+    return None
+
+def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "empresa": f"ilike.{empresa}",
+        "codrodada": f"ilike.{rodada}",
+        "emaillider": f"ilike.{email_lider}",
+        "tipo_relatorio": f"eq.{tipo_relatorio}",
+        "order": "data_criacao.desc",
+        "limit": 1
+    }
+    resp = requests.get(url, headers=headers, params=params)
+    if resp.status_code == 200:
+        dados = resp.json()
+        if dados:
+            dados_json = dados[0].get("dados_json")
+            if isinstance(dados_json, str):
+                try:
+                    dados_json = json.loads(dados_json)
+                except Exception as e:
+                    print("Erro ao converter dados_json:", e)
+                    return None
+            return dados_json
     return None
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
@@ -142,10 +184,6 @@ def emitir_parecer_arquetipos():
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
 
-
-
-
-# ---------- ROTA PRINCIPAL ----------
 @app.route("/emitir-parecer-microambiente", methods=["POST", "OPTIONS"])
 def emitir_parecer_microambiente():
     if request.method == "OPTIONS":
@@ -156,91 +194,107 @@ def emitir_parecer_microambiente():
         return response
 
     try:
-        dados_requisicao = request.get_json()
-        empresa = dados_requisicao["empresa"].lower()
-        rodada = dados_requisicao["codrodada"].lower()
-        email_lider = dados_requisicao["emailLider"].lower()
+        dados = request.get_json()
+        empresa = dados["empresa"].lower()
+        rodada = dados["codrodada"].lower()
+        email_lider = dados["emailLider"].lower()
 
-        # --- 1. Carregar o guia base do arquivo local ---
-        try:
-            with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
-                guia_texto_completo = f.read()
-            
-            marcador_inicio = "##### INICIO MICROAMBIENTE #####"
-            marcador_fim = "##### FIM MICROAMBIENTE #####"
-            inicio = guia_texto_completo.find(marcador_inicio)
-            fim = guia_texto_completo.find(marcador_fim)
-            
-            conteudo_parecer = guia_texto_completo[inicio + len(marcador_inicio):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
+        tipo_relatorio = "microambiente_parecer_ia"
 
-        except FileNotFoundError:
-            conteudo_parecer = "Erro: Arquivo 'guias_completos_unificados.txt' não encontrado no servidor."
-            print(f"ERRO: Arquivo 'guias_completos_unificados.txt' não encontrado.")
-        except Exception as e:
-            conteudo_parecer = f"Erro ao carregar o guia de microambiente: {str(e)}"
-            print(f"ERRO: Ao carregar guia de microambiente: {str(e)}")
-        
-        # --- 2. Preparar o HTML do IFRAME para o gráfico de Dimensões (linhas) ---
-        # Foco APENAS neste gráfico, como você solicitou.
-        endpoint_pagina_grafico_dimensoes = "microambiente_grafico_mediaequipe_dimensao" 
-        base_url_graficos = "https://microambiente-avaliacao.onrender.com/"
-        
-        # Constrói a URL completa para o iframe do gráfico de dimensões
-        url_iframe_dimensoes = f"{base_url_graficos}{endpoint_pagina_grafico_dimensoes}?empresa={empresa}&codrodada={rodada}&emailLider={email_lider}"
-        
-        # Cria a tag <iframe> com estilos de DEBUG visual FORTE
-        # Esses estilos devem ser removidos APÓS o gráfico aparecer.
-        iframe_html_dimensoes = f'''
-        <br>
-        <iframe src="{url_iframe_dimensoes}" 
-                style="width:100%;height:500px;border:5px solid red !important; display:block !important; background-color:yellow !important;"
-                title="Gráfico de Dimensões da Equipe">
-        </iframe>
-        <br>
-        '''
+        with open("guias_completos_unificados.txt", "r", encoding="utf-8") as f:
+            texto = f.read()
+        inicio = texto.find("##### INICIO MICROAMBIENTE #####")
+        fim = texto.find("##### FIM MICROAMBIENTE #####")
+        guia = texto[inicio + len("##### INICIO MICROAMBIENTE #####"):fim].strip() if inicio != -1 and fim != -1 else "Guia de Microambiente não encontrado."
 
-        # --- 3. Injetar o IFRAME no conteúdo do parecer no LOCAL EXATO ---
-        # Este é o marcador no texto do guia onde o gráfico será inserido.
-        marcador_no_texto = "Abaixo, os gráficos de dimensões e subdimensões de microambiente na percepção de sua equipe:"
-        
-        # Substitui o marcador no texto pelo marcador + o iframe.
-        if marcador_no_texto in conteudo_parecer:
-            conteudo_parecer_final = conteudo_parecer.replace(marcador_no_texto, f"{marcador_no_texto}{iframe_html_dimensoes}")
-        else:
-            # Se o marcador não for encontrado, adiciona o gráfico no final do parecer para depuração
-            conteudo_parecer_final = conteudo_parecer + iframe_html_dimensoes
-            print(f"AVISO: Marcador '{marcador_no_texto}' não encontrado no guia. Gráfico adicionado ao final do parecer.")
-
-
-        # --- 4. Montar a resposta final para o frontend ---
         dados_retorno = {
             "titulo": "PARECER INTELIGENTE - MICROAMBIENTE",
             "subtitulo": f"{empresa.upper()} / {rodada.upper()} / {email_lider}",
             "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "conteudo_html": conteudo_parecer_final # O texto do parecer COM o iframe injetado
+            "conteudo_html": guia
         }
 
-        # --- 5. Salvar o parecer (com a referência aos gráficos) no Supabase ---
-        tipo_relatorio_parecer = "microambiente_parecer_ia"
-        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio_parecer)
+        salvar_relatorio_analitico_no_supabase(dados_retorno, empresa, rodada, email_lider, tipo_relatorio)
 
         response = jsonify(dados_retorno)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 200
 
-    except requests.exceptions.RequestException as e:
-        print(f"Erro de comunicação com o Supabase ao buscar ou salvar parecer: {str(e)}")
-        detailed_traceback = traceback.format_exc()
-        print(f"TRACEBACK COMPLETO:\n{detailed_traceback}")
-        response = jsonify({"erro": f"Erro de comunicação com o Supabase: {str(e)}", "debug_info": "Verifique os logs."})
-        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
-        return response, 500
     except Exception as e:
-        print("Erro geral no parecer IA microambiente:", e)
-        detailed_traceback = traceback.format_exc()
-        print(f"TRACEBACK COMPLETO:\n{detailed_traceback}")
-        response = jsonify({"erro": str(e), "debug_info": "Verifique os logs para detalhes."})
+        print("Erro no parecer IA microambiente:", e)
+        response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
 
+@app.route("/buscar-json-supabase", methods=["POST", "OPTIONS"])
+def buscar_json_supabase_rota():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
 
+    try:
+        dados = request.get_json()
+        tipo_relatorio = dados["tipo_relatorio"]
+        empresa = dados["empresa"].lower()
+        codrodada = dados["codrodada"].lower()
+        emailLider = dados["emailLider"].lower()
+
+        print(f"🔍 Buscando dados: {tipo_relatorio}, {empresa}, {codrodada}, {emailLider}")
+
+        dados_json = buscar_json_supabase(tipo_relatorio, empresa, codrodada, emailLider)
+
+        if dados_json:
+            response = jsonify(dados_json)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+        else:
+            response = jsonify({"erro": "Dados não encontrados"})
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+    except Exception as e:
+        print("Erro ao buscar JSON:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+@app.route("/buscar-json-microambiente", methods=["POST", "OPTIONS"])
+def buscar_json_microambiente_rota():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json()
+        tipo_relatorio = dados["tipo_relatorio"]
+        empresa = dados["empresa"].lower()
+        codrodada = dados["codrodada"].lower()
+        emailLider = dados["emailLider"].lower()
+
+        print(f"🔍 Buscando dados microambiente: {tipo_relatorio}, {empresa}, {codrodada}, {emailLider}")
+
+        dados_json = buscar_json_microambiente(tipo_relatorio, empresa, codrodada, emailLider)
+
+        if dados_json:
+            response = jsonify(dados_json)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+        else:
+            response = jsonify({"erro": "Dados não encontrados"})
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+    except Exception as e:
+        print("Erro ao buscar JSON microambiente:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
