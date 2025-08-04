@@ -49,13 +49,6 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     }
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
     
-    # PRIMEIRO: Buscar TODOS os dados para ver o que existe
-    print(f"🔍 SUPABASE - Buscando TODOS os dados para debug:")
-    resp_todos = requests.get(url, headers=headers, params={"limit": 10})
-    print(f"📦 SUPABASE - Todos os dados: {resp_todos.status_code}")
-    print(f"📦 SUPABASE - Resposta completa: {resp_todos.text}")
-    
-    # DEPOIS: Buscar com filtros
     params = {
         "empresa": f"eq.{empresa}",
         "codrodada": f"eq.{rodada}",
@@ -65,41 +58,14 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "limit": 1
     }
     
-    print(f"🔍 SUPABASE - Buscando dados com filtros:")
-    print(f"   URL: {url}")
-    print(f"   Parâmetros: {params}")
-    print(f"   Tipo: {tipo_relatorio}")
-    print(f"   Empresa: {empresa}")
-    print(f"   Rodada: {rodada}")
-    print(f"   Email: {email_lider}")
-    
     resp = requests.get(url, headers=headers, params=params)
-    print(f"📦 SUPABASE - Status: {resp.status_code}")
-    print(f"📦 SUPABASE - Resposta: {resp.text}")
-
+    
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
-            dados_json = dados[0].get("dados_json")
-            print(f"✅ SUPABASE - Dados encontrados: {dados_json}")
-            
-            # CONVERTER STRING PARA OBJETO SE NECESSÁRIO
-            if isinstance(dados_json, str):
-                try:
-                    import json
-                    dados_json = json.loads(dados_json)
-                    print(f"✅ SUPABASE - String convertida para objeto")
-                except Exception as e:
-                    print(f"❌ SUPABASE - Erro ao converter string: {e}")
-                    return dados_json
-            
-            return dados_json
-        else:
-            print(f"❌ SUPABASE - Nenhum dado encontrado")
-    else:
-        print(f"❌ SUPABASE - Erro na requisição: {resp.status_code}")
-    
+            return dados[0].get("dados_json")
     return None
+
 
 def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
     headers = {
