@@ -42,13 +42,14 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
+import json
+
 def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
     }
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    
     params = {
         "empresa": f"eq.{empresa}",
         "codrodada": f"eq.{rodada}",
@@ -57,15 +58,20 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
         "order": "data_criacao.desc",
         "limit": 1
     }
-    
     resp = requests.get(url, headers=headers, params=params)
-    
     if resp.status_code == 200:
         dados = resp.json()
         if dados:
-            return dados[0].get("dados_json")
+            dados_json = dados[0].get("dados_json")
+            # CONVERTER STRING PARA OBJETO SE NECESSÁRIO
+            if isinstance(dados_json, str):
+                try:
+                    dados_json = json.loads(dados_json)
+                except Exception as e:
+                    print("Erro ao converter dados_json:", e)
+                    return None
+            return dados_json
     return None
-
 
 def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
     headers = {
