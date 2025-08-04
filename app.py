@@ -57,9 +57,9 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     
     # DEPOIS: Buscar com filtros
     params = {
-        "empresa": f"ilike.{empresa}",
-        "codrodada": f"ilike.{rodada}",
-        "emaillider": f"ilike.{email_lider}",
+        "empresa": f"eq.{empresa}",
+        "codrodada": f"eq.{rodada}",
+        "emaillider": f"eq.{email_lider}",
         "tipo_relatorio": f"eq.{tipo_relatorio}",
         "order": "data_criacao.desc",
         "limit": 1
