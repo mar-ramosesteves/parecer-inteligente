@@ -410,8 +410,6 @@ Ao fazer isto, ** os seus colaboradores tentaram dizer a você como é trabalhar
 [COR:PRETO]
 Abaixo, o seu resultado dimensão e subdimensão, com o objetivo de evidenciar os GAP's que devemn ser priorizados, na visão de sua equipe: 
 
-## INSERIR GRÁFICO WATERFALL
-
 
 Seria útil se você checasse o seu entendimento sobre as questões que foram levantadas na pesquisa. Uma forma de fazer isto é fazer uma reunião com os seus subordinados diretos para dividir e discutir os resultados do Ambiente e trazer as questões a público. Você não só irá levar adiante o seu próprio entendimento, mas também: 
 
@@ -649,8 +647,7 @@ A dimensão Colaboração Mútua do Ambiente da Equipe é influenciada por quatr
 
 Abaixo, o termômetro de GAP's, que serve para determinar o tipo de microambiente que você proporciona à sua equipe. Quanto menor o número GAP's, maior o estímulo que os integrantes de sua equipe tem em se engajar e produzir resultados de alta performance.
 
-## INSERIR GRÁFICO TERMÔMETRO
 
 A seguir, o relatório analítico por afirmação, comparando o que a sua equipe julga ser ideal e como eles gostariam que fosse, divididos por dimensões e subdimensões de microambiente. Boa leitura!
 ##### FIM MICROAMBIENTE #####
-## INSERIR RELATÓRIO ANALÍTICO POR AFIRMAÇÃO - MICROAMBIENTE.
+
