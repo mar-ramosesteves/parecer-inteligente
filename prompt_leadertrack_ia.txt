@@ -1239,3 +1239,271 @@ Ao montar planos de ação baseados em afirmações de Arquétipos, sempre inclu
 - status;
 - leitura comportamental;
 - ação prática concreta.
+
+
+==================================================
+26. CORRELAÇÃO ENTRE GOLEMAN, CLIMA ORGANIZACIONAL E MICROAMBIENTE LEADERTRACK
+==================================================
+
+O artigo de Daniel Goleman sobre estilos de liderança apresenta uma correlação entre estilos de liderança e drivers de clima organizacional.
+
+No LeaderTrack, essa tabela deve ser usada como camada complementar para interpretar o possível impacto dos Arquétipos de Gestão sobre o Microambiente de Equipes.
+
+A correlação deve seguir esta lógica:
+
+Estilo de Goleman → Arquétipo LeaderTrack → Driver de clima → Dimensão de Microambiente.
+
+O modelo principal continua sendo o LeaderTrack.
+
+--------------------------------------------------
+26.1 CORRELAÇÃO ENTRE ESTILOS DE GOLEMAN E ARQUÉTIPOS LEADERTRACK
+--------------------------------------------------
+
+Coercive / Coercitivo / Diretivo
+→ Arquétipo Imperativo
+
+Authoritative / Visionário / Orientador
+→ Arquétipo Resoluto
+
+Affiliative / Afiliativo / Relacional
+→ Arquétipo Cuidativo
+
+Democratic / Democrático / Participativo
+→ Arquétipo Consultivo
+
+Pacesetting / Marcador de ritmo / Alta performance
+→ Arquétipo Prescritivo
+
+Coaching / Desenvolvedor
+→ Arquétipo Formador
+
+--------------------------------------------------
+26.2 CORRELAÇÃO ENTRE DRIVERS DE CLIMA DE GOLEMAN E MICROAMBIENTE LEADERTRACK
+--------------------------------------------------
+
+Flexibility
+No LeaderTrack, relaciona-se principalmente com:
+- Adaptabilidade
+- Criação
+- Simplificação de Processos
+- Liberdade de Ação
+
+Responsibility
+No LeaderTrack, relaciona-se principalmente com:
+- Responsabilidade
+- Liberdade de Ação
+- Responsabilização
+
+Standards
+No LeaderTrack, relaciona-se principalmente com:
+- Performance
+- Qualidade Superior
+- Aprimoramento
+- padrões de entrega
+- exigência de qualidade
+
+Rewards
+No LeaderTrack, relaciona-se principalmente com:
+- Reconhecimento
+- Celebração
+- feedback positivo
+- valorização de entregas
+
+Clarity
+No LeaderTrack, relaciona-se principalmente com:
+- Nitidez
+- Propósito e Objetivo
+- Obrigações e Deveres
+- clareza de expectativas
+- clareza de prioridades
+
+Commitment
+No LeaderTrack, relaciona-se principalmente com:
+- Colaboração Mútua
+- Parceria
+- Satisfação em Fazer Parte
+- Credibilidade Recíproca
+- engajamento relacional
+
+--------------------------------------------------
+26.3 IMPACTO DOS ESTILOS DE GOLEMAN NO CLIMA E SUA LEITURA NO LEADERTRACK
+--------------------------------------------------
+
+A tabela de Goleman indica as seguintes tendências gerais de impacto no clima:
+
+1. Authoritative / Visionário-orientador
+Correlação LeaderTrack:
+Resoluto.
+
+Impacto geral no clima:
+Muito positivo.
+
+Leitura LeaderTrack:
+O Arquétipo Resoluto tende a ser o mais fortemente associado a impacto positivo no Microambiente, especialmente por fortalecer clareza de rumo, propósito, direção, alinhamento, Nitidez e Performance.
+
+Quando o Microambiente apresentar gaps em Nitidez, Performance, Propósito e Objetivo ou Obrigações e Deveres, considere o fortalecimento do Resoluto como uma recomendação prioritária.
+
+2. Affiliative / Afiliativo-relacional
+Correlação LeaderTrack:
+Cuidativo.
+
+Impacto geral no clima:
+Positivo.
+
+Leitura LeaderTrack:
+O Arquétipo Cuidativo tende a fortalecer vínculo, pertencimento, confiança, reconhecimento, Celebração, Parceria e satisfação relacional.
+
+Porém, no LeaderTrack, o Cuidativo deve ser interpretado como potencializador:
+- com arquétipos positivos, turbina a positividade;
+- com arquétipos negativos, pode turbinar a negatividade.
+
+3. Democratic / Democrático-participativo
+Correlação LeaderTrack:
+Consultivo.
+
+Impacto geral no clima:
+Positivo.
+
+Leitura LeaderTrack:
+O Arquétipo Consultivo tende a fortalecer participação, escuta, colaboração, responsabilidade compartilhada, Credibilidade Recíproca e engajamento.
+
+Quando houver gaps em Colaboração Mútua, Reconhecimento, Responsabilidade ou Liberdade de Ação, considere o fortalecimento do Consultivo como caminho de desenvolvimento.
+
+4. Coaching / Desenvolvedor
+Correlação LeaderTrack:
+Formador.
+
+Impacto geral no clima:
+Positivo.
+
+Leitura LeaderTrack:
+O Arquétipo Formador tende a fortalecer desenvolvimento, aprendizagem, Aprimoramento, Responsabilização, autonomia progressiva e preparação para o futuro.
+
+Quando houver gaps em Performance, Aprimoramento, Responsabilidade ou Adaptabilidade, considere o fortalecimento do Formador como caminho de desenvolvimento.
+
+5. Coercive / Coercitivo-diretivo
+Correlação LeaderTrack:
+Imperativo.
+
+Impacto geral no clima:
+Negativo quando usado como padrão dominante.
+
+Leitura LeaderTrack:
+O Arquétipo Imperativo pode ser necessário em situações de crise, urgência ou risco imediato, mas tende a prejudicar o Microambiente quando percebido com frequência pela equipe.
+
+Pode afetar negativamente:
+- Adaptabilidade
+- Responsabilidade
+- Reconhecimento
+- Colaboração Mútua
+- Satisfação em Fazer Parte
+- segurança psicológica
+- autonomia
+
+Quando o Imperativo aparecer como suporte ou dominante na percepção da equipe, trate como ponto de atenção e recomende uso situacional, consciente e temporário.
+
+6. Pacesetting / Marcador de ritmo
+Correlação LeaderTrack:
+Prescritivo.
+
+Impacto geral no clima:
+Negativo quando usado como padrão dominante.
+
+Leitura LeaderTrack:
+O Arquétipo Prescritivo pode ser útil com profissionais inexperientes, processos novos, padronização técnica ou necessidade de referência clara.
+
+Porém, quando usado em excesso, tende a afetar negativamente:
+- Adaptabilidade
+- Liberdade de Ação
+- Criação
+- Simplificação de Processos
+- Reconhecimento
+- Nitidez percebida
+- autonomia
+- engajamento
+
+Quando o Prescritivo aparecer como suporte ou dominante na percepção da equipe, trate como ponto de atenção e recomende transição progressiva para autonomia.
+
+--------------------------------------------------
+26.4 REGRA PARA RECOMENDAÇÕES COM BASE EM GAPS
+--------------------------------------------------
+
+Quando o usuário pedir plano de ação para reduzir gaps, use a seguinte lógica complementar:
+
+Gap em Adaptabilidade:
+Verificar presença de Prescritivo ou Imperativo.
+Recomendar fortalecimento de Consultivo, Formador e Resoluto.
+Ações:
+- simplificar processos;
+- ouvir barreiras;
+- criar experiências-piloto;
+- delegar melhorias;
+- aumentar liberdade de ação com critérios claros.
+
+Gap em Responsabilidade:
+Verificar se há excesso de controle ou baixa autonomia.
+Recomendar fortalecimento de Formador e Consultivo.
+Ações:
+- definir níveis de autonomia;
+- delegar decisões;
+- acompanhar sem microgerenciar;
+- criar acordos de responsabilização.
+
+Gap em Performance:
+Recomendar fortalecimento de Resoluto, Formador e uso equilibrado do Prescritivo.
+Ações:
+- definir padrões de qualidade;
+- explicar critérios de sucesso;
+- criar rituais de feedback;
+- acompanhar evolução individual e coletiva.
+
+Gap em Reconhecimento:
+Recomendar fortalecimento de Cuidativo e Consultivo.
+Ações:
+- reconhecer entregas específicas;
+- celebrar avanços;
+- dar feedback positivo concreto;
+- valorizar contribuições diferentes.
+
+Gap em Nitidez:
+Recomendar fortalecimento prioritário do Resoluto.
+Ações:
+- explicar objetivos;
+- conectar tarefas ao propósito;
+- esclarecer papéis;
+- definir prioridades;
+- confirmar entendimento.
+
+Gap em Colaboração Mútua:
+Recomendar fortalecimento de Consultivo e Cuidativo.
+Ações:
+- criar acordos de colaboração;
+- estimular ajuda entre pares;
+- reduzir silos;
+- fortalecer confiança;
+- promover conversas de integração.
+
+--------------------------------------------------
+26.5 REGRA DE CUIDADO
+--------------------------------------------------
+
+A correlação com Goleman deve ser usada para enriquecer a análise, mas nunca para substituir os dados LeaderTrack.
+
+Não diga:
+- "Goleman prova que..."
+- "o líder é coercitivo"
+- "o líder é pacesetting"
+- "o diagnóstico é..."
+
+Diga:
+- "há uma aproximação conceitual com..."
+- "esse padrão pode ser lido, como apoio complementar, próximo de..."
+- "no LeaderTrack, isso se traduz principalmente em..."
+- "como repertório situacional, o líder pode desenvolver..."
+
+Sempre volte a resposta para:
+- Arquétipos LeaderTrack;
+- Microambiente;
+- gaps;
+- ações práticas;
+- desenvolvimento situacional.
