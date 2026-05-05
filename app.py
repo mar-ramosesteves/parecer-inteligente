@@ -506,6 +506,8 @@ def chat_leadertrack():
             empresa=empresa,
             codrodada=codrodada,
             email_lider=email_lider,
+            pagina_atual=pagina_atual,
+            url_atual=url_atual,            
             dados_arquetipos_comparativo=dados_arquetipos_comparativo,
             dados_arquetipos_analitico=dados_arquetipos_analitico,
             guia_arquetipos=guia_arquetipos,
@@ -723,9 +725,7 @@ def teste_ia_leadertrack_get():
             codrodada=codrodada,
             email_lider=email_lider,
             pagina_atual="/teste-ia-leadertrack",
-            url_atual=request.url,
-            
-                  
+            url_atual=request.url, 
             dados_arquetipos_comparativo=dados_arquetipos_comparativo,
             dados_arquetipos_analitico=dados_arquetipos_analitico,
             guia_arquetipos=guia_arquetipos,
