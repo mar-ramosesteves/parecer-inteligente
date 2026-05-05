@@ -439,5 +439,66 @@ def chat_leadertrack():
         return response, 500
 
 
+@app.route("/teste-chat-leadertrack", methods=["GET"])
+def teste_chat_leadertrack_get():
+    try:
+        empresa = request.args.get("empresa", "").lower()
+        codrodada = request.args.get("codrodada", "").lower()
+        email_lider = request.args.get("emailLider", "").lower()
+        pergunta = request.args.get(
+            "pergunta",
+            "Como posso melhorar o microambiente da minha equipe com base nos meus arquétipos?"
+        )
+
+        if not empresa or not codrodada or not email_lider:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Informe empresa, codrodada e emailLider na URL.",
+                "exemplo": "/teste-chat-leadertrack?empresa=empresa_teste&codrodada=rodada1&emailLider=lider@teste.com"
+            }), 400
+
+        prompt_base = carregar_prompt_leadertrack()
+
+        dados_arquetipos = buscar_json_supabase(
+            "arquetipos_grafico_comparativo",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_microambiente = buscar_json_microambiente(
+            "microambiente_grafico_barras",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_saude_emocional = buscar_json_supabase(
+            "saude_emocional_grafico_barras",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        return jsonify({
+            "status": "ok",
+            "pergunta": pergunta,
+            "prompt_carregado": True,
+            "tamanho_prompt": len(prompt_base),
+            "dados_encontrados": {
+                "arquetipos": "ENCONTRADO" if dados_arquetipos else "NÃO ENCONTRADO",
+                "microambiente": "ENCONTRADO" if dados_microambiente else "NÃO ENCONTRADO",
+                "saude_emocional": "ENCONTRADO" if dados_saude_emocional else "NÃO ENCONTRADO"
+            }
+        }), 200
+
+    except Exception as e:
+        print("Erro no teste chat Leadertrack GET:", e)
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(e)
+        }), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True)
