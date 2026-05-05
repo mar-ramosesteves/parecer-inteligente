@@ -15,6 +15,30 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+
+def carregar_prompt_leadertrack():
+    """
+    Carrega o prompt base do Assistente Inteligente Leadertrack.
+
+    Este arquivo contém as regras que impedem a IA de sair do contexto
+    do método Leadertrack.
+    """
+    try:
+        with open("prompt_leadertrack_ia.txt", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return """
+ERRO: O arquivo prompt_leadertrack_ia.txt não foi encontrado.
+Verifique se ele está no mesmo nível do app.py.
+"""
+    except Exception as e:
+        return f"""
+ERRO: Não foi possível carregar o prompt Leadertrack.
+Detalhe técnico: {str(e)}
+"""
+
+
+
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
     headers = {
@@ -300,6 +324,120 @@ def buscar_json_microambiente_rota():
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
+
+@app.route("/teste-prompt-leadertrack", methods=["GET"])
+def teste_prompt_leadertrack():
+    try:
+        prompt = carregar_prompt_leadertrack()
+
+        return jsonify({
+            "status": "ok",
+            "mensagem": "Prompt Leadertrack carregado com sucesso.",
+            "tamanho_caracteres": len(prompt),
+            "inicio_prompt": prompt[:300]
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(e)
+        }), 500
+
+@app.route("/chat-leadertrack", methods=["POST", "OPTIONS"])
+def chat_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json()
+
+        empresa = dados.get("empresa", "").lower()
+        codrodada = dados.get("codrodada", "").lower()
+        email_lider = dados.get("emailLider", "").lower()
+        pergunta = dados.get("pergunta", "")
+
+        if not empresa or not codrodada or not email_lider or not pergunta:
+            response = jsonify({
+                "erro": "Campos obrigatórios ausentes.",
+                "campos_necessarios": [
+                    "empresa",
+                    "codrodada",
+                    "emailLider",
+                    "pergunta"
+                ]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        prompt_base = carregar_prompt_leadertrack()
+
+        # Busca os dados reais já gerados pelo Leadertrack no Supabase
+        dados_arquetipos = buscar_json_supabase(
+            "arquetipos_grafico_comparativo",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        dados_microambiente = buscar_json_microambiente(
+            "microambiente_grafico_barras",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        dados_saude_emocional = buscar_json_supabase(
+            "saude_emocional_grafico_barras",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        resposta_teste = f"""
+        Assistente Leadertrack ativo.
+        
+        Recebi a sua pergunta:
+        {pergunta}
+        
+        Contexto recebido:
+        Empresa: {empresa}
+        Rodada: {codrodada}
+        Líder: {email_lider}
+        
+        Prompt Leadertrack:
+        {len(prompt_base)} caracteres carregados.
+        
+        Dados encontrados no Supabase:
+        
+        Arquétipos:
+        {"ENCONTRADO" if dados_arquetipos else "NÃO ENCONTRADO"}
+        
+        Microambiente:
+        {"ENCONTRADO" if dados_microambiente else "NÃO ENCONTRADO"}
+        
+        Saúde Emocional:
+        {"ENCONTRADO" if dados_saude_emocional else "NÃO ENCONTRADO"}
+        
+        Esta ainda é uma resposta de teste.
+        No próximo passo, estes dados serão enviados para a IA de forma controlada.
+        """
+        response = jsonify({
+            "status": "ok",
+            "resposta": resposta_teste
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro no chat Leadertrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
