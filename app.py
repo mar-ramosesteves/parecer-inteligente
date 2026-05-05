@@ -436,23 +436,59 @@ def chat_leadertrack():
 
         prompt_base = carregar_prompt_leadertrack()
 
-        # Busca os dados reais já gerados pelo Leadertrack no Supabase
-        dados_arquetipos = buscar_json_supabase(
+        # Busca os dados reais de Arquétipos já gerados pelo Leadertrack no Supabase
+        dados_arquetipos_comparativo = buscar_json_supabase(
             "arquetipos_grafico_comparativo",
             empresa,
             codrodada,
             email_lider
         )
         
-        dados_microambiente = buscar_json_microambiente(
-            "microambiente_grafico_barras",
+        dados_arquetipos_analitico = buscar_json_supabase(
+            "arquetipos_analitico",
             empresa,
             codrodada,
             email_lider
         )
         
-        dados_saude_emocional = buscar_json_supabase(
-            "saude_emocional_grafico_barras",
+        guia_arquetipos = buscar_json_supabase(
+            "arquetipos_parecer_ia",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        # Busca os dados reais de Microambiente já gerados pelo Leadertrack no Supabase
+        dados_microambiente_analitico = buscar_json_microambiente(
+            "microambiente_analitico",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        dados_microambiente_subdimensao = buscar_json_microambiente(
+            "microambiente_grafico_mediaequipe_subdimensao",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        dados_microambiente_termometro_gaps = buscar_json_microambiente(
+            "microambiente_termometro_gaps",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        dados_microambiente_waterfall_gaps = buscar_json_microambiente(
+            "microambiente_waterfall_gaps",
+            empresa,
+            codrodada,
+            email_lider
+        )
+        
+        guia_microambiente = buscar_json_microambiente(
+            "microambiente_parecer_ia",
             empresa,
             codrodada,
             email_lider
