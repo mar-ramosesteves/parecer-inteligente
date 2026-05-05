@@ -458,38 +458,29 @@ def chat_leadertrack():
             email_lider
         )
         
-        resposta_teste = f"""
-        Assistente Leadertrack ativo.
+        resposta_ia = gerar_resposta_ia_leadertrack(
+            pergunta=pergunta,
+            prompt_base=prompt_base,
+            empresa=empresa,
+            codrodada=codrodada,
+            email_lider=email_lider,
+            dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+            dados_arquetipos_analitico=dados_arquetipos_analitico,
+            guia_arquetipos=guia_arquetipos,
+            dados_microambiente_analitico=dados_microambiente_analitico,
+            dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+            dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+            dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+            guia_microambiente=guia_microambiente
+        )
+
         
-        Recebi a sua pergunta:
-        {pergunta}
-        
-        Contexto recebido:
-        Empresa: {empresa}
-        Rodada: {codrodada}
-        Líder: {email_lider}
-        
-        Prompt Leadertrack:
-        {len(prompt_base)} caracteres carregados.
-        
-        Dados encontrados no Supabase:
-        
-        Arquétipos:
-        {"ENCONTRADO" if dados_arquetipos else "NÃO ENCONTRADO"}
-        
-        Microambiente:
-        {"ENCONTRADO" if dados_microambiente else "NÃO ENCONTRADO"}
-        
-        Saúde Emocional:
-        {"ENCONTRADO" if dados_saude_emocional else "NÃO ENCONTRADO"}
-        
-        Esta ainda é uma resposta de teste.
-        No próximo passo, estes dados serão enviados para a IA de forma controlada.
-        """
         response = jsonify({
             "status": "ok",
-            "resposta": resposta_teste
+            "resposta": resposta_ia
         })
+
+        
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 200
 
