@@ -465,83 +465,82 @@ def teste_chat_leadertrack_get():
             codrodada,
             email_lider
         )
-        
+
         dados_arquetipos_analitico = buscar_json_supabase(
             "arquetipos_analitico",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         guia_arquetipos = buscar_json_supabase(
             "arquetipos_parecer_ia",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         dados_microambiente_analitico = buscar_json_microambiente(
             "microambiente_analitico",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         dados_microambiente_subdimensao = buscar_json_microambiente(
             "microambiente_grafico_mediaequipe_subdimensao",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         dados_microambiente_termometro_gaps = buscar_json_microambiente(
             "microambiente_termometro_gaps",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         dados_microambiente_waterfall_gaps = buscar_json_microambiente(
             "microambiente_waterfall_gaps",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         guia_microambiente = buscar_json_microambiente(
             "microambiente_parecer_ia",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         dados_saude_emocional = buscar_json_supabase(
             "saude_emocional_grafico_barras",
             empresa,
             codrodada,
             email_lider
         )
-        
+
         return jsonify({
             "status": "ok",
             "pergunta": pergunta,
             "prompt_carregado": True,
             "tamanho_prompt": len(prompt_base),
-
-            
             "dados_encontrados": {
                 "arquetipos_grafico_comparativo": "ENCONTRADO" if dados_arquetipos_comparativo else "NÃO ENCONTRADO",
                 "arquetipos_analitico": "ENCONTRADO" if dados_arquetipos_analitico else "NÃO ENCONTRADO",
                 "arquetipos_parecer_ia_guia": "ENCONTRADO" if guia_arquetipos else "NÃO ENCONTRADO",
-            
+
                 "microambiente_analitico": "ENCONTRADO" if dados_microambiente_analitico else "NÃO ENCONTRADO",
                 "microambiente_grafico_mediaequipe_subdimensao": "ENCONTRADO" if dados_microambiente_subdimensao else "NÃO ENCONTRADO",
                 "microambiente_termometro_gaps": "ENCONTRADO" if dados_microambiente_termometro_gaps else "NÃO ENCONTRADO",
                 "microambiente_waterfall_gaps": "ENCONTRADO" if dados_microambiente_waterfall_gaps else "NÃO ENCONTRADO",
                 "microambiente_parecer_ia_guia": "ENCONTRADO" if guia_microambiente else "NÃO ENCONTRADO",
-            
+
                 "saude_emocional": "ENCONTRADO" if dados_saude_emocional else "NÃO ENCONTRADO"
             }
+        }), 200
 
     except Exception as e:
         print("Erro no teste chat Leadertrack GET:", e)
@@ -549,7 +548,6 @@ def teste_chat_leadertrack_get():
             "status": "erro",
             "mensagem": str(e)
         }), 500
-
 
 if __name__ == "__main__":
     app.run(debug=True)
