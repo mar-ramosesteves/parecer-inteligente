@@ -596,5 +596,115 @@ def teste_chat_leadertrack_get():
             "mensagem": str(e)
         }), 500
 
+
+
+@app.route("/teste-ia-leadertrack", methods=["GET"])
+def teste_ia_leadertrack_get():
+    try:
+        empresa = request.args.get("empresa", "").lower()
+        codrodada = request.args.get("codrodada", "").lower()
+        email_lider = request.args.get("emailLider", "").lower()
+        pergunta = request.args.get(
+            "pergunta",
+            "Como posso melhorar o microambiente da minha equipe com base nos meus arquétipos?"
+        )
+
+        if not empresa or not codrodada or not email_lider:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Informe empresa, codrodada e emailLider na URL.",
+                "exemplo": "/teste-ia-leadertrack?empresa=fastco&codrodada=av1225&emailLider=felipe@astro34.com.br"
+            }), 400
+
+        prompt_base = carregar_prompt_leadertrack()
+
+        dados_arquetipos_comparativo = buscar_json_supabase(
+            "arquetipos_grafico_comparativo",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_arquetipos_analitico = buscar_json_supabase(
+            "arquetipos_analitico",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        guia_arquetipos = buscar_json_supabase(
+            "arquetipos_parecer_ia",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_microambiente_analitico = buscar_json_microambiente(
+            "microambiente_analitico",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_microambiente_subdimensao = buscar_json_microambiente(
+            "microambiente_grafico_mediaequipe_subdimensao",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_microambiente_termometro_gaps = buscar_json_microambiente(
+            "microambiente_termometro_gaps",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        dados_microambiente_waterfall_gaps = buscar_json_microambiente(
+            "microambiente_waterfall_gaps",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        guia_microambiente = buscar_json_microambiente(
+            "microambiente_parecer_ia",
+            empresa,
+            codrodada,
+            email_lider
+        )
+
+        resposta_ia = gerar_resposta_ia_leadertrack(
+            pergunta=pergunta,
+            prompt_base=prompt_base,
+            empresa=empresa,
+            codrodada=codrodada,
+            email_lider=email_lider,
+            dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+            dados_arquetipos_analitico=dados_arquetipos_analitico,
+            guia_arquetipos=guia_arquetipos,
+            dados_microambiente_analitico=dados_microambiente_analitico,
+            dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+            dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+            dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+            guia_microambiente=guia_microambiente
+        )
+
+        return jsonify({
+            "status": "ok",
+            "pergunta": pergunta,
+            "resposta": resposta_ia
+        }), 200
+
+    except Exception as e:
+        print("Erro no teste IA Leadertrack GET:", e)
+        return jsonify({
+            "status": "erro",
+            "mensagem": str(e)
+        }), 500
+
+
+
+
 if __name__ == "__main__":
     app.run(debug=True)
