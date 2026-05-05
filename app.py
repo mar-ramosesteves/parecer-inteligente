@@ -46,6 +46,8 @@ def gerar_resposta_ia_leadertrack(
     empresa,
     codrodada,
     email_lider,
+    pagina_atual,
+    url_atual,    
     dados_arquetipos_comparativo,
     dados_arquetipos_analitico,
     guia_arquetipos,
@@ -63,7 +65,9 @@ def gerar_resposta_ia_leadertrack(
         "empresa": empresa,
         "codrodada": codrodada,
         "email_lider": email_lider,
-        "pergunta_usuario": pergunta,
+        "pagina_atual": pagina_atual,
+        "url_atual": url_atual,
+        "pergunta_usuario": pergunta,        
         "dados_disponiveis": {
             "arquetipos_grafico_comparativo": dados_arquetipos_comparativo,
             "arquetipos_analitico": dados_arquetipos_analitico,
@@ -420,6 +424,8 @@ def chat_leadertrack():
         codrodada = dados.get("codrodada", "").lower()
         email_lider = dados.get("emailLider", "").lower()
         pergunta = dados.get("pergunta", "")
+        pagina_atual = dados.get("paginaAtual", "")
+        url_atual = dados.get("urlAtual", "")
 
         if not empresa or not codrodada or not email_lider or not pergunta:
             response = jsonify({
@@ -716,6 +722,10 @@ def teste_ia_leadertrack_get():
             empresa=empresa,
             codrodada=codrodada,
             email_lider=email_lider,
+            pagina_atual="/teste-ia-leadertrack",
+            url_atual=request.url,
+            
+                  
             dados_arquetipos_comparativo=dados_arquetipos_comparativo,
             dados_arquetipos_analitico=dados_arquetipos_analitico,
             guia_arquetipos=guia_arquetipos,
