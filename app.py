@@ -8,12 +8,15 @@ import base64
 import io
 import numpy as np
 import requests
+from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
 
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def carregar_prompt_leadertrack():
@@ -36,6 +39,64 @@ Verifique se ele está no mesmo nível do app.py.
 ERRO: Não foi possível carregar o prompt Leadertrack.
 Detalhe técnico: {str(e)}
 """
+
+def gerar_resposta_ia_leadertrack(
+    pergunta,
+    prompt_base,
+    empresa,
+    codrodada,
+    email_lider,
+    dados_arquetipos_comparativo,
+    dados_arquetipos_analitico,
+    guia_arquetipos,
+    dados_microambiente_analitico,
+    dados_microambiente_subdimensao,
+    dados_microambiente_termometro_gaps,
+    dados_microambiente_waterfall_gaps,
+    guia_microambiente
+):
+    """
+    Gera uma resposta do Assistente Leadertrack com base apenas nos dados fornecidos.
+    """
+
+    contexto_leadertrack = {
+        "empresa": empresa,
+        "codrodada": codrodada,
+        "email_lider": email_lider,
+        "pergunta_usuario": pergunta,
+        "dados_disponiveis": {
+            "arquetipos_grafico_comparativo": dados_arquetipos_comparativo,
+            "arquetipos_analitico": dados_arquetipos_analitico,
+            "arquetipos_parecer_ia_guia": guia_arquetipos,
+            "microambiente_analitico": dados_microambiente_analitico,
+            "microambiente_grafico_mediaequipe_subdimensao": dados_microambiente_subdimensao,
+            "microambiente_termometro_gaps": dados_microambiente_termometro_gaps,
+            "microambiente_waterfall_gaps": dados_microambiente_waterfall_gaps,
+            "microambiente_parecer_ia_guia": guia_microambiente
+        }
+    }
+
+    resposta = openai_client.chat.completions.create(
+        model="gpt-4.1-mini",
+        temperature=0.2,
+        messages=[
+            {
+                "role": "system",
+                "content": prompt_base
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Responda à pergunta do usuário usando exclusivamente o contexto JSON abaixo. "
+                    "Não invente dados. Não use teorias externas. "
+                    "Se algum dado não estiver disponível, informe a limitação.\n\n"
+                    f"CONTEXTO LEADERTRACK:\n{json.dumps(contexto_leadertrack, ensure_ascii=False)}"
+                )
+            }
+        ]
+    )
+
+    return resposta.choices[0].message.content
 
 
 
