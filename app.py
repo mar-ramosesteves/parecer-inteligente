@@ -515,12 +515,7 @@ def teste_chat_leadertrack_get():
             email_lider
         )
 
-        dados_saude_emocional = buscar_json_supabase(
-            "saude_emocional_grafico_barras",
-            empresa,
-            codrodada,
-            email_lider
-        )
+        
 
         return jsonify({
             "status": "ok",
@@ -538,7 +533,7 @@ def teste_chat_leadertrack_get():
                 "microambiente_waterfall_gaps": "ENCONTRADO" if dados_microambiente_waterfall_gaps else "NÃO ENCONTRADO",
                 "microambiente_parecer_ia_guia": "ENCONTRADO" if guia_microambiente else "NÃO ENCONTRADO",
 
-                "saude_emocional": "ENCONTRADO" if dados_saude_emocional else "NÃO ENCONTRADO"
+                
             }
         }), 200
 
