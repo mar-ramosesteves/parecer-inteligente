@@ -21,6 +21,15 @@ def slug(value):
     return text.strip("_")[:60] or "item"
 
 
+def parse_percent(value, default=0):
+    if value in (None, ""):
+        return default
+    try:
+        return float(str(value).replace("%", "").replace(",", ".").strip())
+    except Exception:
+        return default
+
+
 def parse_json_response(raw):
     if isinstance(raw, dict):
         parsed = raw
@@ -56,9 +65,11 @@ def microenvironment_affirmations(dados_microambiente_analitico):
     rows = (dados_microambiente_analitico or {}).get("dados") or []
     normalized = []
     for row in rows:
-        gap = float(row.get("GAP", 0) or 0)
-        real = float(row.get("PONTUACAO_REAL", 0) or 0)
-        ideal = float(row.get("PONTUACAO_IDEAL", 0) or 0)
+        gap_original = parse_percent(row.get("GAP", 0))
+        real = parse_percent(row.get("PONTUACAO_REAL", 0))
+        ideal = parse_percent(row.get("PONTUACAO_IDEAL", 0))
+        gap_calculado = abs(ideal - real)
+        gap = abs(gap_original) if gap_original else gap_calculado
         normalized.append({
             "questao": fix_text(row.get("QUESTAO")),
             "afirmacao": fix_text(row.get("AFIRMACAO")),
@@ -67,6 +78,7 @@ def microenvironment_affirmations(dados_microambiente_analitico):
             "real_percentual": real,
             "ideal_percentual": ideal,
             "gap_percentual": gap,
+            "gap_original_percentual": gap_original,
             "criticidade": classify_gap(gap),
         })
     return sorted(normalized, key=lambda item: item["gap_percentual"], reverse=True)
