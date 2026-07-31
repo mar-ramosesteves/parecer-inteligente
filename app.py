@@ -29,6 +29,7 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gest
 
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -246,10 +247,11 @@ def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
     return None
 
 
-def supabase_headers(prefer_return=True):
+def supabase_headers(prefer_return=True, use_service_role=False):
+    key = SUPABASE_SERVICE_ROLE_KEY if use_service_role and SUPABASE_SERVICE_ROLE_KEY else SUPABASE_KEY
     headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
     if prefer_return:
@@ -258,10 +260,10 @@ def supabase_headers(prefer_return=True):
 
 
 def supabase_insert(table, payload):
-    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+    if not SUPABASE_REST_URL or not (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY):
         raise RuntimeError("Supabase nao configurado no ambiente.")
     url = f"{SUPABASE_REST_URL}/{table}"
-    response = requests.post(url, headers=supabase_headers(), json=payload, timeout=60)
+    response = requests.post(url, headers=supabase_headers(use_service_role=True), json=payload, timeout=60)
     if response.status_code >= 300:
         raise RuntimeError(f"Erro ao salvar em {table}: HTTP {response.status_code} - {response.text}")
     data = response.json()
