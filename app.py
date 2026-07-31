@@ -1469,6 +1469,31 @@ def gerar_pdi_leadertrack_afirmacao():
             response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
             return response, 400
 
+        gap_id_previo = str(dados.get("gapId") or dados.get("gap_id") or "").strip()
+        if usar_cache and gap_id_previo:
+            intervalo_previo = None
+            if etapa != "diagnostico":
+                intervalo_previo = intervalo_etapa_leadertrack(etapa, dados)
+            if etapa == "diagnostico":
+                cache_key_previa = leadertrack_cache_key(
+                    empresa, codrodada, email_lider, equipe_tipo, gap_id_previo, etapa
+                )
+                cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key_previa)
+                if cached_payload:
+                    response = jsonify(cached_payload)
+                    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                    return response, 200
+            elif intervalo_previo:
+                inicio_previo, fim_previo = intervalo_previo
+                cache_key_previa = leadertrack_cache_key(
+                    empresa, codrodada, email_lider, equipe_tipo, gap_id_previo, etapa, inicio_previo, fim_previo
+                )
+                cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key_previa)
+                if cached_payload:
+                    response = jsonify(cached_payload)
+                    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                    return response, 200
+
         dados_arquetipos_comparativo = buscar_json_supabase(
             "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
         )
