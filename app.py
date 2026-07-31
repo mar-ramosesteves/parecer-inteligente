@@ -326,7 +326,8 @@ def avaliar_amostra_leadertrack(*relatorios):
         if isinstance(value, dict):
             for key, item in value.items():
                 key_norm = _normalizar_chave_amostra(key)
-                if isinstance(item, (int, float, str, bool)) and key_norm in (
+                if isinstance(item, (int, float, str, bool)) and (
+                    key_norm in (
                     "respondentes",
                     "respostasequipe",
                     "respostasdaequipe",
@@ -335,6 +336,13 @@ def avaliar_amostra_leadertrack(*relatorios):
                     "menosde3meses",
                     "menos3meses",
                     "amostrainsuficiente",
+                    )
+                    or "respondente" in key_norm
+                    or "respostaequipe" in key_norm
+                    or "elegivel" in key_norm
+                    or "elegivei" in key_norm
+                    or "amostra" in key_norm
+                    or "menosde3" in key_norm
                 ):
                     campos[key_norm] = item
                 walk(item, f"{path}.{key}" if path else str(key))
@@ -348,13 +356,35 @@ def avaliar_amostra_leadertrack(*relatorios):
         walk(relatorio)
 
     texto_unificado = " ".join(textos)
-    insuficiente = (
-        "amostra insuficiente" in texto_unificado
-        or bool(campos.get("amostrainsuficiente"))
-    )
+    def numero(value):
+        try:
+            return float(str(value).replace(",", "."))
+        except Exception:
+            return None
+
     elegiveis = campos.get("elegiveismedia", campos.get("elegiveisparamedia"))
     respostas = campos.get("respostasequipe", campos.get("respostasdaequipe", campos.get("respondentes")))
     menos_3_meses = campos.get("menosde3meses", campos.get("menos3meses"))
+
+    for key, value in campos.items():
+        if "elegivel" in key or "elegivei" in key:
+            elegiveis = value if elegiveis in (None, "") else elegiveis
+        if "respondente" in key or "respostaequipe" in key:
+            respostas = value if respostas in (None, "") else respostas
+        if "menosde3" in key:
+            menos_3_meses = value if menos_3_meses in (None, "") else menos_3_meses
+
+    elegiveis_num = numero(elegiveis)
+    respostas_num = numero(respostas)
+
+    insuficiente = (
+        "amostra insuficiente" in texto_unificado
+        or "menos de 3 respostas" in texto_unificado
+        or "menos de três respostas" in texto_unificado
+        or bool(campos.get("amostrainsuficiente"))
+        or (elegiveis_num is not None and elegiveis_num < 3)
+        or (respostas_num is not None and respostas_num < 3)
+    )
 
     return {
         "insuficiente": bool(insuficiente),
