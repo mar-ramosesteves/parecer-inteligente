@@ -42,6 +42,49 @@ def bool_param(value, default=False):
     return str(value).strip().lower() in ("1", "true", "sim", "yes", "y")
 
 
+def leadertrack_gap_id(gap):
+    return f"{gap.get('questao')}_{slug(gap.get('dimensao'))}_{slug(gap.get('subdimensao'))}"
+
+
+def selecionar_gap_leadertrack(todas_afirmacoes, dados):
+    gap_enviado = dados.get("gap")
+    if isinstance(gap_enviado, dict) and gap_enviado.get("questao"):
+        return gap_enviado
+
+    gap_id = str(dados.get("gapId") or dados.get("gap_id") or "").strip()
+    questao = str(dados.get("questao") or "").strip().lower()
+    dimensao = str(dados.get("dimensao") or "").strip().lower()
+    subdimensao = str(dados.get("subdimensao") or "").strip().lower()
+
+    for gap in todas_afirmacoes:
+        if gap_id and leadertrack_gap_id(gap) == gap_id:
+            return gap
+        if questao and str(gap.get("questao") or "").strip().lower() == questao:
+            if dimensao and str(gap.get("dimensao") or "").strip().lower() != dimensao:
+                continue
+            if subdimensao and str(gap.get("subdimensao") or "").strip().lower() != subdimensao:
+                continue
+            return gap
+    return None
+
+
+def intervalo_etapa_leadertrack(etapa, dados):
+    etapa = str(etapa or "diagnostico").strip().lower()
+    mapa = {
+        "semanas_1_4": (1, 4),
+        "1_4": (1, 4),
+        "semanas_5_8": (5, 8),
+        "5_8": (5, 8),
+        "semanas_9_12": (9, 12),
+        "9_12": (9, 12),
+    }
+    if etapa in mapa:
+        return mapa[etapa]
+    if dados.get("semanaInicio") and dados.get("semanaFim"):
+        return int(dados["semanaInicio"]), int(dados["semanaFim"])
+    return None
+
+
 def carregar_prompt_leadertrack():
     """
     Carrega o prompt base do Assistente Inteligente Leadertrack.
@@ -940,6 +983,199 @@ def gerar_devolutiva_leadertrack():
 
     except Exception as e:
         print("Erro ao gerar devolutiva LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/gerar-pdi-leadertrack-afirmacao", methods=["POST", "OPTIONS"])
+def gerar_pdi_leadertrack_afirmacao():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = dados.get("empresa", "").lower()
+        codrodada = dados.get("codrodada", "").lower()
+        email_lider = dados.get("emailLider", "").lower()
+        nome_lider = dados.get("nomeLider", "")
+        contexto = dados.get("contexto", "")
+        etapa = str(dados.get("etapa") or "diagnostico").strip().lower()
+        indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
+
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+
+        if not empresa or not codrodada or not email_lider:
+            response = jsonify({
+                "erro": "Campos obrigatorios ausentes.",
+                "campos_necessarios": ["empresa", "codrodada", "emailLider"]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        dados_arquetipos_comparativo = buscar_json_supabase(
+            "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
+        )
+        dados_arquetipos_analitico = buscar_json_supabase(
+            "arquetipos_analitico", empresa, codrodada, email_lider
+        )
+        guia_arquetipos = buscar_json_supabase(
+            "arquetipos_parecer_ia", empresa, codrodada, email_lider
+        )
+        dados_microambiente_analitico = buscar_json_microambiente(
+            "microambiente_analitico", empresa, codrodada, email_lider
+        )
+        dados_microambiente_subdimensao = buscar_json_microambiente(
+            "microambiente_grafico_mediaequipe_subdimensao", empresa, codrodada, email_lider
+        )
+        dados_microambiente_termometro_gaps = buscar_json_microambiente(
+            "microambiente_termometro_gaps", empresa, codrodada, email_lider
+        )
+        dados_microambiente_waterfall_gaps = buscar_json_microambiente(
+            "microambiente_waterfall_gaps", empresa, codrodada, email_lider
+        )
+        guia_microambiente = buscar_json_microambiente(
+            "microambiente_parecer_ia", empresa, codrodada, email_lider
+        )
+
+        if not dados_arquetipos_comparativo or not dados_microambiente_analitico:
+            response = jsonify({
+                "erro": "Dados LeaderTrack insuficientes para gerar PDI da afirmacao.",
+                "dados_encontrados": {
+                    "arquetipos_grafico_comparativo": bool(dados_arquetipos_comparativo),
+                    "microambiente_analitico": bool(dados_microambiente_analitico),
+                }
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+        arquetipos = archetype_summary(dados_arquetipos_comparativo)
+        todas_afirmacoes = microenvironment_affirmations(dados_microambiente_analitico)
+        gap = selecionar_gap_leadertrack(todas_afirmacoes, dados)
+        if not gap:
+            response = jsonify({
+                "erro": "Afirmacao/gap nao encontrado.",
+                "orientacao": "Informe gapId, questao ou envie o objeto gap retornado pela devolutiva estruturada."
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+        leader = {
+            "nome": nome_lider,
+            "email": email_lider,
+            "rodada": codrodada,
+            "contexto": contexto,
+            "contexto_ids": contexto_ids,
+        }
+        prompt_base = carregar_prompt_leadertrack()
+
+        if etapa == "diagnostico":
+            prompt = build_diagnostic_prompt(
+                leader=leader,
+                arquetipos=arquetipos,
+                gap=gap,
+                indicadores_disponiveis=indicadores_disponiveis,
+            )
+            resposta_ia = gerar_resposta_ia_leadertrack(
+                pergunta=prompt,
+                prompt_base=prompt_base,
+                empresa=empresa,
+                codrodada=codrodada,
+                email_lider=email_lider,
+                pagina_atual="/gerar-pdi-leadertrack-afirmacao",
+                url_atual="https://gestor.thehrkey.tech",
+                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+                dados_arquetipos_analitico=dados_arquetipos_analitico,
+                guia_arquetipos=guia_arquetipos,
+                dados_microambiente_analitico=dados_microambiente_analitico,
+                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+                guia_microambiente=guia_microambiente,
+            )
+            resultado = parse_json_response(resposta_ia)
+            payload = {
+                "status": "ok",
+                "etapa": etapa,
+                "gap_id": leadertrack_gap_id(gap),
+                "gap": gap,
+                "diagnostico": resultado,
+                "persistencia": "nao_salvo",
+                "proxima_etapa_sugerida": "semanas_1_4",
+            }
+        else:
+            intervalo = intervalo_etapa_leadertrack(etapa, dados)
+            if not intervalo:
+                response = jsonify({
+                    "erro": "Etapa invalida.",
+                    "etapas_validas": ["diagnostico", "semanas_1_4", "semanas_5_8", "semanas_9_12"]
+                })
+                response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                return response, 400
+
+            diagnostico = dados.get("diagnostico") or {
+                "status": "diagnostico_nao_enviado",
+                "orientacao": "Use preferencialmente o diagnostico gerado na etapa diagnostico como entrada desta chamada.",
+            }
+            inicio, fim = intervalo
+            prompt = build_weekly_prompt(
+                leader=leader,
+                arquetipos=arquetipos,
+                gap=gap,
+                diagnostic=diagnostico,
+                start_week=inicio,
+                end_week=fim,
+                indicadores_disponiveis=indicadores_disponiveis,
+            )
+            resposta_ia = gerar_resposta_ia_leadertrack(
+                pergunta=prompt,
+                prompt_base=prompt_base,
+                empresa=empresa,
+                codrodada=codrodada,
+                email_lider=email_lider,
+                pagina_atual="/gerar-pdi-leadertrack-afirmacao",
+                url_atual="https://gestor.thehrkey.tech",
+                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+                dados_arquetipos_analitico=dados_arquetipos_analitico,
+                guia_arquetipos=guia_arquetipos,
+                dados_microambiente_analitico=dados_microambiente_analitico,
+                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+                guia_microambiente=guia_microambiente,
+            )
+            resultado = parse_json_response(resposta_ia)
+            proxima_etapa = None
+            if fim == 4:
+                proxima_etapa = "semanas_5_8"
+            elif fim == 8:
+                proxima_etapa = "semanas_9_12"
+            payload = {
+                "status": "ok",
+                "etapa": etapa,
+                "gap_id": leadertrack_gap_id(gap),
+                "gap": gap,
+                "diagnostico_usado": diagnostico,
+                "plano_parcial": resultado,
+                "persistencia": "nao_salvo",
+                "proxima_etapa_sugerida": proxima_etapa,
+            }
+
+        response = jsonify(payload)
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao gerar PDI LeaderTrack por afirmacao:", e)
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
