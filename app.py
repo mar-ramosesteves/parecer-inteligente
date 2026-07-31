@@ -907,6 +907,7 @@ def gerar_devolutiva_leadertrack():
                     "requer_validacao_consultiva": True,
                 },
             }
+            historico_snapshot = dict(pdi_payload)
             pdi_payload["historico_evento_inicial"] = build_history_event(
                 empresa=empresa,
                 contexto=contexto,
@@ -916,7 +917,7 @@ def gerar_devolutiva_leadertrack():
                 gap_id=gap_id,
                 event_type="pdi_sugerido_pela_devolutiva",
                 description="PDI sugerido a partir de devolutiva LeaderTrack, pendente de validacao consultiva.",
-                payload=pdi_payload,
+                payload=historico_snapshot,
             )
             pdi_payload["meta_desempenho_sugerida"] = build_performance_goal_suggestion(
                 email_lider=email_lider,
