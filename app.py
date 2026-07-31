@@ -9,6 +9,19 @@ import io
 import numpy as np
 import requests
 from openai import OpenAI
+from leadertrack_devolutivas import (
+    archetype_summary,
+    build_diagnostic_prompt,
+    build_empty_devolutiva,
+    build_history_event,
+    build_performance_goal_suggestion,
+    build_weekly_prompt,
+    filter_gaps,
+    low_reference_affirmations,
+    microenvironment_affirmations,
+    parse_json_response,
+    slug,
+)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -177,6 +190,141 @@ def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
                     return None
             return dados_json
     return None
+
+
+def supabase_headers(prefer_return=True):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    if prefer_return:
+        headers["Prefer"] = "return=representation"
+    return headers
+
+
+def supabase_insert(table, payload):
+    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase nao configurado no ambiente.")
+    url = f"{SUPABASE_REST_URL}/{table}"
+    response = requests.post(url, headers=supabase_headers(), json=payload, timeout=60)
+    if response.status_code >= 300:
+        raise RuntimeError(f"Erro ao salvar em {table}: HTTP {response.status_code} - {response.text}")
+    data = response.json()
+    if isinstance(data, list) and data:
+        return data[0]
+    return data
+
+
+def persistir_devolutiva_leadertrack(devolutiva, gerado_por=None):
+    contexto_ids = devolutiva.get("contexto_ids") or {}
+    parent_payload = {
+        "empresa": devolutiva.get("empresa"),
+        "contexto": devolutiva.get("contexto"),
+        "cliente_id": contexto_ids.get("cliente_id"),
+        "holding_id": contexto_ids.get("holding_id"),
+        "empresa_id": contexto_ids.get("empresa_id"),
+        "filial_id": contexto_ids.get("filial_id"),
+        "codrodada": devolutiva.get("codrodada"),
+        "email_lider": devolutiva.get("email_lider"),
+        "nome_lider": devolutiva.get("nome_lider"),
+        "status": "rascunho_gerado",
+        "limite_gaps": len(devolutiva.get("gaps_priorizados") or []),
+        "maximo_gaps_por_ciclo": (devolutiva.get("faseamento_anual_sugerido") or {}).get("maximo_recomendado_por_ciclo", 4),
+        "gap_minimo_percentual": (devolutiva.get("criterios_de_leitura") or {}).get("gap_minimo_percentual"),
+        "baixa_referencia_threshold_percentual": (devolutiva.get("criterios_de_leitura") or {}).get("baixa_referencia_threshold_percentual"),
+        "dados_entrada_resumo": {
+            "arquetipos": devolutiva.get("arquetipos"),
+            "resumo_severidade": devolutiva.get("resumo_severidade"),
+            "criterios_de_leitura": devolutiva.get("criterios_de_leitura"),
+        },
+        "todas_afirmacoes_microambiente": devolutiva.get("todas_afirmacoes_microambiente") or [],
+        "baixa_referencia": devolutiva.get("baixa_referencia") or [],
+        "faseamento_anual_sugerido": devolutiva.get("faseamento_anual_sugerido") or {},
+        "resposta_leadertrackbot_json": devolutiva,
+        "pdi_enviado_para_modulo_pdi": False,
+        "meta_desempenho_sugerida": any((pdi.get("meta_desempenho_sugerida") for pdi in devolutiva.get("pdis") or [])),
+        "gerado_por": gerado_por,
+    }
+    saved_parent = supabase_insert("leadertrack_devolutivas", parent_payload)
+    devolutiva_id = saved_parent.get("id")
+
+    for pdi in devolutiva.get("pdis") or []:
+        gap = pdi.get("gap") or {}
+        gap_id = pdi.get("gap_id")
+        for semana in pdi.get("plano_12_semanas") or []:
+            supabase_insert("leadertrack_pdi_acompanhamento", {
+            "devolutiva_id": devolutiva_id,
+            "cliente_id": contexto_ids.get("cliente_id"),
+            "holding_id": contexto_ids.get("holding_id"),
+            "empresa_id": contexto_ids.get("empresa_id"),
+            "filial_id": contexto_ids.get("filial_id"),
+            "gap_id": gap_id,
+                "questao": gap.get("questao"),
+                "dimensao": gap.get("dimensao"),
+                "subdimensao": gap.get("subdimensao"),
+                "afirmacao": gap.get("afirmacao"),
+                "semana": semana.get("semana"),
+                "foco_da_semana": semana.get("foco_da_semana"),
+                "objetivo": semana.get("objetivo"),
+                "prazo": semana.get("prazo"),
+                "status": semana.get("status") or "nao_iniciado",
+                "acoes_praticas": semana.get("acoes_praticas") or [],
+                "formato_sugerido": semana.get("formato_sugerido"),
+                "tarefa_do_lider": semana.get("tarefa_do_lider") or [],
+                "tarefa_da_equipe": semana.get("tarefa_da_equipe") or [],
+                "perguntas_para_equipe": semana.get("perguntas_para_equipe") or [],
+                "o_que_mostrar_para_equipe": semana.get("o_que_mostrar_para_equipe") or [],
+                "o_que_nao_mostrar_para_equipe": semana.get("o_que_nao_mostrar_para_equipe") or [],
+                "indicador": semana.get("indicador"),
+                "evidencia_esperada": semana.get("evidencia_esperada"),
+                "resultado_esperado": semana.get("resultado_esperado"),
+                "indicadores_operacionais_relacionados": semana.get("indicadores_operacionais_relacionados") or [],
+                "metrica_operacional_base": semana.get("metrica_operacional_base"),
+                "evolucao_operacional_observada": semana.get("evolucao_operacional_observada"),
+                "resultado_obtido": semana.get("resultado_obtido"),
+                "observacoes_de_evolucao": semana.get("observacoes_de_evolucao"),
+            })
+
+        historico = dict(pdi.get("historico_evento_inicial") or {})
+        if historico:
+            historico["devolutiva_id"] = devolutiva_id
+            historico["cliente_id"] = contexto_ids.get("cliente_id")
+            historico["holding_id"] = contexto_ids.get("holding_id")
+            historico["empresa_id"] = contexto_ids.get("empresa_id")
+            historico["filial_id"] = contexto_ids.get("filial_id")
+            supabase_insert("leadertrack_pdi_historico", historico)
+
+        meta = dict(pdi.get("meta_desempenho_sugerida") or {})
+        if meta:
+            meta["devolutiva_id"] = devolutiva_id
+            meta["cliente_id"] = contexto_ids.get("cliente_id")
+            meta["holding_id"] = contexto_ids.get("holding_id")
+            meta["empresa_id"] = contexto_ids.get("empresa_id")
+            meta["filial_id"] = contexto_ids.get("filial_id")
+            supabase_insert("leadertrack_pdi_meta_desempenho", meta)
+
+        indicadores = (
+            (pdi.get("diagnostico") or {})
+            .get("indicadores_de_efetividade", {})
+            .get("indicadores_operacionais_sugeridos", [])
+        )
+        for indicador in indicadores:
+            supabase_insert("leadertrack_pdi_indicadores_operacionais", {
+                "devolutiva_id": devolutiva_id,
+                "cliente_id": contexto_ids.get("cliente_id"),
+                "holding_id": contexto_ids.get("holding_id"),
+                "empresa_id": contexto_ids.get("empresa_id"),
+                "filial_id": contexto_ids.get("filial_id"),
+                "gap_id": gap_id,
+                "nome_indicador": indicador,
+                "fonte": "sugerido_leadertrackbot",
+            })
+
+    return {
+        "devolutiva_id": devolutiva_id,
+        "status_persistencia": "salvo_no_supabase",
+    }
 
 @app.route("/emitir-parecer-arquetipos", methods=["POST", "OPTIONS"])
 def emitir_parecer_arquetipos():
@@ -530,6 +678,226 @@ def chat_leadertrack():
 
     except Exception as e:
         print("Erro no chat Leadertrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/gerar-devolutiva-leadertrack", methods=["POST", "OPTIONS"])
+def gerar_devolutiva_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = dados.get("empresa", "").lower()
+        codrodada = dados.get("codrodada", "").lower()
+        email_lider = dados.get("emailLider", "").lower()
+        contexto = dados.get("contexto", "")
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+        nome_lider = dados.get("nomeLider", "")
+        gap_minimo = float(dados.get("gapMinimo", 20) or 20)
+        baixa_referencia_threshold = float(dados.get("baixaReferenciaThreshold", 70) or 70)
+        limite_gaps = dados.get("limiteGaps")
+        limite_gaps = int(limite_gaps) if limite_gaps not in (None, "", 0, "0") else None
+        maximo_gaps_por_ciclo = int(dados.get("maximoGapsPorCiclo", 4) or 4)
+        gerar_apenas_primeiro_ciclo = bool(dados.get("gerarApenasPrimeiroCiclo", True))
+        persistir = bool(dados.get("persistir", False))
+        gerado_por = dados.get("geradoPor")
+        indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
+
+        if not empresa or not codrodada or not email_lider:
+            response = jsonify({
+                "erro": "Campos obrigatorios ausentes.",
+                "campos_necessarios": ["empresa", "codrodada", "emailLider"]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        prompt_base = carregar_prompt_leadertrack()
+
+        dados_arquetipos_comparativo = buscar_json_supabase(
+            "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
+        )
+        dados_arquetipos_analitico = buscar_json_supabase(
+            "arquetipos_analitico", empresa, codrodada, email_lider
+        )
+        guia_arquetipos = buscar_json_supabase(
+            "arquetipos_parecer_ia", empresa, codrodada, email_lider
+        )
+        dados_microambiente_analitico = buscar_json_microambiente(
+            "microambiente_analitico", empresa, codrodada, email_lider
+        )
+        dados_microambiente_subdimensao = buscar_json_microambiente(
+            "microambiente_grafico_mediaequipe_subdimensao", empresa, codrodada, email_lider
+        )
+        dados_microambiente_termometro_gaps = buscar_json_microambiente(
+            "microambiente_termometro_gaps", empresa, codrodada, email_lider
+        )
+        dados_microambiente_waterfall_gaps = buscar_json_microambiente(
+            "microambiente_waterfall_gaps", empresa, codrodada, email_lider
+        )
+        guia_microambiente = buscar_json_microambiente(
+            "microambiente_parecer_ia", empresa, codrodada, email_lider
+        )
+
+        if not dados_arquetipos_comparativo or not dados_microambiente_analitico:
+            response = jsonify({
+                "erro": "Dados LeaderTrack insuficientes para gerar devolutiva.",
+                "dados_encontrados": {
+                    "arquetipos_grafico_comparativo": bool(dados_arquetipos_comparativo),
+                    "microambiente_analitico": bool(dados_microambiente_analitico),
+                }
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
+
+        arquetipos = archetype_summary(dados_arquetipos_comparativo)
+        todas_afirmacoes = microenvironment_affirmations(dados_microambiente_analitico)
+        gaps = filter_gaps(todas_afirmacoes, gap_minimo)
+        if limite_gaps:
+            gaps = gaps[:limite_gaps]
+        baixa_referencia = low_reference_affirmations(todas_afirmacoes, baixa_referencia_threshold)
+        gaps_para_gerar = gaps[:maximo_gaps_por_ciclo] if gerar_apenas_primeiro_ciclo else gaps
+        leader = {
+            "nome": nome_lider,
+            "email": email_lider,
+            "rodada": codrodada,
+            "contexto": contexto,
+            "contexto_ids": contexto_ids,
+        }
+        devolutiva = build_empty_devolutiva(
+            empresa=empresa,
+            contexto=contexto,
+            codrodada=codrodada,
+            email_lider=email_lider,
+            nome_lider=nome_lider,
+            gaps=gaps,
+            arquetipos=arquetipos,
+            maximo_gaps_por_ciclo=maximo_gaps_por_ciclo,
+            todas_afirmacoes=todas_afirmacoes,
+            baixa_referencia=baixa_referencia,
+            gap_minimo=gap_minimo,
+            baixa_referencia_threshold=baixa_referencia_threshold,
+            contexto_ids=contexto_ids,
+        )
+        devolutiva["status"] = "gerada_sem_persistencia"
+
+        for gap in gaps_para_gerar:
+            gap_id = f"{gap['questao']}_{slug(gap['dimensao'])}_{slug(gap['subdimensao'])}"
+            prompt_diagnostico = build_diagnostic_prompt(
+                leader=leader,
+                arquetipos=arquetipos,
+                gap=gap,
+                indicadores_disponiveis=indicadores_disponiveis,
+            )
+            resposta_diagnostico = gerar_resposta_ia_leadertrack(
+                pergunta=prompt_diagnostico,
+                prompt_base=prompt_base,
+                empresa=empresa,
+                codrodada=codrodada,
+                email_lider=email_lider,
+                pagina_atual="/gerar-devolutiva-leadertrack",
+                url_atual="https://gestor.thehrkey.tech",
+                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+                dados_arquetipos_analitico=dados_arquetipos_analitico,
+                guia_arquetipos=guia_arquetipos,
+                dados_microambiente_analitico=dados_microambiente_analitico,
+                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+                guia_microambiente=guia_microambiente,
+            )
+            diagnostico = parse_json_response(resposta_diagnostico)
+
+            semanas = []
+            revisoes = []
+            for inicio, fim in [(1, 4), (5, 8), (9, 12)]:
+                prompt_semanal = build_weekly_prompt(
+                    leader=leader,
+                    arquetipos=arquetipos,
+                    gap=gap,
+                    diagnostic=diagnostico,
+                    start_week=inicio,
+                    end_week=fim,
+                    indicadores_disponiveis=indicadores_disponiveis,
+                )
+                resposta_semanal = gerar_resposta_ia_leadertrack(
+                    pergunta=prompt_semanal,
+                    prompt_base=prompt_base,
+                    empresa=empresa,
+                    codrodada=codrodada,
+                    email_lider=email_lider,
+                    pagina_atual="/gerar-devolutiva-leadertrack",
+                    url_atual="https://gestor.thehrkey.tech",
+                    dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+                    dados_arquetipos_analitico=dados_arquetipos_analitico,
+                    guia_arquetipos=guia_arquetipos,
+                    dados_microambiente_analitico=dados_microambiente_analitico,
+                    dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+                    dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+                    dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+                    guia_microambiente=guia_microambiente,
+                )
+                plano = parse_json_response(resposta_semanal)
+                semanas.extend(plano.get("plano_12_semanas", []))
+                if plano.get("revisao_parcial_informal"):
+                    revisoes.append(plano["revisao_parcial_informal"])
+
+            plano_12_semanas = sorted(semanas, key=lambda item: int(item.get("semana", 0) or 0))
+            pdi_payload = {
+                "gap_id": gap_id,
+                "gap": gap,
+                "diagnostico": diagnostico,
+                "plano_12_semanas": plano_12_semanas,
+                "revisoes_parciais_informais": revisoes,
+                "origem_para_pdi_treinamentos": {
+                    "pode_enviar_para_modulo_pdi": True,
+                    "status_inicial": "sugerido_pela_devolutiva",
+                    "requer_validacao_consultiva": True,
+                },
+            }
+            pdi_payload["historico_evento_inicial"] = build_history_event(
+                empresa=empresa,
+                contexto=contexto,
+                email_lider=email_lider,
+                nome_lider=nome_lider,
+                codrodada=codrodada,
+                gap_id=gap_id,
+                event_type="pdi_sugerido_pela_devolutiva",
+                description="PDI sugerido a partir de devolutiva LeaderTrack, pendente de validacao consultiva.",
+                payload=pdi_payload,
+            )
+            pdi_payload["meta_desempenho_sugerida"] = build_performance_goal_suggestion(
+                email_lider=email_lider,
+                empresa=empresa,
+                contexto=contexto,
+                codrodada=codrodada,
+                gap_id=gap_id,
+                gap=gap,
+            )
+            devolutiva["pdis"].append(pdi_payload)
+
+        if persistir:
+            persistencia = persistir_devolutiva_leadertrack(devolutiva, gerado_por=gerado_por)
+            devolutiva["persistencia"] = persistencia
+            devolutiva["status"] = "gerada_e_salva_como_rascunho"
+
+        response = jsonify(devolutiva)
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao gerar devolutiva LeaderTrack:", e)
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
