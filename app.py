@@ -285,7 +285,7 @@ def listar_lideres_relatorios(empresa, codrodada):
         "order": "emaillider.asc,data_criacao.desc",
         "limit": 1000,
     }
-    response = requests.get(url, headers=supabase_headers(prefer_return=False), params=params, timeout=60)
+    response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
     if response.status_code >= 300:
         raise RuntimeError(f"Erro ao listar lideres: HTTP {response.status_code} - {response.text}")
 
@@ -378,7 +378,7 @@ def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, 
 
 
 def buscar_cache_leadertrack(empresa, email_lider, cache_key):
-    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+    if not SUPABASE_REST_URL or not (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY):
         return None
 
     url = f"{SUPABASE_REST_URL}/leadertrack_pdi_historico"
@@ -391,7 +391,7 @@ def buscar_cache_leadertrack(empresa, email_lider, cache_key):
         "order": "data_evento.desc",
         "limit": 80,
     }
-    response = requests.get(url, headers=supabase_headers(prefer_return=False), params=params, timeout=60)
+    response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
     if response.status_code >= 300:
         print("Cache LeaderTrack indisponivel:", response.status_code, response.text)
         return None
