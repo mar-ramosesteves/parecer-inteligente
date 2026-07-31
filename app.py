@@ -269,6 +269,50 @@ def supabase_insert(table, payload):
     return data
 
 
+def listar_lideres_relatorios(empresa, codrodada):
+    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase nao configurado no ambiente.")
+
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "select": "emaillider,tipo_relatorio,data_criacao,dados_json",
+        "empresa": f"ilike.{empresa}",
+        "codrodada": f"ilike.{codrodada}",
+        "tipo_relatorio": "in.(microambiente_analitico,arquetipos_analitico)",
+        "order": "emaillider.asc,data_criacao.desc",
+        "limit": 1000,
+    }
+    response = requests.get(url, headers=supabase_headers(prefer_return=False), params=params, timeout=60)
+    if response.status_code >= 300:
+        raise RuntimeError(f"Erro ao listar lideres: HTTP {response.status_code} - {response.text}")
+
+    leaders = {}
+    for row in response.json() or []:
+        email = str(row.get("emaillider") or "").strip().lower()
+        if not email:
+            continue
+        current = leaders.setdefault(email, {
+            "email": email,
+            "nome": None,
+            "rotulo": email,
+            "relatorios_disponiveis": [],
+            "ultima_atualizacao": None,
+        })
+        tipo = row.get("tipo_relatorio")
+        if tipo and tipo not in current["relatorios_disponiveis"]:
+            current["relatorios_disponiveis"].append(tipo)
+        data_criacao = row.get("data_criacao")
+        if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
+            current["ultima_atualizacao"] = data_criacao
+
+    lista = []
+    for leader in leaders.values():
+        if leader["nome"]:
+            leader["rotulo"] = f"{leader['nome']} - {leader['email']}"
+        lista.append(leader)
+    return sorted(lista, key=lambda item: item["rotulo"].lower())
+
+
 def persistir_devolutiva_leadertrack(devolutiva, gerado_por=None):
     contexto_ids = devolutiva.get("contexto_ids") or {}
     parent_payload = {
@@ -983,6 +1027,56 @@ def gerar_devolutiva_leadertrack():
 
     except Exception as e:
         print("Erro ao gerar devolutiva LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/listar-lideres-leadertrack", methods=["POST", "OPTIONS"])
+def listar_lideres_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = dados.get("empresa", "").lower()
+        codrodada = dados.get("codrodada", "").lower()
+        contexto = dados.get("contexto", "")
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+
+        if not empresa or not codrodada:
+            response = jsonify({
+                "erro": "Campos obrigatorios ausentes.",
+                "campos_necessarios": ["empresa", "codrodada"]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        lideres = listar_lideres_relatorios(empresa, codrodada)
+        response = jsonify({
+            "status": "ok",
+            "empresa": empresa,
+            "codrodada": codrodada,
+            "contexto": contexto,
+            "contexto_ids": contexto_ids,
+            "total": len(lideres),
+            "lideres": lideres,
+            "observacao": "Lista baseada em relatorios LeaderTrack ja apurados. Nome completo depende de vinculo futuro com cadastro central.",
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao listar lideres LeaderTrack:", e)
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
