@@ -1510,7 +1510,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 "proxima_etapa_sugerida": "semanas_1_4",
             }
             if gravar_cache:
-                payload["persistencia"] = salvar_cache_leadertrack(
+                persistencia_cache = salvar_cache_leadertrack(
                     empresa=empresa,
                     contexto=contexto,
                     contexto_ids=contexto_ids,
@@ -1520,6 +1520,13 @@ def gerar_pdi_leadertrack_afirmacao():
                     payload=payload,
                     gerado_por=gerado_por,
                 )
+                payload["persistencia"] = persistencia_cache
+                if persistencia_cache.get("status") == "salvo_no_historico_cache":
+                    payload["cache"]["status"] = "saved"
+                    payload["cache"]["historico_id"] = persistencia_cache.get("historico_id")
+                else:
+                    payload["cache"]["status"] = "save_failed"
+                    payload["cache"]["erro"] = persistencia_cache.get("erro")
         else:
             intervalo = intervalo_etapa_leadertrack(etapa, dados)
             if not intervalo:
@@ -1591,7 +1598,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 "proxima_etapa_sugerida": proxima_etapa,
             }
             if gravar_cache:
-                payload["persistencia"] = salvar_cache_leadertrack(
+                persistencia_cache = salvar_cache_leadertrack(
                     empresa=empresa,
                     contexto=contexto,
                     contexto_ids=contexto_ids,
@@ -1601,6 +1608,13 @@ def gerar_pdi_leadertrack_afirmacao():
                     payload=payload,
                     gerado_por=gerado_por,
                 )
+                payload["persistencia"] = persistencia_cache
+                if persistencia_cache.get("status") == "salvo_no_historico_cache":
+                    payload["cache"]["status"] = "saved"
+                    payload["cache"]["historico_id"] = persistencia_cache.get("historico_id")
+                else:
+                    payload["cache"]["status"] = "save_failed"
+                    payload["cache"]["erro"] = persistencia_cache.get("erro")
 
         response = jsonify(payload)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
