@@ -314,6 +314,52 @@ def listar_lideres_relatorios(empresa, codrodada):
     return sorted(lista, key=lambda item: item["rotulo"].lower())
 
 
+def listar_empresas_relatorios(codrodada=None):
+    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase nao configurado no ambiente.")
+
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "select": "empresa,codrodada,data_criacao",
+        "tipo_relatorio": "in.(microambiente_analitico,arquetipos_analitico)",
+        "order": "empresa.asc,data_criacao.desc",
+        "limit": 1000,
+    }
+    if codrodada:
+        params["codrodada"] = f"ilike.{codrodada}"
+
+    response = requests.get(url, headers=supabase_headers(prefer_return=False), params=params, timeout=60)
+    if response.status_code >= 300:
+        raise RuntimeError(f"Erro ao listar empresas: HTTP {response.status_code} - {response.text}")
+
+    empresas = {}
+    for row in response.json() or []:
+        codigo = str(row.get("empresa") or "").strip()
+        if not codigo:
+            continue
+        key = codigo.lower()
+        current = empresas.setdefault(key, {
+            "codigo": key,
+            "empresa": key,
+            "nome": codigo.upper(),
+            "rotulo": codigo.upper(),
+            "rodadas": set(),
+            "ultima_atualizacao": None,
+        })
+        rodada = row.get("codrodada")
+        if rodada:
+            current["rodadas"].add(str(rodada))
+        data_criacao = row.get("data_criacao")
+        if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
+            current["ultima_atualizacao"] = data_criacao
+
+    lista = []
+    for empresa in empresas.values():
+        empresa["rodadas"] = sorted(empresa["rodadas"])
+        lista.append(empresa)
+    return sorted(lista, key=lambda item: item["rotulo"].lower())
+
+
 def _normalizar_chave_amostra(value):
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
@@ -883,6 +929,7 @@ def gerar_devolutiva_leadertrack():
         codrodada = dados.get("codrodada", "").lower()
         email_lider = dados.get("emailLider", "").lower()
         contexto = dados.get("contexto", "")
+        equipe_tipo = str(dados.get("equipeTipo") or dados.get("tipoEquipe") or "direta").strip().lower()
         contexto_ids = {
             "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
             "holding_id": dados.get("holding_id") or dados.get("holdingId"),
@@ -992,6 +1039,7 @@ def gerar_devolutiva_leadertrack():
             baixa_referencia_threshold=baixa_referencia_threshold,
             contexto_ids=contexto_ids,
         )
+        devolutiva["equipe_tipo"] = equipe_tipo
         devolutiva["amostra"] = amostra
         if amostra.get("insuficiente"):
             devolutiva["modo_devolutiva"] = {
@@ -1133,6 +1181,46 @@ def gerar_devolutiva_leadertrack():
 
     except Exception as e:
         print("Erro ao gerar devolutiva LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/listar-empresas-leadertrack", methods=["POST", "OPTIONS"])
+def listar_empresas_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        codrodada = str(dados.get("codrodada") or "").strip().lower()
+        contexto = dados.get("contexto", "")
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+
+        empresas = listar_empresas_relatorios(codrodada=codrodada or None)
+        response = jsonify({
+            "status": "ok",
+            "codrodada": codrodada,
+            "contexto": contexto,
+            "contexto_ids": contexto_ids,
+            "total": len(empresas),
+            "empresas": empresas,
+            "observacao": "Lista baseada em empresas tecnicas encontradas nos relatorios LeaderTrack ja apurados. Nome oficial deve ser vinculado ao cadastro central em uma proxima etapa.",
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao listar empresas LeaderTrack:", e)
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
