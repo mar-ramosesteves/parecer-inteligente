@@ -32,6 +32,16 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
+def bool_param(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in ("1", "true", "sim", "yes", "y")
+
+
 def carregar_prompt_leadertrack():
     """
     Carrega o prompt base do Assistente Inteligente Leadertrack.
@@ -710,8 +720,9 @@ def gerar_devolutiva_leadertrack():
         limite_gaps = dados.get("limiteGaps")
         limite_gaps = int(limite_gaps) if limite_gaps not in (None, "", 0, "0") else None
         maximo_gaps_por_ciclo = int(dados.get("maximoGapsPorCiclo", 4) or 4)
-        gerar_apenas_primeiro_ciclo = bool(dados.get("gerarApenasPrimeiroCiclo", True))
-        persistir = bool(dados.get("persistir", False))
+        gerar_apenas_primeiro_ciclo = bool_param(dados.get("gerarApenasPrimeiroCiclo"), True)
+        gerar_planos_com_ia = bool_param(dados.get("gerarPlanosComIA"), False)
+        persistir = bool_param(dados.get("persistir"), False)
         gerado_por = dados.get("geradoPor")
         indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
 
@@ -723,7 +734,15 @@ def gerar_devolutiva_leadertrack():
             response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
             return response, 400
 
-        prompt_base = carregar_prompt_leadertrack()
+        if persistir and not gerar_planos_com_ia:
+            response = jsonify({
+                "erro": "Persistencia bloqueada para devolutiva sem planos gerados pela IA.",
+                "orientacao": "Envie gerarPlanosComIA=true apenas quando for gerar e salvar um PDI validado."
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        prompt_base = carregar_prompt_leadertrack() if gerar_planos_com_ia else ""
 
         dados_arquetipos_comparativo = buscar_json_supabase(
             "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
@@ -791,48 +810,24 @@ def gerar_devolutiva_leadertrack():
             contexto_ids=contexto_ids,
         )
         devolutiva["status"] = "gerada_sem_persistencia"
+        devolutiva["modo_geracao_planos"] = "com_ia" if gerar_planos_com_ia else "estrutura_sem_ia"
+        devolutiva["proximo_passo_sugerido"] = (
+            "Gerar PDI detalhado por afirmacao, em chamada especifica com IA, para evitar timeout."
+            if not gerar_planos_com_ia else
+            "Validar plano gerado antes de enviar para PDI/Treinamentos ou Desempenho."
+        )
 
         for gap in gaps_para_gerar:
             gap_id = f"{gap['questao']}_{slug(gap['dimensao'])}_{slug(gap['subdimensao'])}"
-            prompt_diagnostico = build_diagnostic_prompt(
-                leader=leader,
-                arquetipos=arquetipos,
-                gap=gap,
-                indicadores_disponiveis=indicadores_disponiveis,
-            )
-            resposta_diagnostico = gerar_resposta_ia_leadertrack(
-                pergunta=prompt_diagnostico,
-                prompt_base=prompt_base,
-                empresa=empresa,
-                codrodada=codrodada,
-                email_lider=email_lider,
-                pagina_atual="/gerar-devolutiva-leadertrack",
-                url_atual="https://gestor.thehrkey.tech",
-                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
-                dados_arquetipos_analitico=dados_arquetipos_analitico,
-                guia_arquetipos=guia_arquetipos,
-                dados_microambiente_analitico=dados_microambiente_analitico,
-                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
-                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
-                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
-                guia_microambiente=guia_microambiente,
-            )
-            diagnostico = parse_json_response(resposta_diagnostico)
-
-            semanas = []
-            revisoes = []
-            for inicio, fim in [(1, 4), (5, 8), (9, 12)]:
-                prompt_semanal = build_weekly_prompt(
+            if gerar_planos_com_ia:
+                prompt_diagnostico = build_diagnostic_prompt(
                     leader=leader,
                     arquetipos=arquetipos,
                     gap=gap,
-                    diagnostic=diagnostico,
-                    start_week=inicio,
-                    end_week=fim,
                     indicadores_disponiveis=indicadores_disponiveis,
                 )
-                resposta_semanal = gerar_resposta_ia_leadertrack(
-                    pergunta=prompt_semanal,
+                resposta_diagnostico = gerar_resposta_ia_leadertrack(
+                    pergunta=prompt_diagnostico,
                     prompt_base=prompt_base,
                     empresa=empresa,
                     codrodada=codrodada,
@@ -848,20 +843,66 @@ def gerar_devolutiva_leadertrack():
                     dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
                     guia_microambiente=guia_microambiente,
                 )
-                plano = parse_json_response(resposta_semanal)
-                semanas.extend(plano.get("plano_12_semanas", []))
-                if plano.get("revisao_parcial_informal"):
-                    revisoes.append(plano["revisao_parcial_informal"])
+                diagnostico = parse_json_response(resposta_diagnostico)
 
-            plano_12_semanas = sorted(semanas, key=lambda item: int(item.get("semana", 0) or 0))
+                semanas = []
+                revisoes = []
+                for inicio, fim in [(1, 4), (5, 8), (9, 12)]:
+                    prompt_semanal = build_weekly_prompt(
+                        leader=leader,
+                        arquetipos=arquetipos,
+                        gap=gap,
+                        diagnostic=diagnostico,
+                        start_week=inicio,
+                        end_week=fim,
+                        indicadores_disponiveis=indicadores_disponiveis,
+                    )
+                    resposta_semanal = gerar_resposta_ia_leadertrack(
+                        pergunta=prompt_semanal,
+                        prompt_base=prompt_base,
+                        empresa=empresa,
+                        codrodada=codrodada,
+                        email_lider=email_lider,
+                        pagina_atual="/gerar-devolutiva-leadertrack",
+                        url_atual="https://gestor.thehrkey.tech",
+                        dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+                        dados_arquetipos_analitico=dados_arquetipos_analitico,
+                        guia_arquetipos=guia_arquetipos,
+                        dados_microambiente_analitico=dados_microambiente_analitico,
+                        dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+                        dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+                        dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+                        guia_microambiente=guia_microambiente,
+                    )
+                    plano = parse_json_response(resposta_semanal)
+                    semanas.extend(plano.get("plano_12_semanas", []))
+                    if plano.get("revisao_parcial_informal"):
+                        revisoes.append(plano["revisao_parcial_informal"])
+
+                plano_12_semanas = sorted(semanas, key=lambda item: int(item.get("semana", 0) or 0))
+            else:
+                diagnostico = {
+                    "status": "pendente_geracao_ia",
+                    "mensagem": "Diagnostico tecnico e plano semanal devem ser gerados por etapa para evitar timeout.",
+                    "gap": gap,
+                    "arquetipos_disponiveis_para_cruzamento": arquetipos,
+                    "indicadores_operacionais_disponiveis": indicadores_disponiveis,
+                }
+                plano_12_semanas = []
+                revisoes = []
+
             pdi_payload = {
                 "gap_id": gap_id,
                 "gap": gap,
                 "diagnostico": diagnostico,
                 "plano_12_semanas": plano_12_semanas,
                 "revisoes_parciais_informais": revisoes,
+                "geracao_ia": {
+                    "status": "concluida" if gerar_planos_com_ia else "pendente",
+                    "motivo": None if gerar_planos_com_ia else "A tela deve solicitar a geracao profunda deste gap em chamada propria.",
+                },
                 "origem_para_pdi_treinamentos": {
-                    "pode_enviar_para_modulo_pdi": True,
+                    "pode_enviar_para_modulo_pdi": bool(gerar_planos_com_ia),
                     "status_inicial": "sugerido_pela_devolutiva",
                     "requer_validacao_consultiva": True,
                 },
