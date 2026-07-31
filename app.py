@@ -360,6 +360,96 @@ def listar_empresas_relatorios(codrodada=None):
     return sorted(lista, key=lambda item: item["rotulo"].lower())
 
 
+def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
+    parts = [
+        "leadertrack_pdi_v1",
+        str(empresa or "").strip().lower(),
+        str(codrodada or "").strip().lower(),
+        str(email_lider or "").strip().lower(),
+        str(equipe_tipo or "direta").strip().lower(),
+        str(gap_id or "").strip().lower(),
+        str(etapa or "").strip().lower(),
+        str(semana_inicio or ""),
+        str(semana_fim or ""),
+    ]
+    return "|".join(parts)
+
+
+def buscar_cache_leadertrack(empresa, email_lider, cache_key):
+    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+        return None
+
+    url = f"{SUPABASE_REST_URL}/leadertrack_pdi_historico"
+    params = {
+        "select": "id,dados_depois,data_evento",
+        "empresa": f"eq.{empresa}",
+        "profissional_email": f"eq.{email_lider}",
+        "origem": "eq.leadertrackbot_cache",
+        "tipo_evento": "eq.ia_gerada",
+        "order": "data_evento.desc",
+        "limit": 80,
+    }
+    response = requests.get(url, headers=supabase_headers(prefer_return=False), params=params, timeout=60)
+    if response.status_code >= 300:
+        print("Cache LeaderTrack indisponivel:", response.status_code, response.text)
+        return None
+
+    for row in response.json() or []:
+        dados = row.get("dados_depois") or {}
+        if isinstance(dados, str):
+            try:
+                dados = json.loads(dados)
+            except Exception:
+                dados = {}
+        if dados.get("cache_key") == cache_key:
+            payload = dados.get("payload") or {}
+            if isinstance(payload, dict):
+                payload["persistencia"] = "cache_lido"
+                payload["fonte"] = "cache"
+                payload["cache"] = {
+                    "status": "hit",
+                    "cache_key": cache_key,
+                    "historico_id": row.get("id"),
+                    "data_evento": row.get("data_evento"),
+                }
+                return payload
+    return None
+
+
+def salvar_cache_leadertrack(empresa, contexto, contexto_ids, email_lider, nome_lider, cache_key, payload, gerado_por=None):
+    evento = {
+        "profissional_email": email_lider,
+        "profissional_nome": nome_lider,
+        "cliente_id": contexto_ids.get("cliente_id"),
+        "holding_id": contexto_ids.get("holding_id"),
+        "empresa_id": contexto_ids.get("empresa_id"),
+        "filial_id": contexto_ids.get("filial_id"),
+        "empresa": empresa,
+        "contexto": contexto,
+        "origem": "leadertrackbot_cache",
+        "tipo_evento": "ia_gerada",
+        "descricao_evento": "Geracao de IA LeaderTrack salva para reuso como cache tecnico.",
+        "dados_antes": None,
+        "dados_depois": {
+            "cache_key": cache_key,
+            "payload": payload,
+        },
+        "registrado_por": gerado_por,
+    }
+    try:
+        saved = supabase_insert("leadertrack_pdi_historico", evento)
+        return {
+            "status": "salvo_no_historico_cache",
+            "historico_id": saved.get("id") if isinstance(saved, dict) else None,
+        }
+    except Exception as exc:
+        print("Erro ao salvar cache LeaderTrack:", exc)
+        return {
+            "status": "nao_salvo",
+            "erro": str(exc),
+        }
+
+
 def _normalizar_chave_amostra(value):
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
@@ -1292,8 +1382,12 @@ def gerar_pdi_leadertrack_afirmacao():
         email_lider = dados.get("emailLider", "").lower()
         nome_lider = dados.get("nomeLider", "")
         contexto = dados.get("contexto", "")
+        equipe_tipo = str(dados.get("equipeTipo") or dados.get("tipoEquipe") or "direta").strip().lower()
         etapa = str(dados.get("etapa") or "diagnostico").strip().lower()
         indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
+        usar_cache = bool_param(dados.get("usarCache"), True)
+        gravar_cache = bool_param(dados.get("gravarCache"), True)
+        gerado_por = dados.get("geradoPor")
 
         contexto_ids = {
             "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
@@ -1362,11 +1456,21 @@ def gerar_pdi_leadertrack_afirmacao():
             "email": email_lider,
             "rodada": codrodada,
             "contexto": contexto,
+            "equipe_tipo": equipe_tipo,
             "contexto_ids": contexto_ids,
         }
         prompt_base = carregar_prompt_leadertrack()
+        gap_id = leadertrack_gap_id(gap)
 
         if etapa == "diagnostico":
+            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa)
+            if usar_cache:
+                cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
+                if cached_payload:
+                    response = jsonify(cached_payload)
+                    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                    return response, 200
+
             prompt = build_diagnostic_prompt(
                 leader=leader,
                 arquetipos=arquetipos,
@@ -1394,12 +1498,28 @@ def gerar_pdi_leadertrack_afirmacao():
             payload = {
                 "status": "ok",
                 "etapa": etapa,
-                "gap_id": leadertrack_gap_id(gap),
+                "gap_id": gap_id,
                 "gap": gap,
                 "diagnostico": resultado,
                 "persistencia": "nao_salvo",
+                "fonte": "ia",
+                "cache": {
+                    "status": "miss",
+                    "cache_key": cache_key,
+                },
                 "proxima_etapa_sugerida": "semanas_1_4",
             }
+            if gravar_cache:
+                payload["persistencia"] = salvar_cache_leadertrack(
+                    empresa=empresa,
+                    contexto=contexto,
+                    contexto_ids=contexto_ids,
+                    email_lider=email_lider,
+                    nome_lider=nome_lider,
+                    cache_key=cache_key,
+                    payload=payload,
+                    gerado_por=gerado_por,
+                )
         else:
             intervalo = intervalo_etapa_leadertrack(etapa, dados)
             if not intervalo:
@@ -1415,6 +1535,14 @@ def gerar_pdi_leadertrack_afirmacao():
                 "orientacao": "Use preferencialmente o diagnostico gerado na etapa diagnostico como entrada desta chamada.",
             }
             inicio, fim = intervalo
+            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, inicio, fim)
+            if usar_cache:
+                cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
+                if cached_payload:
+                    response = jsonify(cached_payload)
+                    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                    return response, 200
+
             prompt = build_weekly_prompt(
                 leader=leader,
                 arquetipos=arquetipos,
@@ -1450,13 +1578,29 @@ def gerar_pdi_leadertrack_afirmacao():
             payload = {
                 "status": "ok",
                 "etapa": etapa,
-                "gap_id": leadertrack_gap_id(gap),
+                "gap_id": gap_id,
                 "gap": gap,
                 "diagnostico_usado": diagnostico,
                 "plano_parcial": resultado,
                 "persistencia": "nao_salvo",
+                "fonte": "ia",
+                "cache": {
+                    "status": "miss",
+                    "cache_key": cache_key,
+                },
                 "proxima_etapa_sugerida": proxima_etapa,
             }
+            if gravar_cache:
+                payload["persistencia"] = salvar_cache_leadertrack(
+                    empresa=empresa,
+                    contexto=contexto,
+                    contexto_ids=contexto_ids,
+                    email_lider=email_lider,
+                    nome_lider=nome_lider,
+                    cache_key=cache_key,
+                    payload=payload,
+                    gerado_por=gerado_por,
+                )
 
         response = jsonify(payload)
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
