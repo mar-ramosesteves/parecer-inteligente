@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import json
+import re
 from datetime import datetime
 import matplotlib.pyplot as plt
 import base64
@@ -311,6 +312,63 @@ def listar_lideres_relatorios(empresa, codrodada):
             leader["rotulo"] = f"{leader['nome']} - {leader['email']}"
         lista.append(leader)
     return sorted(lista, key=lambda item: item["rotulo"].lower())
+
+
+def _normalizar_chave_amostra(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def avaliar_amostra_leadertrack(*relatorios):
+    textos = []
+    campos = {}
+
+    def walk(value, path=""):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                key_norm = _normalizar_chave_amostra(key)
+                if isinstance(item, (int, float, str, bool)) and key_norm in (
+                    "respondentes",
+                    "respostasequipe",
+                    "respostasdaequipe",
+                    "elegiveismedia",
+                    "elegiveisparamedia",
+                    "menosde3meses",
+                    "menos3meses",
+                    "amostrainsuficiente",
+                ):
+                    campos[key_norm] = item
+                walk(item, f"{path}.{key}" if path else str(key))
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                walk(item, f"{path}[{index}]")
+        elif isinstance(value, str):
+            textos.append(value.lower())
+
+    for relatorio in relatorios:
+        walk(relatorio)
+
+    texto_unificado = " ".join(textos)
+    insuficiente = (
+        "amostra insuficiente" in texto_unificado
+        or bool(campos.get("amostrainsuficiente"))
+    )
+    elegiveis = campos.get("elegiveismedia", campos.get("elegiveisparamedia"))
+    respostas = campos.get("respostasequipe", campos.get("respostasdaequipe", campos.get("respondentes")))
+    menos_3_meses = campos.get("menosde3meses", campos.get("menos3meses"))
+
+    return {
+        "insuficiente": bool(insuficiente),
+        "respostas_equipe": respostas,
+        "elegiveis_media": elegiveis,
+        "menos_de_3_meses": menos_3_meses,
+        "criterio": "Amostra minima recomendada: pelo menos 3 respostas elegiveis para media da equipe.",
+        "orientacao": (
+            "Quando a amostra e insuficiente, os graficos podem existir, mas a devolutiva deve ser tratada "
+            "como leitura limitada. Evite conclusoes fortes sobre percepcao coletiva da equipe."
+            if insuficiente else
+            "Amostra sem sinal automatico de insuficiencia nos metadados disponiveis."
+        ),
+    }
 
 
 def persistir_devolutiva_leadertrack(devolutiva, gerado_por=None):
@@ -873,6 +931,14 @@ def gerar_devolutiva_leadertrack():
         if limite_gaps:
             gaps = gaps[:limite_gaps]
         baixa_referencia = low_reference_affirmations(todas_afirmacoes, baixa_referencia_threshold)
+        amostra = avaliar_amostra_leadertrack(
+            dados_arquetipos_comparativo,
+            dados_arquetipos_analitico,
+            dados_microambiente_analitico,
+            dados_microambiente_subdimensao,
+            dados_microambiente_termometro_gaps,
+            dados_microambiente_waterfall_gaps,
+        )
         gaps_para_gerar = gaps[:maximo_gaps_por_ciclo] if gerar_apenas_primeiro_ciclo else gaps
         leader = {
             "nome": nome_lider,
@@ -896,6 +962,16 @@ def gerar_devolutiva_leadertrack():
             baixa_referencia_threshold=baixa_referencia_threshold,
             contexto_ids=contexto_ids,
         )
+        devolutiva["amostra"] = amostra
+        if amostra.get("insuficiente"):
+            devolutiva["modo_devolutiva"] = {
+                "modo": "amostra_insuficiente",
+                "titulo": "Amostra insuficiente para leitura coletiva robusta",
+                "leitura": amostra.get("orientacao"),
+            }
+            devolutiva["avisos"] = (devolutiva.get("avisos") or []) + [
+                "Amostra insuficiente: tratar graficos e planos como leitura limitada, sem conclusoes fortes sobre a equipe.",
+            ]
         devolutiva["status"] = "gerada_sem_persistencia"
         devolutiva["modo_geracao_planos"] = "com_ia" if gerar_planos_com_ia else "estrutura_sem_ia"
         devolutiva["proximo_passo_sugerido"] = (
