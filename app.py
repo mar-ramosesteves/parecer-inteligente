@@ -1366,6 +1366,69 @@ def listar_lideres_leadertrack():
         return response, 500
 
 
+@app.route("/teste-cache-leadertrack", methods=["POST", "OPTIONS"])
+def teste_cache_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = str(dados.get("empresa") or "fastco").strip().lower()
+        codrodada = str(dados.get("codrodada") or "av1225").strip().lower()
+        email_lider = str(dados.get("emailLider") or "teste-cache@leadertrack.local").strip().lower()
+        nome_lider = str(dados.get("nomeLider") or "Teste Cache LeaderTrack").strip()
+        contexto = str(dados.get("contexto") or "teste_cache").strip()
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+        cache_key = leadertrack_cache_key(
+            empresa=empresa,
+            codrodada=codrodada,
+            email_lider=email_lider,
+            equipe_tipo="diagnostico",
+            gap_id="teste_cache",
+            etapa="teste_cache",
+        )
+        payload_teste = {
+            "status": "ok",
+            "etapa": "teste_cache",
+            "gap_id": "teste_cache",
+            "fonte": "teste_sem_ia",
+            "cache": {
+                "status": "miss",
+                "cache_key": cache_key,
+            },
+        }
+        persistencia = salvar_cache_leadertrack(
+            empresa=empresa,
+            contexto=contexto,
+            contexto_ids=contexto_ids,
+            email_lider=email_lider,
+            nome_lider=nome_lider,
+            cache_key=cache_key,
+            payload=payload_teste,
+            gerado_por=dados.get("geradoPor"),
+        )
+        payload_teste["persistencia"] = persistencia
+        response = jsonify(payload_teste)
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        status_code = 200 if persistencia.get("status") == "salvo_no_historico_cache" else 500
+        return response, status_code
+
+    except Exception as e:
+        print("Erro no teste de cache LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
 @app.route("/gerar-pdi-leadertrack-afirmacao", methods=["POST", "OPTIONS"])
 def gerar_pdi_leadertrack_afirmacao():
     if request.method == "OPTIONS":
