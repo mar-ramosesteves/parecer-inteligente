@@ -378,10 +378,11 @@ def listar_empresas_relatorios(codrodada=None):
     return sorted(lista, key=lambda item: item["rotulo"].lower())
 
 
-def listar_rodadas_relatorios(empresa=None, email_lider=None):
+def listar_rodadas_relatorios(empresa=None, email_lider=None, contexto_ids=None):
     if not SUPABASE_REST_URL or not SUPABASE_KEY:
         raise RuntimeError("Supabase nao configurado no ambiente.")
 
+    contexto_ids = contexto_ids or {}
     rodadas = {}
 
     def add_rodada(row, fonte):
@@ -468,19 +469,24 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None):
                 break
             offset += limit
 
-    if not email_lider:
-        url = f"{SUPABASE_REST_URL}/leadertrack_rodadas"
-        params = {
-            "select": "codrodada,cliente_id,holding_id,ciclo_avaliacao_id",
-            "order": "codrodada.desc",
-            "limit": 1000,
-        }
-        response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
-        if response.status_code < 300:
-            for row in response.json() or []:
-                add_rodada(row, "leadertrack_rodadas")
-        elif response.status_code != 404:
-            print("Fonte de rodadas ignorada (leadertrack_rodadas):", response.status_code, response.text)
+    url = f"{SUPABASE_REST_URL}/leadertrack_rodadas"
+    params = {
+        "select": "codrodada,cliente_id,holding_id,ciclo_avaliacao_id",
+        "order": "codrodada.desc",
+        "limit": 1000,
+    }
+    if contexto_ids.get("cliente_id"):
+        params["cliente_id"] = f"eq.{contexto_ids.get('cliente_id')}"
+    if contexto_ids.get("holding_id"):
+        params["holding_id"] = f"eq.{contexto_ids.get('holding_id')}"
+    if contexto_ids.get("ciclo_avaliacao_id"):
+        params["ciclo_avaliacao_id"] = f"eq.{contexto_ids.get('ciclo_avaliacao_id')}"
+    response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
+    if response.status_code < 300:
+        for row in response.json() or []:
+            add_rodada(row, "leadertrack_rodadas")
+    elif response.status_code != 404:
+        print("Fonte de rodadas ignorada (leadertrack_rodadas):", response.status_code, response.text)
 
     lista = []
     for rodada in rodadas.values():
@@ -1469,7 +1475,11 @@ def listar_rodadas_leadertrack():
             "filial_id": dados.get("filial_id") or dados.get("filialId"),
         }
 
-        rodadas = listar_rodadas_relatorios(empresa=empresa or None, email_lider=email_lider or None)
+        rodadas = listar_rodadas_relatorios(
+            empresa=empresa or None,
+            email_lider=email_lider or None,
+            contexto_ids=contexto_ids,
+        )
         response = jsonify({
             "status": "ok",
             "empresa": empresa,
