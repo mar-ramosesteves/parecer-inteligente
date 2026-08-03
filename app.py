@@ -382,11 +382,41 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None):
     if not SUPABASE_REST_URL or not SUPABASE_KEY:
         raise RuntimeError("Supabase nao configurado no ambiente.")
 
-    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
     rodadas = {}
+
+    def add_rodada(row, fonte):
+        codigo = str(row.get("codrodada") or "").strip()
+        if not codigo:
+            return
+        key = codigo.lower()
+        current = rodadas.setdefault(key, {
+            "codigo": key,
+            "codrodada": key,
+            "rotulo": codigo,
+            "empresas": set(),
+            "lideres": set(),
+            "relatorios_disponiveis": set(),
+            "fontes": set(),
+            "ultima_atualizacao": None,
+        })
+        empresa_row = row.get("empresa")
+        if empresa_row:
+            current["empresas"].add(str(empresa_row).strip().lower())
+        lider_row = row.get("emaillider") or row.get("email")
+        if lider_row:
+            current["lideres"].add(str(lider_row).strip().lower())
+        tipo = row.get("tipo_relatorio") or row.get("tipo")
+        if tipo:
+            current["relatorios_disponiveis"].add(str(tipo))
+        current["fontes"].add(fonte)
+        data_criacao = row.get("data_criacao") or row.get("data")
+        if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
+            current["ultima_atualizacao"] = data_criacao
+
     limit = 1000
     offset = 0
     while True:
+        url = f"{SUPABASE_REST_URL}/relatorios_gerados"
         params = {
             "select": "empresa,codrodada,emaillider,tipo_relatorio,data_criacao",
             "tipo_relatorio": "in.(microambiente_analitico,arquetipos_analitico)",
@@ -405,41 +435,59 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None):
 
         rows = response.json() or []
         for row in rows:
-            codigo = str(row.get("codrodada") or "").strip()
-            if not codigo:
-                continue
-            key = codigo.lower()
-            current = rodadas.setdefault(key, {
-                "codigo": key,
-                "codrodada": key,
-                "rotulo": codigo,
-                "empresas": set(),
-                "lideres": set(),
-                "relatorios_disponiveis": set(),
-                "ultima_atualizacao": None,
-            })
-            empresa_row = row.get("empresa")
-            if empresa_row:
-                current["empresas"].add(str(empresa_row).strip().lower())
-            lider_row = row.get("emaillider")
-            if lider_row:
-                current["lideres"].add(str(lider_row).strip().lower())
-            tipo = row.get("tipo_relatorio")
-            if tipo:
-                current["relatorios_disponiveis"].add(str(tipo))
-            data_criacao = row.get("data_criacao")
-            if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
-                current["ultima_atualizacao"] = data_criacao
+            add_rodada(row, "relatorios_gerados")
 
         if len(rows) < limit:
             break
         offset += limit
+
+    for table in ("relatorios_microambiente", "relatorios_arquetipos"):
+        limit = 1000
+        offset = 0
+        while True:
+            url = f"{SUPABASE_REST_URL}/{table}"
+            params = {
+                "select": "codrodada,email,tipo,data,nome",
+                "order": "data.desc",
+                "limit": limit,
+                "offset": offset,
+            }
+            if email_lider:
+                params["email"] = f"ilike.{email_lider}"
+            response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
+            if response.status_code == 404:
+                break
+            if response.status_code >= 300:
+                print(f"Fonte de rodadas ignorada ({table}):", response.status_code, response.text)
+                break
+
+            rows = response.json() or []
+            for row in rows:
+                add_rodada(row, table)
+            if len(rows) < limit:
+                break
+            offset += limit
+
+    if not email_lider:
+        url = f"{SUPABASE_REST_URL}/leadertrack_rodadas"
+        params = {
+            "select": "codrodada,cliente_id,holding_id,ciclo_avaliacao_id",
+            "order": "codrodada.desc",
+            "limit": 1000,
+        }
+        response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
+        if response.status_code < 300:
+            for row in response.json() or []:
+                add_rodada(row, "leadertrack_rodadas")
+        elif response.status_code != 404:
+            print("Fonte de rodadas ignorada (leadertrack_rodadas):", response.status_code, response.text)
 
     lista = []
     for rodada in rodadas.values():
         rodada["empresas"] = sorted(rodada["empresas"])
         rodada["lideres"] = sorted(rodada["lideres"])
         rodada["relatorios_disponiveis"] = sorted(rodada["relatorios_disponiveis"])
+        rodada["fontes"] = sorted(rodada["fontes"])
         lista.append(rodada)
     return sorted(lista, key=lambda item: item.get("ultima_atualizacao") or "", reverse=True)
 
