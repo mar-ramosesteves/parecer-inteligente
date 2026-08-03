@@ -433,6 +433,100 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
     )
 
 
+def integrated_plan_schema():
+    return {
+        "tipo": "pdi_integrado_por_tema",
+        "tema": "",
+        "dimensao": "",
+        "subdimensao": "",
+        "afirmacoes_abrangidas": [],
+        "diagnostico_integrado": {
+            "sintese_executiva": "",
+            "causa_comum_provavel": "",
+            "como_os_gaps_se_conectam": [],
+            "impacto_no_microambiente": "",
+            "impacto_operacional_esperado": "",
+            "cuidados_de_interpretacao": [],
+        },
+        "cruzamento_arquetipos": {
+            "arquetipos_dominantes_que_ajudam": [],
+            "riscos_de_excesso_dos_arquetipos_dominantes": [],
+            "arquetipos_a_desenvolver": [],
+            "como_usar_repertorio_para_o_tema": [],
+        },
+        "plano_12_semanas": [
+            {
+                "semana": week,
+                "foco_da_semana": "",
+                "afirmacoes_impactadas": [],
+                "objetivo": "",
+                "formato_sugerido": "",
+                "acoes_praticas": [],
+                "perguntas_para_equipe": [],
+                "tarefa_do_lider": [],
+                "tarefa_da_equipe": [],
+                "o_que_mostrar_para_equipe": [],
+                "o_que_nao_mostrar_para_equipe": [],
+                "indicadores_operacionais_relacionados": [],
+                "indicador": "",
+                "metrica_operacional_base": "",
+                "evolucao_operacional_observada": "",
+                "evidencia_esperada": "",
+                "resultado_esperado": "",
+                "resultado_obtido": "",
+                "status": "nao_iniciado",
+                "observacoes_de_evolucao": "",
+            }
+            for week in range(1, 13)
+        ],
+        "revisoes_parciais_informais": [
+            {
+                "semana": 4,
+                "objetivo": "",
+                "perguntas_de_revisao": [],
+                "evidencias_a_observar": [],
+                "decisao": "manter_ajustar_ou_repriorizar",
+            },
+            {
+                "semana": 8,
+                "objetivo": "",
+                "perguntas_de_revisao": [],
+                "evidencias_a_observar": [],
+                "decisao": "manter_ajustar_ou_repriorizar",
+            },
+            {
+                "semana": 12,
+                "objetivo": "",
+                "perguntas_de_revisao": [],
+                "evidencias_a_observar": [],
+                "decisao": "encerrar_ampliar_ou_fasear_proximo_tema",
+            },
+        ],
+        "resultado_esperado_do_ciclo": "",
+        "observacao_para_pdi": "Plano integrado gerado a partir de multiplas afirmacoes LeaderTrack relacionadas ao mesmo tema.",
+    }
+
+
+def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiveis):
+    payload = {
+        "lider": leader,
+        "arquetipos": arquetipos,
+        "grupo_tematico": group,
+        "afirmacoes_abrangidas": group.get("afirmacoes") or [],
+        "indicadores_operacionais_disponiveis": indicadores_disponiveis,
+        "saida_obrigatoria": integrated_plan_schema(),
+    }
+    return (
+        "Gere um PDI integrado LeaderTrack de 12 semanas para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente. "
+        "O objetivo e reduzir volume para o lider sem perder rastreabilidade: mencione sempre quais afirmacoes o plano cobre e quais afirmacoes cada semana impacta. "
+        "Analise a causa comum do grupo, a dimensao/subdimensao, os arquetipos dominantes que podem ajudar, riscos de excesso e arquetipos a desenvolver. "
+        "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicadores, evidencias, resultado esperado, resultado obtido em branco e revisoes informais nas semanas 4, 8 e 12. "
+        "Conecte as acoes a indicadores operacionais reais quando possivel, mas nao invente numeros. "
+        "Nao use saude emocional na devolutiva individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
+        f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
 def build_empty_devolutiva(
     empresa,
     contexto,

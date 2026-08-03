@@ -15,6 +15,7 @@ from leadertrack_devolutivas import (
     build_diagnostic_prompt,
     build_empty_devolutiva,
     build_history_event,
+    build_integrated_plan_prompt,
     build_performance_goal_suggestion,
     build_weekly_prompt,
     filter_gaps,
@@ -1651,14 +1652,31 @@ def gerar_pdi_leadertrack_afirmacao():
             response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
             return response, 400
 
+        grupo_enviado = dados.get("grupo") if isinstance(dados.get("grupo"), dict) else {}
+        grupo_id_previo = str(
+            dados.get("grupoId")
+            or dados.get("grupo_id")
+            or grupo_enviado.get("grupo_id")
+            or ""
+        ).strip()
         gap_id_previo = str(dados.get("gapId") or dados.get("gap_id") or "").strip()
-        if usar_cache and gap_id_previo:
+        cache_id_previo = grupo_id_previo if etapa == "integrado" else gap_id_previo
+        if usar_cache and cache_id_previo:
             intervalo_previo = None
             if etapa != "diagnostico":
                 intervalo_previo = intervalo_etapa_leadertrack(etapa, dados)
             if etapa == "diagnostico":
                 cache_key_previa = leadertrack_cache_key(
-                    empresa, codrodada, email_lider, equipe_tipo, gap_id_previo, etapa
+                    empresa, codrodada, email_lider, equipe_tipo, cache_id_previo, etapa
+                )
+                cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key_previa)
+                if cached_payload:
+                    response = jsonify(cached_payload)
+                    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                    return response, 200
+            elif etapa == "integrado":
+                cache_key_previa = leadertrack_cache_key(
+                    empresa, codrodada, email_lider, equipe_tipo, cache_id_previo, etapa
                 )
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key_previa)
                 if cached_payload:
@@ -1668,7 +1686,7 @@ def gerar_pdi_leadertrack_afirmacao():
             elif intervalo_previo:
                 inicio_previo, fim_previo = intervalo_previo
                 cache_key_previa = leadertrack_cache_key(
-                    empresa, codrodada, email_lider, equipe_tipo, gap_id_previo, etapa, inicio_previo, fim_previo
+                    empresa, codrodada, email_lider, equipe_tipo, cache_id_previo, etapa, inicio_previo, fim_previo
                 )
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key_previa)
                 if cached_payload:
@@ -1714,8 +1732,8 @@ def gerar_pdi_leadertrack_afirmacao():
 
         arquetipos = archetype_summary(dados_arquetipos_comparativo)
         todas_afirmacoes = microenvironment_affirmations(dados_microambiente_analitico)
-        gap = selecionar_gap_leadertrack(todas_afirmacoes, dados)
-        if not gap:
+        gap = None if etapa == "integrado" else selecionar_gap_leadertrack(todas_afirmacoes, dados)
+        if etapa != "integrado" and not gap:
             response = jsonify({
                 "erro": "Afirmacao/gap nao encontrado.",
                 "orientacao": "Informe gapId, questao ou envie o objeto gap retornado pela devolutiva estruturada."
@@ -1732,7 +1750,7 @@ def gerar_pdi_leadertrack_afirmacao():
             "contexto_ids": contexto_ids,
         }
         prompt_base = carregar_prompt_leadertrack()
-        gap_id = leadertrack_gap_id(gap)
+        gap_id = leadertrack_gap_id(gap) if gap else grupo_id_previo
 
         if etapa == "diagnostico":
             cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa)
@@ -1799,12 +1817,87 @@ def gerar_pdi_leadertrack_afirmacao():
                 else:
                     payload["cache"]["status"] = "save_failed"
                     payload["cache"]["erro"] = persistencia_cache.get("erro")
+        elif etapa == "integrado":
+            grupo = grupo_enviado or {}
+            grupo_id = str(grupo.get("grupo_id") or grupo_id_previo or "").strip()
+            if not grupo_id or not isinstance(grupo.get("afirmacoes"), list) or not grupo.get("afirmacoes"):
+                response = jsonify({
+                    "erro": "Grupo tematico ausente ou incompleto.",
+                    "orientacao": "Envie grupoId e o objeto grupo retornado em agrupamentos_tematicos."
+                })
+                response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                return response, 400
+
+            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, grupo_id, etapa)
+            if usar_cache:
+                cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
+                if cached_payload:
+                    response = jsonify(cached_payload)
+                    response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+                    return response, 200
+
+            prompt = build_integrated_plan_prompt(
+                leader=leader,
+                arquetipos=arquetipos,
+                group=grupo,
+                indicadores_disponiveis=indicadores_disponiveis,
+            )
+            resposta_ia = gerar_resposta_ia_leadertrack(
+                pergunta=prompt,
+                prompt_base=prompt_base,
+                empresa=empresa,
+                codrodada=codrodada,
+                email_lider=email_lider,
+                pagina_atual="/gerar-pdi-leadertrack-afirmacao",
+                url_atual="https://gestor.thehrkey.tech",
+                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
+                dados_arquetipos_analitico=dados_arquetipos_analitico,
+                guia_arquetipos=guia_arquetipos,
+                dados_microambiente_analitico=dados_microambiente_analitico,
+                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
+                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
+                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
+                guia_microambiente=guia_microambiente,
+            )
+            resultado = parse_json_response(resposta_ia)
+            payload = {
+                "status": "ok",
+                "etapa": etapa,
+                "grupo_id": grupo_id,
+                "grupo": grupo,
+                "plano_integrado": resultado,
+                "persistencia": "nao_salvo",
+                "fonte": "ia",
+                "cache": {
+                    "status": "miss",
+                    "cache_key": cache_key,
+                },
+                "observacao": "Plano integrado gerado para uso consultivo. Ainda nao enviado ao PDI oficial.",
+            }
+            if gravar_cache:
+                persistencia_cache = salvar_cache_leadertrack(
+                    empresa=empresa,
+                    contexto=contexto,
+                    contexto_ids=contexto_ids,
+                    email_lider=email_lider,
+                    nome_lider=nome_lider,
+                    cache_key=cache_key,
+                    payload=payload,
+                    gerado_por=gerado_por,
+                )
+                payload["persistencia"] = persistencia_cache
+                if persistencia_cache.get("status") == "salvo_no_historico_cache":
+                    payload["cache"]["status"] = "saved"
+                    payload["cache"]["historico_id"] = persistencia_cache.get("historico_id")
+                else:
+                    payload["cache"]["status"] = "save_failed"
+                    payload["cache"]["erro"] = persistencia_cache.get("erro")
         else:
             intervalo = intervalo_etapa_leadertrack(etapa, dados)
             if not intervalo:
                 response = jsonify({
                     "erro": "Etapa invalida.",
-                    "etapas_validas": ["diagnostico", "semanas_1_4", "semanas_5_8", "semanas_9_12"]
+                    "etapas_validas": ["diagnostico", "integrado", "semanas_1_4", "semanas_5_8", "semanas_9_12"]
                 })
                 response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
                 return response, 400
