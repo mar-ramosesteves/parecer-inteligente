@@ -378,6 +378,56 @@ def listar_empresas_relatorios(codrodada=None):
     return sorted(lista, key=lambda item: item["rotulo"].lower())
 
 
+def listar_rodadas_relatorios(empresa=None):
+    if not SUPABASE_REST_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase nao configurado no ambiente.")
+
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    params = {
+        "select": "empresa,codrodada,tipo_relatorio,data_criacao",
+        "tipo_relatorio": "in.(microambiente_analitico,arquetipos_analitico)",
+        "order": "data_criacao.desc",
+        "limit": 1000,
+    }
+    if empresa:
+        params["empresa"] = f"ilike.{empresa}"
+
+    response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
+    if response.status_code >= 300:
+        raise RuntimeError(f"Erro ao listar rodadas: HTTP {response.status_code} - {response.text}")
+
+    rodadas = {}
+    for row in response.json() or []:
+        codigo = str(row.get("codrodada") or "").strip()
+        if not codigo:
+            continue
+        key = codigo.lower()
+        current = rodadas.setdefault(key, {
+            "codigo": key,
+            "codrodada": key,
+            "rotulo": codigo,
+            "empresas": set(),
+            "relatorios_disponiveis": set(),
+            "ultima_atualizacao": None,
+        })
+        empresa_row = row.get("empresa")
+        if empresa_row:
+            current["empresas"].add(str(empresa_row).strip().lower())
+        tipo = row.get("tipo_relatorio")
+        if tipo:
+            current["relatorios_disponiveis"].add(str(tipo))
+        data_criacao = row.get("data_criacao")
+        if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
+            current["ultima_atualizacao"] = data_criacao
+
+    lista = []
+    for rodada in rodadas.values():
+        rodada["empresas"] = sorted(rodada["empresas"])
+        rodada["relatorios_disponiveis"] = sorted(rodada["relatorios_disponiveis"])
+        lista.append(rodada)
+    return sorted(lista, key=lambda item: item.get("ultima_atualizacao") or "", reverse=True)
+
+
 def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
     parts = [
         "leadertrack_pdi_v1",
@@ -1329,6 +1379,46 @@ def listar_empresas_leadertrack():
 
     except Exception as e:
         print("Erro ao listar empresas LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/listar-rodadas-leadertrack", methods=["POST", "OPTIONS"])
+def listar_rodadas_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = str(dados.get("empresa") or "").strip().lower()
+        contexto = dados.get("contexto", "")
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+
+        rodadas = listar_rodadas_relatorios(empresa=empresa or None)
+        response = jsonify({
+            "status": "ok",
+            "empresa": empresa,
+            "contexto": contexto,
+            "contexto_ids": contexto_ids,
+            "total": len(rodadas),
+            "rodadas": rodadas,
+            "observacao": "Lista baseada nas rodadas encontradas nos relatorios LeaderTrack ja apurados.",
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao listar rodadas LeaderTrack:", e)
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
