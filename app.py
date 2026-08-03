@@ -188,6 +188,28 @@ def gerar_resposta_ia_leadertrack(
     return resposta.choices[0].message.content
 
 
+def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base):
+    """
+    Chamada reduzida para etapas que ja enviam o contexto estruturado no proprio prompt.
+    Evita carregar graficos e relatorios inteiros quando a tela pede apenas uma semana integrada.
+    """
+    resposta = openai_client.chat.completions.create(
+        model="gpt-4.1-mini",
+        temperature=0.2,
+        messages=[
+            {
+                "role": "system",
+                "content": prompt_base,
+            },
+            {
+                "role": "user",
+                "content": pergunta,
+            },
+        ],
+    )
+    return resposta.choices[0].message.content
+
+
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
@@ -1846,22 +1868,9 @@ def gerar_pdi_leadertrack_afirmacao():
                 start_week=inicio,
                 end_week=fim,
             )
-            resposta_ia = gerar_resposta_ia_leadertrack(
+            resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base,
-                empresa=empresa,
-                codrodada=codrodada,
-                email_lider=email_lider,
-                pagina_atual="/gerar-pdi-leadertrack-afirmacao",
-                url_atual="https://gestor.thehrkey.tech",
-                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
-                dados_arquetipos_analitico=dados_arquetipos_analitico,
-                guia_arquetipos=guia_arquetipos,
-                dados_microambiente_analitico=dados_microambiente_analitico,
-                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
-                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
-                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
-                guia_microambiente=guia_microambiente,
             )
             resultado = parse_json_response(resposta_ia)
             payload = {
