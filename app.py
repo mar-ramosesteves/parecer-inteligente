@@ -378,51 +378,67 @@ def listar_empresas_relatorios(codrodada=None):
     return sorted(lista, key=lambda item: item["rotulo"].lower())
 
 
-def listar_rodadas_relatorios(empresa=None):
+def listar_rodadas_relatorios(empresa=None, email_lider=None):
     if not SUPABASE_REST_URL or not SUPABASE_KEY:
         raise RuntimeError("Supabase nao configurado no ambiente.")
 
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
-    params = {
-        "select": "empresa,codrodada,tipo_relatorio,data_criacao",
-        "tipo_relatorio": "in.(microambiente_analitico,arquetipos_analitico)",
-        "order": "data_criacao.desc",
-        "limit": 1000,
-    }
-    if empresa:
-        params["empresa"] = f"ilike.{empresa}"
-
-    response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
-    if response.status_code >= 300:
-        raise RuntimeError(f"Erro ao listar rodadas: HTTP {response.status_code} - {response.text}")
-
     rodadas = {}
-    for row in response.json() or []:
-        codigo = str(row.get("codrodada") or "").strip()
-        if not codigo:
-            continue
-        key = codigo.lower()
-        current = rodadas.setdefault(key, {
-            "codigo": key,
-            "codrodada": key,
-            "rotulo": codigo,
-            "empresas": set(),
-            "relatorios_disponiveis": set(),
-            "ultima_atualizacao": None,
-        })
-        empresa_row = row.get("empresa")
-        if empresa_row:
-            current["empresas"].add(str(empresa_row).strip().lower())
-        tipo = row.get("tipo_relatorio")
-        if tipo:
-            current["relatorios_disponiveis"].add(str(tipo))
-        data_criacao = row.get("data_criacao")
-        if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
-            current["ultima_atualizacao"] = data_criacao
+    limit = 1000
+    offset = 0
+    while True:
+        params = {
+            "select": "empresa,codrodada,emaillider,tipo_relatorio,data_criacao",
+            "tipo_relatorio": "in.(microambiente_analitico,arquetipos_analitico)",
+            "order": "data_criacao.desc",
+            "limit": limit,
+            "offset": offset,
+        }
+        if empresa:
+            params["empresa"] = f"ilike.{empresa}"
+        if email_lider:
+            params["emaillider"] = f"ilike.{email_lider}"
+
+        response = requests.get(url, headers=supabase_headers(prefer_return=False, use_service_role=True), params=params, timeout=60)
+        if response.status_code >= 300:
+            raise RuntimeError(f"Erro ao listar rodadas: HTTP {response.status_code} - {response.text}")
+
+        rows = response.json() or []
+        for row in rows:
+            codigo = str(row.get("codrodada") or "").strip()
+            if not codigo:
+                continue
+            key = codigo.lower()
+            current = rodadas.setdefault(key, {
+                "codigo": key,
+                "codrodada": key,
+                "rotulo": codigo,
+                "empresas": set(),
+                "lideres": set(),
+                "relatorios_disponiveis": set(),
+                "ultima_atualizacao": None,
+            })
+            empresa_row = row.get("empresa")
+            if empresa_row:
+                current["empresas"].add(str(empresa_row).strip().lower())
+            lider_row = row.get("emaillider")
+            if lider_row:
+                current["lideres"].add(str(lider_row).strip().lower())
+            tipo = row.get("tipo_relatorio")
+            if tipo:
+                current["relatorios_disponiveis"].add(str(tipo))
+            data_criacao = row.get("data_criacao")
+            if data_criacao and (not current["ultima_atualizacao"] or data_criacao > current["ultima_atualizacao"]):
+                current["ultima_atualizacao"] = data_criacao
+
+        if len(rows) < limit:
+            break
+        offset += limit
 
     lista = []
     for rodada in rodadas.values():
         rodada["empresas"] = sorted(rodada["empresas"])
+        rodada["lideres"] = sorted(rodada["lideres"])
         rodada["relatorios_disponiveis"] = sorted(rodada["relatorios_disponiveis"])
         lista.append(rodada)
     return sorted(lista, key=lambda item: item.get("ultima_atualizacao") or "", reverse=True)
@@ -1396,6 +1412,7 @@ def listar_rodadas_leadertrack():
     try:
         dados = request.get_json() or {}
         empresa = str(dados.get("empresa") or "").strip().lower()
+        email_lider = str(dados.get("emailLider") or dados.get("email_lider") or "").strip().lower()
         contexto = dados.get("contexto", "")
         contexto_ids = {
             "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
@@ -1404,10 +1421,11 @@ def listar_rodadas_leadertrack():
             "filial_id": dados.get("filial_id") or dados.get("filialId"),
         }
 
-        rodadas = listar_rodadas_relatorios(empresa=empresa or None)
+        rodadas = listar_rodadas_relatorios(empresa=empresa or None, email_lider=email_lider or None)
         response = jsonify({
             "status": "ok",
             "empresa": empresa,
+            "email_lider": email_lider,
             "contexto": contexto,
             "contexto_ids": contexto_ids,
             "total": len(rodadas),
