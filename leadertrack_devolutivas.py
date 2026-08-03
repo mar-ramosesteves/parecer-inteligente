@@ -248,6 +248,74 @@ def annual_phasing(items, gaps_per_cycle=4):
     }
 
 
+def thematic_grouping(items, max_items_per_group=6):
+    groups_by_key = {}
+    for item in items or []:
+        dimensao = item.get("dimensao") or "Sem dimensao"
+        subdimensao = item.get("subdimensao") or "Sem subdimensao"
+        key = f"{dimensao}|{subdimensao}"
+        if key not in groups_by_key:
+            groups_by_key[key] = {
+                "grupo_id": f"grupo_{slug(dimensao)}_{slug(subdimensao)}",
+                "titulo": f"{dimensao} / {subdimensao}",
+                "dimensao": dimensao,
+                "subdimensao": subdimensao,
+                "afirmacoes": [],
+            }
+        groups_by_key[key]["afirmacoes"].append(item)
+
+    groups = []
+    for group in groups_by_key.values():
+        afirmacoes = sorted(
+            group["afirmacoes"],
+            key=lambda gap: float(gap.get("gap_percentual") or 0),
+            reverse=True,
+        )
+        gap_medio = (
+            sum(float(gap.get("gap_percentual") or 0) for gap in afirmacoes) / len(afirmacoes)
+            if afirmacoes else 0
+        )
+        gap_maximo = max((float(gap.get("gap_percentual") or 0) for gap in afirmacoes), default=0)
+        questoes = [gap.get("questao") for gap in afirmacoes if gap.get("questao")]
+        group["afirmacoes"] = afirmacoes[:max_items_per_group]
+        group["total_afirmacoes"] = len(afirmacoes)
+        group["questoes"] = questoes
+        group["gap_medio_percentual"] = round(gap_medio, 2)
+        group["gap_maximo_percentual"] = round(gap_maximo, 2)
+        group["criticidade"] = classify_gap(gap_maximo)
+        group["plano_integrado_sugerido"] = {
+            "tipo": "estrutura_sem_ia",
+            "objetivo": (
+                f"Tratar de forma integrada {len(afirmacoes)} afirmacao(oes) conectada(s) "
+                f"a {group['dimensao']} / {group['subdimensao']}."
+            ),
+            "premissa": (
+                "Quando varias afirmacoes apontam para a mesma dimensao ou subdimensao, "
+                "o PDI pode ser organizado por tema para reduzir volume, aumentar foco e facilitar execucao."
+            ),
+            "como_usar": [
+                "Apresentar ao lider que o plano cobre um conjunto de afirmacoes relacionadas.",
+                "Escolher rituais e comportamentos que ataquem a causa comum do grupo.",
+                "Registrar semanalmente quais afirmacoes foram impactadas por cada acao.",
+                "Revisar evidencias nas semanas 4, 8 e 12 antes de abrir novo bloco de desenvolvimento.",
+            ],
+            "observacao": (
+                "Esta estrutura e uma sugestao tecnica sem IA profunda. A geracao detalhada pode ser feita "
+                "posteriormente pelo LeaderTrackbot para o grupo selecionado."
+            ),
+        }
+        groups.append(group)
+
+    return sorted(
+        groups,
+        key=lambda group: (
+            int(group.get("total_afirmacoes") or 0),
+            float(group.get("gap_maximo_percentual") or 0),
+        ),
+        reverse=True,
+    )
+
+
 def diagnostic_schema():
     return {
         "gap": {},
@@ -413,6 +481,7 @@ def build_empty_devolutiva(
         "plano_sustentacao_microambiente": build_sustainability_plan(gaps, baixa_referencia),
         "plano_desenvolvimento_arquetipos": build_archetype_development_plan(arquetipos),
         "faseamento_anual_sugerido": annual_phasing(gaps, maximo_gaps_por_ciclo),
+        "agrupamentos_tematicos": thematic_grouping(gaps, maximo_gaps_por_ciclo + 2),
         "pdis": [],
         "historico_profissional": {
             "politica": "Todo PDI gerado, aprovado, alterado, acompanhado ou encerrado deve gerar evento historico.",
