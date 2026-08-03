@@ -433,9 +433,16 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
     )
 
 
-def integrated_plan_schema():
+def integrated_plan_schema(start_week=1, end_week=12):
+    start_week = max(1, min(12, int(start_week or 1)))
+    end_week = max(start_week, min(12, int(end_week or 12)))
+    revision_weeks = [week for week in (4, 8, 12) if start_week <= week <= end_week]
     return {
         "tipo": "pdi_integrado_por_tema",
+        "semanas_geradas": {
+            "inicio": start_week,
+            "fim": end_week,
+        },
         "tema": "",
         "dimensao": "",
         "subdimensao": "",
@@ -477,51 +484,46 @@ def integrated_plan_schema():
                 "status": "nao_iniciado",
                 "observacoes_de_evolucao": "",
             }
-            for week in range(1, 13)
+            for week in range(start_week, end_week + 1)
         ],
         "revisoes_parciais_informais": [
             {
-                "semana": 4,
+                "semana": week,
                 "objetivo": "",
                 "perguntas_de_revisao": [],
                 "evidencias_a_observar": [],
-                "decisao": "manter_ajustar_ou_repriorizar",
-            },
-            {
-                "semana": 8,
-                "objetivo": "",
-                "perguntas_de_revisao": [],
-                "evidencias_a_observar": [],
-                "decisao": "manter_ajustar_ou_repriorizar",
-            },
-            {
-                "semana": 12,
-                "objetivo": "",
-                "perguntas_de_revisao": [],
-                "evidencias_a_observar": [],
-                "decisao": "encerrar_ampliar_ou_fasear_proximo_tema",
-            },
+                "decisao": "encerrar_ampliar_ou_fasear_proximo_tema" if week == 12 else "manter_ajustar_ou_repriorizar",
+            }
+            for week in revision_weeks
         ],
         "resultado_esperado_do_ciclo": "",
         "observacao_para_pdi": "Plano integrado gerado a partir de multiplas afirmacoes LeaderTrack relacionadas ao mesmo tema.",
     }
 
 
-def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiveis):
+def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiveis, start_week=1, end_week=12):
+    start_week = max(1, min(12, int(start_week or 1)))
+    end_week = max(start_week, min(12, int(end_week or 12)))
     payload = {
         "lider": leader,
         "arquetipos": arquetipos,
         "grupo_tematico": group,
         "afirmacoes_abrangidas": group.get("afirmacoes") or [],
         "indicadores_operacionais_disponiveis": indicadores_disponiveis,
-        "saida_obrigatoria": integrated_plan_schema(),
+        "semanas_a_gerar": {
+            "inicio": start_week,
+            "fim": end_week,
+        },
+        "saida_obrigatoria": integrated_plan_schema(start_week, end_week),
     }
     return (
-        "Gere um PDI integrado LeaderTrack de 12 semanas para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente. "
+        f"Gere apenas as semanas {start_week} a {end_week} de um PDI integrado LeaderTrack de 12 semanas para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente. "
         "O objetivo e reduzir volume para o lider sem perder rastreabilidade: mencione sempre quais afirmacoes o plano cobre e quais afirmacoes cada semana impacta. "
         "Analise a causa comum do grupo, a dimensao/subdimensao, os arquetipos dominantes que podem ajudar, riscos de excesso e arquetipos a desenvolver. "
-        "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicadores, evidencias, resultado esperado, resultado obtido em branco e revisoes informais nas semanas 4, 8 e 12. "
+        "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicadores, evidencias, resultado esperado e resultado obtido em branco. "
+        "Inclua revisoes informais somente quando a semana 4, 8 ou 12 estiver dentro do intervalo solicitado. "
         "Conecte as acoes a indicadores operacionais reais quando possivel, mas nao invente numeros. "
+        "Mantenha profundidade consultiva, mas seja objetivo para evitar respostas longas demais. "
         "Nao use saude emocional na devolutiva individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )

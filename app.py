@@ -1675,8 +1675,9 @@ def gerar_pdi_leadertrack_afirmacao():
                     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
                     return response, 200
             elif etapa == "integrado":
+                inicio_previo, fim_previo = intervalo_previo or (1, 4)
                 cache_key_previa = leadertrack_cache_key(
-                    empresa, codrodada, email_lider, equipe_tipo, cache_id_previo, etapa
+                    empresa, codrodada, email_lider, equipe_tipo, cache_id_previo, etapa, inicio_previo, fim_previo
                 )
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key_previa)
                 if cached_payload:
@@ -1828,7 +1829,8 @@ def gerar_pdi_leadertrack_afirmacao():
                 response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
                 return response, 400
 
-            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, grupo_id, etapa)
+            inicio, fim = intervalo_etapa_leadertrack(etapa, dados) or (1, 4)
+            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, grupo_id, etapa, inicio, fim)
             if usar_cache:
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
                 if cached_payload:
@@ -1841,6 +1843,8 @@ def gerar_pdi_leadertrack_afirmacao():
                 arquetipos=arquetipos,
                 group=grupo,
                 indicadores_disponiveis=indicadores_disponiveis,
+                start_week=inicio,
+                end_week=fim,
             )
             resposta_ia = gerar_resposta_ia_leadertrack(
                 pergunta=prompt,
@@ -1865,6 +1869,8 @@ def gerar_pdi_leadertrack_afirmacao():
                 "etapa": etapa,
                 "grupo_id": grupo_id,
                 "grupo": grupo,
+                "semana_inicio": inicio,
+                "semana_fim": fim,
                 "plano_integrado": resultado,
                 "persistencia": "nao_salvo",
                 "fonte": "ia",
@@ -1872,6 +1878,7 @@ def gerar_pdi_leadertrack_afirmacao():
                     "status": "miss",
                     "cache_key": cache_key,
                 },
+                "proxima_etapa_sugerida": "integrado_5_8" if fim < 5 else ("integrado_9_12" if fim < 9 else None),
                 "observacao": "Plano integrado gerado para uso consultivo. Ainda nao enviado ao PDI oficial.",
             }
             if gravar_cache:
