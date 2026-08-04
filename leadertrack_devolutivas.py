@@ -364,6 +364,10 @@ def weekly_chunk_schema(start_week, end_week):
                 "foco_da_semana": "",
                 "objetivo": "",
                 "prazo": "",
+                "arquetipo_dominante_a_acionar": "",
+                "como_usar_arquetipo_dominante": "",
+                "arquetipo_complementar_a_desenvolver": "",
+                "pratica_para_desenvolver_arquetipo": "",
                 "acoes_praticas": [],
                 "formato_sugerido": "",
                 "perguntas_para_equipe": [],
@@ -427,6 +431,7 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "A rodada oficial e anual; estas semanas sao acompanhamento informal, sem nova rodada e sem novo inventario. "
         "Conecte as tarefas semanais a indicadores operacionais reais quando possivel: vendas, metas, produtividade, retrabalho, qualidade, prazo/SLA, erros, absenteismo, turnover ou NPS. "
         "Nao invente numeros. Sugira metrica base e evolucao operacional a observar. "
+        "Em cada semana, indique explicitamente qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
         "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicador, evidencia e resultado esperado. "
         "Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
@@ -468,6 +473,10 @@ def integrated_plan_schema(start_week=1, end_week=12):
                 "afirmacoes_impactadas": [],
                 "objetivo": "",
                 "formato_sugerido": "",
+                "arquetipo_dominante_a_acionar": "",
+                "como_usar_arquetipo_dominante": "",
+                "arquetipo_complementar_a_desenvolver": "",
+                "pratica_para_desenvolver_arquetipo": "",
                 "acoes_praticas": [],
                 "perguntas_para_equipe": [],
                 "tarefa_do_lider": [],
@@ -520,6 +529,7 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         f"Gere apenas as semanas {start_week} a {end_week} de um PDI integrado LeaderTrack de 12 semanas para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente. "
         "O objetivo e reduzir volume para o lider sem perder rastreabilidade: mencione sempre quais afirmacoes o plano cobre e quais afirmacoes cada semana impacta. "
         "Analise a causa comum do grupo, a dimensao/subdimensao, os arquetipos dominantes que podem ajudar, riscos de excesso e arquetipos a desenvolver. "
+        "Em cada semana, indique explicitamente qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
         "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicadores, evidencias, resultado esperado e resultado obtido em branco. "
         "Inclua revisoes informais somente quando a semana 4, 8 ou 12 estiver dentro do intervalo solicitado. "
         "Conecte as acoes a indicadores operacionais reais quando possivel, mas nao invente numeros. "
