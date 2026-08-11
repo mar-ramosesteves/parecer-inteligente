@@ -539,6 +539,30 @@ def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, 
     return "|".join(parts)
 
 
+def normalizar_plano_semanal_leadertrack(resultado):
+    if not isinstance(resultado, dict):
+        return resultado
+    semanas = resultado.get("plano_12_semanas")
+    if isinstance(semanas, list) and semanas:
+        return resultado
+
+    for key in ("plano", "semana", "plano_semanal"):
+        value = resultado.get(key)
+        if isinstance(value, dict) and value.get("semana"):
+            resultado["plano_12_semanas"] = [value]
+            return resultado
+
+    for key in ("semanas", "weeks"):
+        value = resultado.get(key)
+        if isinstance(value, list) and value:
+            resultado["plano_12_semanas"] = value
+            return resultado
+
+    if resultado.get("semana"):
+        resultado["plano_12_semanas"] = [resultado.copy()]
+    return resultado
+
+
 def buscar_cache_leadertrack(empresa, email_lider, cache_key):
     if not SUPABASE_REST_URL or not (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY):
         return None
@@ -1872,6 +1896,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 timeout=18,
             )
             resultado = parse_json_response(resposta_ia)
+            resultado = normalizar_plano_semanal_leadertrack(resultado)
             payload = {
                 "status": "ok",
                 "etapa": etapa,
@@ -1953,6 +1978,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 timeout=18,
             )
             resultado = parse_json_response(resposta_ia)
+            resultado = normalizar_plano_semanal_leadertrack(resultado)
             proxima_etapa = None
             if fim == 4:
                 proxima_etapa = "semanas_5_8"
