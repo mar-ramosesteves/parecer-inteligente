@@ -1892,8 +1892,8 @@ def gerar_pdi_leadertrack_afirmacao():
                 pergunta=prompt,
                 prompt_base=prompt_base,
                 model="gpt-4.1-nano",
-                max_tokens=1800,
-                timeout=18,
+                max_tokens=3000,
+                timeout=25,
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
