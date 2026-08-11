@@ -196,6 +196,9 @@ def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base):
     resposta = openai_client.chat.completions.create(
         model="gpt-4.1-mini",
         temperature=0.2,
+        max_tokens=3500,
+        response_format={"type": "json_object"},
+        timeout=25,
         messages=[
             {
                 "role": "system",
