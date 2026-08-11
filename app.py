@@ -188,17 +188,17 @@ def gerar_resposta_ia_leadertrack(
     return resposta.choices[0].message.content
 
 
-def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base):
+def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-mini", max_tokens=3500, timeout=25):
     """
     Chamada reduzida para etapas que ja enviam o contexto estruturado no proprio prompt.
     Evita carregar graficos e relatorios inteiros quando a tela pede apenas uma semana integrada.
     """
     resposta = openai_client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model=model,
         temperature=0.2,
-        max_tokens=3500,
+        max_tokens=max_tokens,
         response_format={"type": "json_object"},
-        timeout=25,
+        timeout=timeout,
         messages=[
             {
                 "role": "system",
@@ -1945,6 +1945,9 @@ def gerar_pdi_leadertrack_afirmacao():
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base_semanal,
+                model="gpt-4.1-nano",
+                max_tokens=1500,
+                timeout=18,
             )
             resultado = parse_json_response(resposta_ia)
             proxima_etapa = None
