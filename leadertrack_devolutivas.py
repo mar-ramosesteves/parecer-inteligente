@@ -357,45 +357,36 @@ def diagnostic_schema():
 
 
 def weekly_chunk_schema(start_week, end_week):
-    return {
+    schema = {
         "plano_12_semanas": [
             {
                 "semana": week,
                 "foco_da_semana": "",
                 "objetivo": "",
-                "prazo": "",
                 "arquetipo_dominante_a_acionar": "",
                 "como_usar_arquetipo_dominante": "",
                 "arquetipo_complementar_a_desenvolver": "",
                 "pratica_para_desenvolver_arquetipo": "",
                 "acoes_praticas": [],
-                "formato_sugerido": "",
                 "perguntas_para_equipe": [],
-                "o_que_mostrar_para_equipe": [],
-                "o_que_nao_mostrar_para_equipe": [],
                 "tarefa_do_lider": [],
                 "tarefa_da_equipe": [],
                 "indicador": "",
-                "evidencia_esperada": "",
                 "resultado_esperado": "",
-                "indicadores_operacionais_relacionados": [],
-                "metrica_operacional_base": "",
-                "evolucao_operacional_observada": "",
-                "resultado_obtido": "",
                 "status": "nao_iniciado",
-                "observacoes_de_evolucao": "",
             }
             for week in range(start_week, end_week + 1)
         ],
-        "revisao_parcial_informal": {
+    }
+    if end_week in (4, 8, 12):
+        schema["revisao_parcial_informal"] = {
             "momento": f"Semana {end_week}",
             "objetivo": "",
             "perguntas_de_revisao": [],
             "evidencias_a_observar": [],
-            "indicadores_operacionais_a_comparar": [],
             "decisao": "manter_ajustar_ou_repriorizar",
-        },
-    }
+        }
+    return schema
 
 
 def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
@@ -417,11 +408,24 @@ def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
 
 
 def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_week, indicadores_disponiveis):
+    diagnostic = diagnostic or {}
+    diagnostico_tecnico = diagnostic.get("diagnostico_tecnico") or {}
+    cruzamento = diagnostic.get("cruzamento_arquetipos") or {}
+    indicadores = diagnostic.get("indicadores_de_efetividade") or {}
+    diagnostic_resumo = {
+        "sintese_executiva": diagnostico_tecnico.get("sintese_executiva"),
+        "hipoteses_provaveis": diagnostico_tecnico.get("hipoteses_provaveis"),
+        "impacto_operacional_esperado": diagnostico_tecnico.get("impacto_operacional_esperado"),
+        "arquetipos_dominantes": cruzamento.get("dominantes"),
+        "arquetipos_a_desenvolver": cruzamento.get("arquetipos_a_desenvolver"),
+        "riscos_de_excesso": cruzamento.get("riscos_de_excesso"),
+        "indicadores_sugeridos": indicadores.get("indicadores_operacionais_sugeridos"),
+    }
     payload = {
         "lider": leader,
         "arquetipos": arquetipos,
         "afirmacao_critica": gap,
-        "diagnostico_tecnico": diagnostic,
+        "diagnostico_tecnico": diagnostic_resumo,
         "indicadores_operacionais_disponiveis": indicadores_disponiveis,
         "semanas_a_gerar": [start_week, end_week],
         "saida_obrigatoria": weekly_chunk_schema(start_week, end_week),
@@ -429,10 +433,11 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
     return (
         f"Gere apenas as semanas {start_week} a {end_week} de um PDI semanal LeaderTrack de 12 semanas. "
         "A rodada oficial e anual; estas semanas sao acompanhamento informal, sem nova rodada e sem novo inventario. "
-        "Conecte as tarefas semanais a indicadores operacionais reais quando possivel: vendas, metas, produtividade, retrabalho, qualidade, prazo/SLA, erros, absenteismo, turnover ou NPS. "
+        "Conecte as tarefas semanais a indicadores operacionais reais quando possivel. "
         "Nao invente numeros. Sugira metrica base e evolucao operacional a observar. "
-        "Em cada semana, indique explicitamente qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
-        "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicador, evidencia e resultado esperado. "
+        "Em cada semana, indique qual arquetipo dominante do lider deve ser acionado e qual arquetipo complementar deve ser desenvolvido. "
+        "Inclua acoes praticas, perguntas para equipe, tarefa do lider, tarefa da equipe, indicador e resultado esperado. "
+        "Seja especifico e consultivo, mas responda com frases curtas para evitar timeout. "
         "Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
