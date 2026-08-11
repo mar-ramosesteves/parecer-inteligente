@@ -89,6 +89,8 @@ def selecionar_gap_leadertrack(todas_afirmacoes, dados):
 
 def intervalo_etapa_leadertrack(etapa, dados):
     etapa = str(etapa or "diagnostico").strip().lower()
+    if dados.get("semanaInicio") and dados.get("semanaFim"):
+        return int(dados["semanaInicio"]), int(dados["semanaFim"])
     mapa = {
         "semanas_1_4": (1, 4),
         "1_4": (1, 4),
@@ -99,8 +101,6 @@ def intervalo_etapa_leadertrack(etapa, dados):
     }
     if etapa in mapa:
         return mapa[etapa]
-    if dados.get("semanaInicio") and dados.get("semanaFim"):
-        return int(dados["semanaInicio"]), int(dados["semanaFim"])
     return None
 
 
