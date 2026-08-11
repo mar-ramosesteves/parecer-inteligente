@@ -316,6 +316,69 @@ def thematic_grouping(items, max_items_per_group=6):
     )
 
 
+def maintenance_grouping(all_items, low_reference_items=None, max_items=6):
+    all_items = all_items or []
+    low_reference_items = low_reference_items or []
+    if not all_items:
+        return []
+
+    pontos_de_atencao = sorted(
+        all_items,
+        key=lambda item: float(item.get("gap_percentual") or 0),
+        reverse=True,
+    )[:max_items]
+    melhores_pontos = sorted(
+        all_items,
+        key=lambda item: float(item.get("real_percentual") or 0),
+        reverse=True,
+    )[:max_items]
+    afirmacoes = pontos_de_atencao or melhores_pontos
+    gap_maximo = max((float(item.get("gap_percentual") or 0) for item in afirmacoes), default=0)
+    gap_medio = (
+        sum(float(item.get("gap_percentual") or 0) for item in afirmacoes) / len(afirmacoes)
+        if afirmacoes else 0
+    )
+    return [
+        {
+            "grupo_id": "grupo_manutencao_microambiente",
+            "titulo": "Manutencao do Microambiente / Prevencao de Gaps",
+            "dimensao": "Manutencao do Microambiente",
+            "subdimensao": "Prevencao de Gaps",
+            "tipo": "manutencao_sem_gap_relevante",
+            "criticidade": "sustentacao",
+            "total_afirmacoes": len(afirmacoes),
+            "questoes": [item.get("questao") for item in afirmacoes if item.get("questao")],
+            "gap_medio_percentual": round(gap_medio, 2),
+            "gap_maximo_percentual": round(gap_maximo, 2),
+            "afirmacoes": afirmacoes,
+            "melhores_pontos": melhores_pontos,
+            "pontos_de_atencao_sub_20": pontos_de_atencao,
+            "baixa_referencia": low_reference_items,
+            "plano_integrado_sugerido": {
+                "tipo": "manutencao_e_prevencao",
+                "objetivo": (
+                    "Parabenizar o lider pela ausencia de gaps relevantes, preservar as praticas que sustentam "
+                    "os melhores resultados e atuar preventivamente nos maiores gaps abaixo do corte."
+                ),
+                "premissa": (
+                    "A ausencia de gaps acima do corte nao elimina a necessidade de PDI; muda o foco para "
+                    "manutencao, reforco positivo, ampliacao de repertorio e prevencao de queda na proxima rodada."
+                ),
+                "como_usar": [
+                    "Abrir a devolutiva reconhecendo os melhores sinais do microambiente.",
+                    "Identificar quais praticas do lider explicam esses resultados.",
+                    "Dar atencao aos maiores gaps abaixo do corte como sinais preventivos.",
+                    "Definir rituais de manutencao e indicadores leves de acompanhamento.",
+                ],
+                "observacao": (
+                    "Plano gerado para lideres sem gaps relevantes no corte atual, com foco em sustentar "
+                    "o que esta forte e reduzir risco de regressao futura."
+                ),
+            },
+        }
+    ]
+
+
 def diagnostic_schema():
     return {
         "gap": {},
@@ -518,6 +581,7 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
     }
     return (
         f"Gere apenas as semanas {start_week} a {end_week} de um PDI integrado LeaderTrack de 12 semanas para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente. "
+        "Se o grupo for de manutencao sem gap relevante, parabenize o lider, destaque o que aparece de melhor, preserve as praticas que explicam os bons resultados e trabalhe preventivamente os maiores gaps abaixo do corte. "
         "O objetivo e reduzir volume para o lider sem perder rastreabilidade: mencione sempre quais afirmacoes o plano cobre e quais afirmacoes cada semana impacta. "
         "Analise a causa comum do grupo, a dimensao/subdimensao, os arquetipos dominantes que podem ajudar, riscos de excesso e arquetipos a desenvolver. "
         "Em cada semana, indique qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
@@ -549,6 +613,9 @@ def build_empty_devolutiva(
     baixa_referencia = baixa_referencia or []
     contexto_ids = contexto_ids or {}
     modo_devolutiva = feedback_mode(gaps, baixa_referencia)
+    agrupamentos = thematic_grouping(gaps, maximo_gaps_por_ciclo + 2)
+    if not agrupamentos:
+        agrupamentos = maintenance_grouping(todas_afirmacoes, baixa_referencia, maximo_gaps_por_ciclo + 2)
     return {
         "status": "preparada_para_geracao",
         "gerado_em": datetime.utcnow().isoformat(),
@@ -578,7 +645,7 @@ def build_empty_devolutiva(
         "plano_sustentacao_microambiente": build_sustainability_plan(gaps, baixa_referencia),
         "plano_desenvolvimento_arquetipos": build_archetype_development_plan(arquetipos),
         "faseamento_anual_sugerido": annual_phasing(gaps, maximo_gaps_por_ciclo),
-        "agrupamentos_tematicos": thematic_grouping(gaps, maximo_gaps_por_ciclo + 2),
+        "agrupamentos_tematicos": agrupamentos,
         "pdis": [],
         "historico_profissional": {
             "politica": "Todo PDI gerado, aprovado, alterado, acompanhado ou encerrado deve gerar evento historico.",
