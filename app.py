@@ -1790,22 +1790,15 @@ def gerar_pdi_leadertrack_afirmacao():
                 gap=gap,
                 indicadores_disponiveis=indicadores_disponiveis,
             )
-            resposta_ia = gerar_resposta_ia_leadertrack(
+            prompt_base_semanal = (
+                "Voce e o LeaderTrackbot. Use exclusivamente o CONTEXTO_JSON enviado pelo usuario. "
+                "Nao invente dados, nomes, indicadores numericos ou teorias externas. "
+                "Gere um PDI consultivo, pratico e fiel ao gap, aos arquetipos e ao microambiente informados. "
+                "Responda somente JSON valido no formato solicitado."
+            )
+            resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
-                prompt_base=prompt_base,
-                empresa=empresa,
-                codrodada=codrodada,
-                email_lider=email_lider,
-                pagina_atual="/gerar-pdi-leadertrack-afirmacao",
-                url_atual="https://gestor.thehrkey.tech",
-                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
-                dados_arquetipos_analitico=dados_arquetipos_analitico,
-                guia_arquetipos=guia_arquetipos,
-                dados_microambiente_analitico=dados_microambiente_analitico,
-                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
-                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
-                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
-                guia_microambiente=guia_microambiente,
+                prompt_base=prompt_base_semanal,
             )
             resultado = parse_json_response(resposta_ia)
             payload = {
@@ -1940,22 +1933,15 @@ def gerar_pdi_leadertrack_afirmacao():
                 end_week=fim,
                 indicadores_disponiveis=indicadores_disponiveis,
             )
-            resposta_ia = gerar_resposta_ia_leadertrack(
+            prompt_base_semanal = (
+                "Voce e o LeaderTrackbot. Use exclusivamente o CONTEXTO_JSON enviado pelo usuario. "
+                "Nao invente dados, nomes, indicadores numericos ou teorias externas. "
+                "Gere um PDI consultivo, pratico e fiel ao gap, aos arquetipos e ao microambiente informados. "
+                "Responda somente JSON valido no formato solicitado."
+            )
+            resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
-                prompt_base=prompt_base,
-                empresa=empresa,
-                codrodada=codrodada,
-                email_lider=email_lider,
-                pagina_atual="/gerar-pdi-leadertrack-afirmacao",
-                url_atual="https://gestor.thehrkey.tech",
-                dados_arquetipos_comparativo=dados_arquetipos_comparativo,
-                dados_arquetipos_analitico=dados_arquetipos_analitico,
-                guia_arquetipos=guia_arquetipos,
-                dados_microambiente_analitico=dados_microambiente_analitico,
-                dados_microambiente_subdimensao=dados_microambiente_subdimensao,
-                dados_microambiente_termometro_gaps=dados_microambiente_termometro_gaps,
-                dados_microambiente_waterfall_gaps=dados_microambiente_waterfall_gaps,
-                guia_microambiente=guia_microambiente,
+                prompt_base=prompt_base_semanal,
             )
             resultado = parse_json_response(resposta_ia)
             proxima_etapa = None
