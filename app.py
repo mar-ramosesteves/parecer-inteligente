@@ -1867,6 +1867,9 @@ def gerar_pdi_leadertrack_afirmacao():
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base,
+                model="gpt-4.1-nano",
+                max_tokens=1800,
+                timeout=18,
             )
             resultado = parse_json_response(resposta_ia)
             payload = {

@@ -446,8 +446,7 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
 def integrated_plan_schema(start_week=1, end_week=12):
     start_week = max(1, min(12, int(start_week or 1)))
     end_week = max(start_week, min(12, int(end_week or 12)))
-    revision_weeks = [week for week in (4, 8, 12) if start_week <= week <= end_week]
-    return {
+    schema = {
         "tipo": "pdi_integrado_por_tema",
         "semanas_geradas": {
             "inicio": start_week,
@@ -461,15 +460,10 @@ def integrated_plan_schema(start_week=1, end_week=12):
             "sintese_executiva": "",
             "causa_comum_provavel": "",
             "como_os_gaps_se_conectam": [],
-            "impacto_no_microambiente": "",
-            "impacto_operacional_esperado": "",
-            "cuidados_de_interpretacao": [],
         },
         "cruzamento_arquetipos": {
             "arquetipos_dominantes_que_ajudam": [],
-            "riscos_de_excesso_dos_arquetipos_dominantes": [],
             "arquetipos_a_desenvolver": [],
-            "como_usar_repertorio_para_o_tema": [],
         },
         "plano_12_semanas": [
             {
@@ -477,7 +471,6 @@ def integrated_plan_schema(start_week=1, end_week=12):
                 "foco_da_semana": "",
                 "afirmacoes_impactadas": [],
                 "objetivo": "",
-                "formato_sugerido": "",
                 "arquetipo_dominante_a_acionar": "",
                 "como_usar_arquetipo_dominante": "",
                 "arquetipo_complementar_a_desenvolver": "",
@@ -486,33 +479,26 @@ def integrated_plan_schema(start_week=1, end_week=12):
                 "perguntas_para_equipe": [],
                 "tarefa_do_lider": [],
                 "tarefa_da_equipe": [],
-                "o_que_mostrar_para_equipe": [],
-                "o_que_nao_mostrar_para_equipe": [],
-                "indicadores_operacionais_relacionados": [],
                 "indicador": "",
-                "metrica_operacional_base": "",
-                "evolucao_operacional_observada": "",
-                "evidencia_esperada": "",
                 "resultado_esperado": "",
-                "resultado_obtido": "",
                 "status": "nao_iniciado",
-                "observacoes_de_evolucao": "",
             }
             for week in range(start_week, end_week + 1)
-        ],
-        "revisoes_parciais_informais": [
-            {
-                "semana": week,
-                "objetivo": "",
-                "perguntas_de_revisao": [],
-                "evidencias_a_observar": [],
-                "decisao": "encerrar_ampliar_ou_fasear_proximo_tema" if week == 12 else "manter_ajustar_ou_repriorizar",
-            }
-            for week in revision_weeks
         ],
         "resultado_esperado_do_ciclo": "",
         "observacao_para_pdi": "Plano integrado gerado a partir de multiplas afirmacoes LeaderTrack relacionadas ao mesmo tema.",
     }
+    if end_week in (4, 8, 12):
+        schema["revisoes_parciais_informais"] = [
+            {
+                "semana": end_week,
+                "objetivo": "",
+                "perguntas_de_revisao": [],
+                "evidencias_a_observar": [],
+                "decisao": "encerrar_ampliar_ou_fasear_proximo_tema" if end_week == 12 else "manter_ajustar_ou_repriorizar",
+            }
+        ]
+    return schema
 
 
 def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiveis, start_week=1, end_week=12):
@@ -534,11 +520,11 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         f"Gere apenas as semanas {start_week} a {end_week} de um PDI integrado LeaderTrack de 12 semanas para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente. "
         "O objetivo e reduzir volume para o lider sem perder rastreabilidade: mencione sempre quais afirmacoes o plano cobre e quais afirmacoes cada semana impacta. "
         "Analise a causa comum do grupo, a dimensao/subdimensao, os arquetipos dominantes que podem ajudar, riscos de excesso e arquetipos a desenvolver. "
-        "Em cada semana, indique explicitamente qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
-        "Inclua tarefas do lider, tarefas da equipe, perguntas, o que mostrar, o que nao mostrar, indicadores, evidencias, resultado esperado e resultado obtido em branco. "
+        "Em cada semana, indique qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
+        "Inclua acoes praticas, perguntas para equipe, tarefa do lider, tarefa da equipe, indicador e resultado esperado. "
         "Inclua revisoes informais somente quando a semana 4, 8 ou 12 estiver dentro do intervalo solicitado. "
         "Conecte as acoes a indicadores operacionais reais quando possivel, mas nao invente numeros. "
-        "Mantenha profundidade consultiva, mas seja objetivo para evitar respostas longas demais. "
+        "Mantenha profundidade consultiva com frases curtas para evitar timeout. "
         "Nao use saude emocional na devolutiva individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
