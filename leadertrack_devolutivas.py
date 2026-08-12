@@ -440,6 +440,9 @@ def weekly_chunk_schema(start_week, end_week):
             "tipo_de_intervencao": "reuniao|pratica_diaria|autodesenvolvimento|alinhamento_com_superior|treinamento|leitura|observacao_em_campo|comunicacao|experimento_operacional|feedback_1a1|revisao_informal",
             "speech_sugerido_do_lider": "",
             "afirmacao_ou_assunto_especifico": "",
+            "palavras_chave_das_afirmacoes": [],
+            "frases_especificas_para_usar": [],
+            "comentarios_de_observacao": [],
             "diferenca_objetiva_da_semana_anterior": "",
             "proxima_pratica_observavel": "",
             "feedback_necessario_para_liberar_proxima_semana": "",
@@ -527,6 +530,10 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "Nao invente numeros. Sugira metrica base e evolucao operacional a observar. "
         "Em cada semana, indique qual arquetipo dominante do lider deve ser acionado e qual arquetipo complementar deve ser desenvolvido. "
         "Cada semana deve citar explicitamente a afirmacao, dimensao, subdimensao ou comportamento especifico envolvido. "
+        "Cada semana deve preencher palavras_chave_das_afirmacoes, frases_especificas_para_usar e comentarios_de_observacao. "
+        "palavras_chave_das_afirmacoes deve extrair termos literais ou muito proximos das afirmacoes, como 'regras objetivas', 'melhor maneira de realizar tarefas', 'sabe o que fazer para melhorar', 'ajuda mutua', conforme o caso real. "
+        "frases_especificas_para_usar deve trazer falas curtas que o lider pode usar com a equipe, mencionando os assuntos das afirmacoes sem expor percentuais, gaps ou dados brutos. "
+        "comentarios_de_observacao deve trazer sinais concretos que o lider deve procurar na rotina, sempre conectados as afirmacoes do bloco. "
         "Construa uma progressao real: diagnosticar, alinhar expectativa, praticar nova conduta, observar em campo, ajustar comunicacao, consolidar evidencia e revisar aprendizado. "
         "Duas semanas consecutivas nao podem ter o mesmo tipo_de_intervencao nem o mesmo objetivo central. "
         "E proibido criar 'diagnostico aprofundado' logo depois de uma semana de diagnostico, conversa individual ou mapeamento; isso e repeticao. "
@@ -544,6 +551,7 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "Limite reuniao/feedback_1a1 a momentos realmente necessarios; depois de uma semana com conversa, a semana seguinte deve transformar o combinado em pratica observavel, comunicacao, experimento, estudo ou acompanhamento de indicador. "
         "Se a acao sugerida for conversar, informe o roteiro especifico, o speech sugerido, o que deve ser observado depois e qual mudanca concreta devera aparecer no comportamento ou indicador. "
         "Sempre que houver comunicacao ou conversa, preencha speech_sugerido_do_lider com uma fala pronta, profissional e adaptada ao tema. "
+        "O speech_sugerido_do_lider deve mencionar pelo menos duas palavras-chave especificas das afirmacoes, sem soar como texto padrao. "
         "Nao repita perguntas, acoes ou tarefas de semanas anteriores; se uma pergunta for parecida, reescreva com finalidade diferente. "
         "Antes de incluir uma semana, compare com as semanas ja propostas: se o leitor pudesse confundir com a semana anterior, nao inclua; substitua por uma intervencao diferente ou encerre o plano. "
         "Inclua acoes praticas detalhadas, perguntas para equipe, tarefa do lider, tarefa da equipe, indicador e resultado esperado. "
@@ -596,6 +604,9 @@ def integrated_plan_schema(start_week=1, end_week=12):
             "speech_sugerido_do_lider": "",
             "afirmacoes_impactadas": [],
             "assunto_especifico_das_afirmacoes": "",
+            "palavras_chave_das_afirmacoes": [],
+            "frases_especificas_para_usar": [],
+            "comentarios_de_observacao": [],
             "diferenca_objetiva_da_semana_anterior": "",
             "proxima_pratica_observavel": "",
             "feedback_necessario_para_liberar_proxima_semana": "",
@@ -658,6 +669,10 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         "Nao preencha semanas apenas para completar 12; um plano menor, objetivo e forte e preferivel a um plano longo e repetitivo. "
         "Se o grupo for de manutencao sem gap relevante, parabenize o lider, destaque o que aparece de melhor, preserve as praticas que explicam os bons resultados e trabalhe preventivamente os maiores gaps abaixo do corte. "
         "O objetivo e reduzir volume para o lider sem perder rastreabilidade: mencione sempre quais afirmacoes o plano cobre e quais afirmacoes cada semana impacta. "
+        "Cada semana deve preencher palavras_chave_das_afirmacoes, frases_especificas_para_usar e comentarios_de_observacao. "
+        "palavras_chave_das_afirmacoes deve extrair termos literais ou muito proximos das afirmacoes do grupo, como 'regras objetivas', 'melhor maneira de realizar tarefas', 'sabe o que fazer para melhorar', 'ajuda mutua', conforme o caso real. "
+        "frases_especificas_para_usar deve trazer falas curtas que o lider pode usar com a equipe, mencionando os assuntos das afirmacoes sem expor percentuais, gaps ou dados brutos. "
+        "comentarios_de_observacao deve trazer sinais concretos que o lider deve procurar na rotina, sempre conectados as afirmacoes do bloco. "
         "Analise a causa comum do grupo, a dimensao/subdimensao, os arquetipos dominantes que podem ajudar, riscos de excesso e arquetipos a desenvolver. "
         "Em cada semana, indique qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
         "Construa uma progressao real: diagnosticar, alinhar expectativa, praticar nova conduta, observar em campo, ajustar comunicacao, consolidar evidencia e revisar aprendizado. "
@@ -677,6 +692,7 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         "Limite reuniao/feedback_1a1 a momentos realmente necessarios; depois de uma semana com conversa, a semana seguinte deve transformar o combinado em pratica observavel, comunicacao, experimento, estudo ou acompanhamento de indicador. "
         "Se a acao sugerida for conversar, informe o roteiro especifico, o speech sugerido, o que deve ser observado depois e qual mudanca concreta devera aparecer no comportamento ou indicador. "
         "Sempre que houver comunicacao ou conversa, preencha speech_sugerido_do_lider com uma fala pronta, profissional e adaptada ao tema. "
+        "O speech_sugerido_do_lider deve mencionar pelo menos duas palavras-chave especificas das afirmacoes do grupo, sem soar como texto padrao. "
         "Cada semana deve mencionar assuntos especificos das afirmacoes envolvidas, nao apenas o nome generico da dimensao. "
         "Nao repita perguntas, acoes ou tarefas entre semanas. Se uma acao for continuidade de outra, deixe claro o avanço novo daquela semana. "
         "Antes de incluir uma semana, compare com as semanas ja propostas: se o leitor pudesse confundir com a semana anterior, nao inclua; substitua por uma intervencao diferente ou encerre o plano. "
@@ -711,7 +727,8 @@ def build_integrated_week1_prompt(leader, arquetipos, group, indicadores_disponi
         "Inclua autodesenvolvimento do lider quando fizer sentido: preparo emocional, treino de comunicacao, escuta, alinhamento com superior ou leitura orientada. "
         "O investimento total da semana nao pode ultrapassar 2 horas. "
         "Na semana 1, use tipo_de_intervencao como uma unica opcao, preferencialmente observacao_em_campo ou autodesenvolvimento. Nao combine tipos com barra vertical. "
-        "Preencha obrigatoriamente: etapa_do_ciclo=diagnostico, investimento_de_tempo_estimado, tempo_total_estimado_minutos, roteiro_de_tempo, tipo_de_intervencao, assunto_especifico_das_afirmacoes, speech_sugerido_do_lider, diferenca_objetiva_da_semana_anterior, proxima_pratica_observavel, feedback_necessario_para_liberar_proxima_semana, criterio_de_conclusao_da_semana, gamificacao, arquetipo_dominante_a_acionar e arquetipo_complementar_a_desenvolver. "
+        "Preencha obrigatoriamente: etapa_do_ciclo=diagnostico, investimento_de_tempo_estimado, tempo_total_estimado_minutos, roteiro_de_tempo, tipo_de_intervencao, assunto_especifico_das_afirmacoes, palavras_chave_das_afirmacoes, frases_especificas_para_usar, comentarios_de_observacao, speech_sugerido_do_lider, diferenca_objetiva_da_semana_anterior, proxima_pratica_observavel, feedback_necessario_para_liberar_proxima_semana, criterio_de_conclusao_da_semana, gamificacao, arquetipo_dominante_a_acionar e arquetipo_complementar_a_desenvolver. "
+        "palavras_chave_das_afirmacoes deve usar termos das afirmacoes do grupo. frases_especificas_para_usar deve trazer falas curtas e aplicaveis. comentarios_de_observacao deve listar sinais concretos da rotina que confirmam ou enfraquecem as afirmacoes. "
         "tempo_total_estimado_minutos deve ser no maximo 120, com roteiro_de_tempo somando ate 120 minutos. roteiro_de_tempo deve ser uma lista de objetos no formato {\"atividade\":\"...\",\"minutos\":30}, nao uma lista de textos soltos. "
         "Nao sugira conversas individuais com todos quando isso puder ultrapassar 120 minutos; prefira amostra representativa, observacao em campo, preparo do lider e comunicacao curta. "
         "A resposta deve ser JSON valido no formato de saida_obrigatoria, contendo exatamente uma entrada em plano_12_semanas, com semana=1. "
