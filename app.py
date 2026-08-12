@@ -188,14 +188,14 @@ def gerar_resposta_ia_leadertrack(
     return resposta.choices[0].message.content
 
 
-def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-mini", max_tokens=3500, timeout=25):
+def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-mini", max_tokens=3500, timeout=25, temperature=0.2):
     """
     Chamada reduzida para etapas que ja enviam o contexto estruturado no proprio prompt.
     Evita carregar graficos e relatorios inteiros quando a tela pede apenas uma semana integrada.
     """
     resposta = openai_client.chat.completions.create(
         model=model,
-        temperature=0.2,
+        temperature=temperature,
         max_tokens=max_tokens,
         response_format={"type": "json_object"},
         timeout=timeout,
@@ -526,7 +526,7 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None, contexto_ids=None)
 
 def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
     parts = [
-        "leadertrack_pdi_v2",
+        "leadertrack_pdi_v3",
         str(empresa or "").strip().lower(),
         str(codrodada or "").strip().lower(),
         str(email_lider or "").strip().lower(),
@@ -1894,6 +1894,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 model="gpt-4.1-mini",
                 max_tokens=4500,
                 timeout=45,
+                temperature=0.35,
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
@@ -1976,6 +1977,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 model="gpt-4.1-mini",
                 max_tokens=3200,
                 timeout=40,
+                temperature=0.35,
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
