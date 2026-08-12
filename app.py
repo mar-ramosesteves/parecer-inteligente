@@ -689,23 +689,31 @@ def revisar_plano_leadertrack_se_incompleto(resultado, prompt_base, model="gpt-4
         }
         return resultado
 
-    prompt_revisao = build_quality_retry_prompt(resultado, problemas)
-    resposta_revisao = gerar_resposta_ia_leadertrack_enxuta(
-        pergunta=prompt_revisao,
-        prompt_base=prompt_base,
-        model=model,
-        max_tokens=4200,
-        timeout=45,
-        temperature=0.25,
-    )
-    revisado = normalizar_plano_semanal_leadertrack(parse_json_response(resposta_revisao))
-    problemas_restantes = problemas_qualidade_plano_leadertrack(revisado)
-    revisado["qualidade_geracao"] = {
-        "status": "revisada" if not problemas_restantes else "revisada_com_pendencias",
-        "problemas_iniciais": problemas[:30],
-        "problemas_restantes": problemas_restantes[:30],
-    }
-    return revisado
+    try:
+        prompt_revisao = build_quality_retry_prompt(resultado, problemas)
+        resposta_revisao = gerar_resposta_ia_leadertrack_enxuta(
+            pergunta=prompt_revisao,
+            prompt_base=prompt_base,
+            model=model,
+            max_tokens=3600,
+            timeout=30,
+            temperature=0.25,
+        )
+        revisado = normalizar_plano_semanal_leadertrack(parse_json_response(resposta_revisao))
+        problemas_restantes = problemas_qualidade_plano_leadertrack(revisado)
+        revisado["qualidade_geracao"] = {
+            "status": "revisada" if not problemas_restantes else "revisada_com_pendencias",
+            "problemas_iniciais": problemas[:30],
+            "problemas_restantes": problemas_restantes[:30],
+        }
+        return revisado
+    except Exception as exc:
+        resultado["qualidade_geracao"] = {
+            "status": "gerada_com_pendencias_revisao_nao_concluida",
+            "problemas_iniciais": problemas[:30],
+            "erro_revisao": str(exc)[:500],
+        }
+        return resultado
 
 
 def buscar_cache_leadertrack(empresa, email_lider, cache_key):
