@@ -527,7 +527,7 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None, contexto_ids=None)
 
 def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
     parts = [
-        "leadertrack_pdi_v9",
+        "leadertrack_pdi_v10",
         str(empresa or "").strip().lower(),
         str(codrodada or "").strip().lower(),
         str(email_lider or "").strip().lower(),
@@ -689,31 +689,12 @@ def revisar_plano_leadertrack_se_incompleto(resultado, prompt_base, model="gpt-4
         }
         return resultado
 
-    try:
-        prompt_revisao = build_quality_retry_prompt(resultado, problemas)
-        resposta_revisao = gerar_resposta_ia_leadertrack_enxuta(
-            pergunta=prompt_revisao,
-            prompt_base=prompt_base,
-            model=model,
-            max_tokens=3600,
-            timeout=30,
-            temperature=0.25,
-        )
-        revisado = normalizar_plano_semanal_leadertrack(parse_json_response(resposta_revisao))
-        problemas_restantes = problemas_qualidade_plano_leadertrack(revisado)
-        revisado["qualidade_geracao"] = {
-            "status": "revisada" if not problemas_restantes else "revisada_com_pendencias",
-            "problemas_iniciais": problemas[:30],
-            "problemas_restantes": problemas_restantes[:30],
-        }
-        return revisado
-    except Exception as exc:
-        resultado["qualidade_geracao"] = {
-            "status": "gerada_com_pendencias_revisao_nao_concluida",
-            "problemas_iniciais": problemas[:30],
-            "erro_revisao": str(exc)[:500],
-        }
-        return resultado
+    resultado["qualidade_geracao"] = {
+        "status": "gerada_com_pendencias",
+        "problemas_iniciais": problemas[:30],
+        "orientacao": "Plano entregue sem segunda chamada de revisao para evitar timeout. Use regenerar se quiser tentar melhorar a qualidade.",
+    }
+    return resultado
 
 
 def buscar_cache_leadertrack(empresa, email_lider, cache_key):
@@ -2051,8 +2032,8 @@ def gerar_pdi_leadertrack_afirmacao():
                     start_week=inicio,
                     end_week=fim,
                 )
-                max_tokens = 4500
-                timeout = 45
+                max_tokens = 3200 if inicio == fim else 4500
+                timeout = 25 if inicio == fim else 45
 
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
