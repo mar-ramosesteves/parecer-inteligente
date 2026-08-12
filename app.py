@@ -527,7 +527,7 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None, contexto_ids=None)
 
 def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
     parts = [
-        "leadertrack_pdi_v6",
+        "leadertrack_pdi_v7",
         str(empresa or "").strip().lower(),
         str(codrodada or "").strip().lower(),
         str(email_lider or "").strip().lower(),
