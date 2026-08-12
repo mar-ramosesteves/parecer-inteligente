@@ -428,6 +428,8 @@ def weekly_chunk_schema(start_week, end_week):
             "foco_da_semana": "",
             "tipo_de_intervencao": "reuniao|pratica_diaria|autodesenvolvimento|alinhamento_com_superior|treinamento|leitura|observacao_em_campo|comunicacao|experimento_operacional|feedback_1a1",
             "afirmacao_ou_assunto_especifico": "",
+            "diferenca_objetiva_da_semana_anterior": "",
+            "proxima_pratica_observavel": "",
             "objetivo": "",
             "arquetipo_dominante_a_acionar": "",
             "como_usar_arquetipo_dominante": "",
@@ -505,6 +507,10 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "Cada semana deve citar explicitamente a afirmacao, dimensao, subdimensao ou comportamento especifico envolvido. "
         "Construa uma progressao real: diagnosticar, alinhar expectativa, praticar nova conduta, observar em campo, ajustar comunicacao, consolidar evidencia e revisar aprendizado. "
         "Duas semanas consecutivas nao podem ter o mesmo tipo_de_intervencao nem o mesmo objetivo central. "
+        "E proibido criar 'diagnostico aprofundado' logo depois de uma semana de diagnostico, conversa individual ou mapeamento; isso e repeticao. "
+        "Depois de diagnosticar, a semana seguinte deve necessariamente converter achados em pacto comportamental, pratica observavel, experimento operacional, comunicacao estruturada, treino de speech, observacao em campo, alinhamento com superior ou revisao de evidencia. "
+        "Cada semana deve preencher diferenca_objetiva_da_semana_anterior explicando o que mudou na natureza da intervencao, nao apenas no texto. "
+        "Cada semana deve preencher proxima_pratica_observavel com uma conduta concreta que o lider ou a equipe executara no trabalho real. "
         "Varie o tipo_de_intervencao: nao use reuniao como solucao padrao. Inclua, quando fizer sentido, autodesenvolvimento, treino de speech, leitura orientada, observacao em campo, alinhamento com superior, feedback 1:1, comunicacao estruturada, experimento operacional e pratica emocional aplicada. "
         "Limite reuniao/feedback_1a1 a momentos realmente necessarios; depois de uma semana com conversa, a semana seguinte deve transformar o combinado em pratica observavel, comunicacao, experimento, estudo ou acompanhamento de indicador. "
         "Se a acao sugerida for conversar, informe o roteiro especifico, o speech sugerido, o que deve ser observado depois e qual mudanca concreta devera aparecer no comportamento ou indicador. "
@@ -548,6 +554,8 @@ def integrated_plan_schema(start_week=1, end_week=12):
             "tipo_de_intervencao": "reuniao|pratica_diaria|autodesenvolvimento|alinhamento_com_superior|treinamento|leitura|observacao_em_campo|comunicacao|experimento_operacional|feedback_1a1",
             "afirmacoes_impactadas": [],
             "assunto_especifico_das_afirmacoes": "",
+            "diferenca_objetiva_da_semana_anterior": "",
+            "proxima_pratica_observavel": "",
             "objetivo": "",
             "arquetipo_dominante_a_acionar": "",
             "como_usar_arquetipo_dominante": "",
@@ -602,6 +610,10 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         "Em cada semana, indique qual arquetipo dominante do lider deve ser acionado, como usa-lo, qual arquetipo complementar deve ser desenvolvido e uma pratica concreta para esse desenvolvimento. "
         "Construa uma progressao real: diagnosticar, alinhar expectativa, praticar nova conduta, observar em campo, ajustar comunicacao, consolidar evidencia e revisar aprendizado. "
         "Duas semanas consecutivas nao podem ter o mesmo tipo_de_intervencao nem o mesmo objetivo central. "
+        "E proibido criar 'diagnostico aprofundado' logo depois de uma semana de diagnostico, conversa individual ou mapeamento; isso e repeticao. "
+        "Depois de diagnosticar, a semana seguinte deve necessariamente converter achados em pacto comportamental, pratica observavel, experimento operacional, comunicacao estruturada, treino de speech, observacao em campo, alinhamento com superior ou revisao de evidencia. "
+        "Cada semana deve preencher diferenca_objetiva_da_semana_anterior explicando o que mudou na natureza da intervencao, nao apenas no texto. "
+        "Cada semana deve preencher proxima_pratica_observavel com uma conduta concreta que o lider ou a equipe executara no trabalho real. "
         "Varie o tipo_de_intervencao: nao use reuniao como solucao padrao. Inclua, quando fizer sentido, autodesenvolvimento, treino de speech, leitura orientada, observacao em campo, alinhamento com superior, feedback 1:1, comunicacao estruturada, experimento operacional e pratica emocional aplicada. "
         "Limite reuniao/feedback_1a1 a momentos realmente necessarios; depois de uma semana com conversa, a semana seguinte deve transformar o combinado em pratica observavel, comunicacao, experimento, estudo ou acompanhamento de indicador. "
         "Se a acao sugerida for conversar, informe o roteiro especifico, o speech sugerido, o que deve ser observado depois e qual mudanca concreta devera aparecer no comportamento ou indicador. "
