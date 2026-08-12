@@ -16,6 +16,7 @@ from leadertrack_devolutivas import (
     build_empty_devolutiva,
     build_history_event,
     build_integrated_plan_prompt,
+    build_integrated_week1_prompt,
     build_performance_goal_suggestion,
     build_weekly_prompt,
     filter_gaps,
@@ -1880,20 +1881,33 @@ def gerar_pdi_leadertrack_afirmacao():
                     response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
                     return response, 200
 
-            prompt = build_integrated_plan_prompt(
-                leader=leader,
-                arquetipos=arquetipos,
-                group=grupo,
-                indicadores_disponiveis=indicadores_disponiveis,
-                start_week=inicio,
-                end_week=fim,
-            )
+            if inicio == 1 and fim == 1:
+                prompt = build_integrated_week1_prompt(
+                    leader=leader,
+                    arquetipos=arquetipos,
+                    group=grupo,
+                    indicadores_disponiveis=indicadores_disponiveis,
+                )
+                max_tokens = 2800
+                timeout = 25
+            else:
+                prompt = build_integrated_plan_prompt(
+                    leader=leader,
+                    arquetipos=arquetipos,
+                    group=grupo,
+                    indicadores_disponiveis=indicadores_disponiveis,
+                    start_week=inicio,
+                    end_week=fim,
+                )
+                max_tokens = 4500
+                timeout = 45
+
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base,
                 model="gpt-4.1-mini",
-                max_tokens=4500,
-                timeout=45,
+                max_tokens=max_tokens,
+                timeout=timeout,
                 temperature=0.35,
             )
             resultado = parse_json_response(resposta_ia)

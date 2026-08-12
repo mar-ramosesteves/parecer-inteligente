@@ -672,6 +672,34 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
     )
 
 
+def build_integrated_week1_prompt(leader, arquetipos, group, indicadores_disponiveis):
+    payload = {
+        "lider": leader,
+        "arquetipos": arquetipos,
+        "grupo_tematico": group,
+        "afirmacoes_abrangidas": group.get("afirmacoes") or [],
+        "indicadores_operacionais_disponiveis": indicadores_disponiveis,
+        "semana_a_gerar": 1,
+        "saida_obrigatoria": integrated_plan_schema(1, 1),
+    }
+    return (
+        "Gere somente a semana 1 de um PDI integrado LeaderTrack para o grupo tematico informado. "
+        "Esta chamada existe para evitar timeout: nao gere semanas 2, 3 ou 4. "
+        "A semana 1 deve ser profunda, mas objetiva, com foco em diagnostico pratico e preparacao do terreno para o plano. "
+        "Use exclusivamente as afirmacoes, gaps, dimensao, subdimensao, arquetipos e contexto enviados. "
+        "Nao invente dados, indicadores numericos, nomes ou historico. "
+        "A semana 1 deve explicar claramente quais sinais o lider deve observar na rotina, quais evidencias deve coletar e como preparar a conversa/acao da semana 2. "
+        "Nao use reuniao como resposta automatica. Se sugerir conversa, detalhe speech, perguntas, evidencias a observar e limite de tempo. "
+        "Inclua autodesenvolvimento do lider quando fizer sentido: preparo emocional, treino de comunicacao, escuta, alinhamento com superior ou leitura orientada. "
+        "O investimento total da semana nao pode ultrapassar 2 horas. "
+        "Preencha obrigatoriamente: etapa_do_ciclo=diagnostico, investimento_de_tempo_estimado, tipo_de_intervencao, assunto_especifico_das_afirmacoes, diferenca_objetiva_da_semana_anterior, proxima_pratica_observavel, feedback_necessario_para_liberar_proxima_semana, criterio_de_conclusao_da_semana, gamificacao, arquetipo_dominante_a_acionar e arquetipo_complementar_a_desenvolver. "
+        "A resposta deve ser JSON valido no formato de saida_obrigatoria, contendo exatamente uma entrada em plano_12_semanas, com semana=1. "
+        "Use a correlacao com Daniel Goleman apenas como apoio conceitual quando ajudar o lider a escolher estilo emocional e situacional; nao cite textualmente artigo. "
+        "Responda somente JSON valido.\n\n"
+        f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
 def build_empty_devolutiva(
     empresa,
     contexto,
