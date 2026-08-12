@@ -283,22 +283,43 @@ def thematic_grouping(items, max_items_per_group=6):
         group["gap_medio_percentual"] = round(gap_medio, 2)
         group["gap_maximo_percentual"] = round(gap_maximo, 2)
         group["criticidade"] = classify_gap(gap_maximo)
-        group["plano_integrado_sugerido"] = {
-            "tipo": "estrutura_sem_ia",
-            "objetivo": (
-                f"Tratar de forma integrada {len(afirmacoes)} afirmacao(oes) conectada(s) "
+        total_texto = len(afirmacoes)
+        if total_texto == 1:
+            objetivo_integrado = (
+                f"Tratar de forma focada 1 afirmacao conectada "
                 f"a {group['dimensao']} / {group['subdimensao']}."
-            ),
-            "premissa": (
+            )
+            premissa_integrada = (
+                "Quando uma afirmacao concentra um tema critico ou relevante, o PDI pode ser "
+                "organizado como um ciclo curto para aprofundar a causa, testar uma pratica "
+                "observavel e medir sinais de evolucao."
+            )
+            como_usar_integrado = [
+                "Apresentar ao lider qual afirmacao sera trabalhada e por que ela importa para o microambiente.",
+                "Escolher uma pratica objetiva que ataque a causa provavel do gap.",
+                "Registrar semanalmente evidencias de mudanca percebidas na equipe.",
+                "Revisar evidencias ao final do ciclo antes de abrir novo bloco de desenvolvimento.",
+            ]
+        else:
+            objetivo_integrado = (
+                f"Tratar de forma integrada {total_texto} afirmacoes conectadas "
+                f"a {group['dimensao']} / {group['subdimensao']}."
+            )
+            premissa_integrada = (
                 "Quando varias afirmacoes apontam para a mesma dimensao ou subdimensao, "
                 "o PDI pode ser organizado por tema para reduzir volume, aumentar foco e facilitar execucao."
-            ),
-            "como_usar": [
+            )
+            como_usar_integrado = [
                 "Apresentar ao lider que o plano cobre um conjunto de afirmacoes relacionadas.",
                 "Escolher rituais e comportamentos que ataquem a causa comum do grupo.",
                 "Registrar semanalmente quais afirmacoes foram impactadas por cada acao.",
                 "Revisar evidencias ao final do ciclo antes de abrir novo bloco de desenvolvimento.",
-            ],
+            ]
+        group["plano_integrado_sugerido"] = {
+            "tipo": "estrutura_sem_ia",
+            "objetivo": objetivo_integrado,
+            "premissa": premissa_integrada,
+            "como_usar": como_usar_integrado,
             "observacao": (
                 "Esta estrutura e uma sugestao tecnica sem IA profunda. A geracao detalhada pode ser feita "
                 "posteriormente pelo LeaderTrackbot para o grupo selecionado."
