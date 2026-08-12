@@ -526,7 +526,7 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None, contexto_ids=None)
 
 def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
     parts = [
-        "leadertrack_pdi_v1",
+        "leadertrack_pdi_v2",
         str(empresa or "").strip().lower(),
         str(codrodada or "").strip().lower(),
         str(email_lider or "").strip().lower(),
@@ -1891,9 +1891,9 @@ def gerar_pdi_leadertrack_afirmacao():
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base,
-                model="gpt-4.1-nano",
-                max_tokens=3000,
-                timeout=25,
+                model="gpt-4.1-mini",
+                max_tokens=4500,
+                timeout=45,
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
@@ -1973,9 +1973,9 @@ def gerar_pdi_leadertrack_afirmacao():
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base_semanal,
-                model="gpt-4.1-nano",
-                max_tokens=1500,
-                timeout=18,
+                model="gpt-4.1-mini",
+                max_tokens=3200,
+                timeout=40,
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
