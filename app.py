@@ -527,7 +527,7 @@ def listar_rodadas_relatorios(empresa=None, email_lider=None, contexto_ids=None)
 
 def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, semana_inicio=None, semana_fim=None):
     parts = [
-        "leadertrack_pdi_v8",
+        "leadertrack_pdi_v9",
         str(empresa or "").strip().lower(),
         str(codrodada or "").strip().lower(),
         str(email_lider or "").strip().lower(),
@@ -562,6 +562,150 @@ def normalizar_plano_semanal_leadertrack(resultado):
     if resultado.get("semana"):
         resultado["plano_12_semanas"] = [resultado.copy()]
     return resultado
+
+
+def _lista_preenchida(valor):
+    return isinstance(valor, list) and any(str(item or "").strip() for item in valor)
+
+
+def _roteiro_tempo_valido(valor):
+    if not isinstance(valor, list) or not valor:
+        return False
+    for item in valor:
+        if not isinstance(item, dict):
+            return False
+        if not str(item.get("atividade") or "").strip():
+            return False
+        try:
+            if int(item.get("minutos") or 0) <= 0:
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def problemas_qualidade_plano_leadertrack(resultado):
+    problemas = []
+    if not isinstance(resultado, dict):
+        return ["Resposta nao retornou objeto JSON."]
+
+    semanas = resultado.get("plano_12_semanas")
+    if not isinstance(semanas, list) or not semanas:
+        return ["Resposta nao trouxe plano_12_semanas com semanas validas."]
+
+    tipos_por_semana = []
+    objetivos_por_semana = []
+    for semana in semanas:
+        if not isinstance(semana, dict):
+            problemas.append("Uma semana veio em formato invalido.")
+            continue
+
+        numero = semana.get("semana") or "?"
+        tipo = str(semana.get("tipo_de_intervencao") or "").strip()
+        objetivo = str(semana.get("objetivo") or "").strip().lower()
+        tipos_por_semana.append(tipo)
+        objetivos_por_semana.append(objetivo)
+
+        campos_texto = [
+            "etapa_do_ciclo",
+            "foco_da_semana",
+            "assunto_especifico_das_afirmacoes",
+            "speech_sugerido_do_lider",
+            "diferenca_objetiva_da_semana_anterior",
+            "proxima_pratica_observavel",
+            "feedback_necessario_para_liberar_proxima_semana",
+            "criterio_de_conclusao_da_semana",
+            "arquetipo_dominante_a_acionar",
+            "como_usar_arquetipo_dominante",
+            "arquetipo_complementar_a_desenvolver",
+            "pratica_para_desenvolver_arquetipo",
+            "indicador",
+            "resultado_esperado",
+        ]
+        for campo in campos_texto:
+            if not str(semana.get(campo) or "").strip():
+                problemas.append(f"Semana {numero}: campo ausente ou vazio: {campo}.")
+
+        for campo in (
+            "palavras_chave_das_afirmacoes",
+            "frases_especificas_para_usar",
+            "comentarios_de_observacao",
+            "acoes_praticas",
+            "perguntas_para_equipe",
+            "tarefa_do_lider",
+            "tarefa_da_equipe",
+            "afirmacoes_impactadas",
+        ):
+            if not _lista_preenchida(semana.get(campo)):
+                problemas.append(f"Semana {numero}: lista ausente ou vazia: {campo}.")
+
+        if not _roteiro_tempo_valido(semana.get("roteiro_de_tempo")):
+            problemas.append(f"Semana {numero}: roteiro_de_tempo precisa ser lista de atividades com minutos.")
+
+        try:
+            total = int(semana.get("tempo_total_estimado_minutos") or 0)
+            if total <= 0 or total > 120:
+                problemas.append(f"Semana {numero}: tempo_total_estimado_minutos fora do limite de ate 120.")
+        except Exception:
+            problemas.append(f"Semana {numero}: tempo_total_estimado_minutos invalido.")
+
+        if not tipo:
+            problemas.append(f"Semana {numero}: tipo_de_intervencao vazio.")
+        elif "|" in tipo or "," in tipo or "/" in tipo:
+            problemas.append(f"Semana {numero}: tipo_de_intervencao deve ser uma unica opcao.")
+
+    for index in range(1, len(tipos_por_semana)):
+        if tipos_por_semana[index] and tipos_por_semana[index] == tipos_por_semana[index - 1]:
+            problemas.append(f"Semanas consecutivas repetiram tipo_de_intervencao: {tipos_por_semana[index]}.")
+
+    for index in range(1, len(objetivos_por_semana)):
+        if objetivos_por_semana[index] and objetivos_por_semana[index] == objetivos_por_semana[index - 1]:
+            problemas.append("Semanas consecutivas repetiram o mesmo objetivo central.")
+
+    return problemas
+
+
+def build_quality_retry_prompt(resultado, problemas):
+    return (
+        "Revise a resposta JSON abaixo para corrigir problemas de qualidade do PDI LeaderTrack. "
+        "Mantenha o mesmo lider, tema, afirmacoes, arquetipos e semanas. "
+        "Nao invente dados numericos nem exponha percentuais para a equipe. "
+        "Preencha todos os campos ausentes com conteudo especifico das afirmacoes envolvidas. "
+        "Inclua palavras-chave literais ou muito proximas das afirmacoes, frases prontas que o lider possa falar "
+        "e comentarios de observacao com sinais concretos da rotina. "
+        "Varie as intervencoes entre semanas e mantenha no maximo 120 minutos por semana. "
+        "Responda somente JSON valido, preservando a estrutura do objeto original.\n\n"
+        f"PROBLEMAS_ENCONTRADOS:\n{json.dumps(problemas[:30], ensure_ascii=False, indent=2)}\n\n"
+        f"JSON_A_CORRIGIR:\n{json.dumps(resultado, ensure_ascii=False, indent=2)}"
+    )
+
+
+def revisar_plano_leadertrack_se_incompleto(resultado, prompt_base, model="gpt-4.1-mini"):
+    problemas = problemas_qualidade_plano_leadertrack(resultado)
+    if not problemas:
+        resultado["qualidade_geracao"] = {
+            "status": "aprovada",
+            "problemas_corrigidos": [],
+        }
+        return resultado
+
+    prompt_revisao = build_quality_retry_prompt(resultado, problemas)
+    resposta_revisao = gerar_resposta_ia_leadertrack_enxuta(
+        pergunta=prompt_revisao,
+        prompt_base=prompt_base,
+        model=model,
+        max_tokens=4200,
+        timeout=45,
+        temperature=0.25,
+    )
+    revisado = normalizar_plano_semanal_leadertrack(parse_json_response(resposta_revisao))
+    problemas_restantes = problemas_qualidade_plano_leadertrack(revisado)
+    revisado["qualidade_geracao"] = {
+        "status": "revisada" if not problemas_restantes else "revisada_com_pendencias",
+        "problemas_iniciais": problemas[:30],
+        "problemas_restantes": problemas_restantes[:30],
+    }
+    return revisado
 
 
 def buscar_cache_leadertrack(empresa, email_lider, cache_key):
@@ -1912,6 +2056,7 @@ def gerar_pdi_leadertrack_afirmacao():
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
+            resultado = revisar_plano_leadertrack_se_incompleto(resultado, prompt_base)
             payload = {
                 "status": "ok",
                 "etapa": etapa,
@@ -1995,6 +2140,7 @@ def gerar_pdi_leadertrack_afirmacao():
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
+            resultado = revisar_plano_leadertrack_se_incompleto(resultado, prompt_base)
             payload = {
                 "status": "ok",
                 "etapa": etapa,
