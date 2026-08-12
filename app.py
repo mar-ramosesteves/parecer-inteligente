@@ -1912,7 +1912,7 @@ def gerar_pdi_leadertrack_afirmacao():
                     "status": "miss",
                     "cache_key": cache_key,
                 },
-                "proxima_etapa_sugerida": "integrado_5_8" if fim < 5 else ("integrado_9_12" if fim < 9 else None),
+                "proxima_etapa_sugerida": None,
                 "observacao": "Plano integrado gerado para uso consultivo. Ainda nao enviado ao PDI oficial.",
             }
             if gravar_cache:
@@ -1981,11 +1981,6 @@ def gerar_pdi_leadertrack_afirmacao():
             )
             resultado = parse_json_response(resposta_ia)
             resultado = normalizar_plano_semanal_leadertrack(resultado)
-            proxima_etapa = None
-            if fim == 4:
-                proxima_etapa = "semanas_5_8"
-            elif fim == 8:
-                proxima_etapa = "semanas_9_12"
             payload = {
                 "status": "ok",
                 "etapa": etapa,
@@ -1999,7 +1994,7 @@ def gerar_pdi_leadertrack_afirmacao():
                     "status": "miss",
                     "cache_key": cache_key,
                 },
-                "proxima_etapa_sugerida": proxima_etapa,
+                "proxima_etapa_sugerida": None,
             }
             if gravar_cache:
                 persistencia_cache = salvar_cache_leadertrack(

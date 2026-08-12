@@ -297,7 +297,7 @@ def thematic_grouping(items, max_items_per_group=6):
                 "Apresentar ao lider que o plano cobre um conjunto de afirmacoes relacionadas.",
                 "Escolher rituais e comportamentos que ataquem a causa comum do grupo.",
                 "Registrar semanalmente quais afirmacoes foram impactadas por cada acao.",
-                "Revisar evidencias nas semanas 4, 8 e 12 antes de abrir novo bloco de desenvolvimento.",
+                "Revisar evidencias ao final do ciclo antes de abrir novo bloco de desenvolvimento.",
             ],
             "observacao": (
                 "Esta estrutura e uma sugestao tecnica sem IA profunda. A geracao detalhada pode ser feita "
@@ -664,7 +664,7 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         "Antes de incluir uma semana, compare com as semanas ja propostas: se o leitor pudesse confundir com a semana anterior, nao inclua; substitua por uma intervencao diferente ou encerre o plano. "
         "Inclua acoes praticas detalhadas, perguntas para equipe, tarefa do lider, tarefa da equipe, indicador e resultado esperado. "
         "Use a correlacao com Daniel Goleman apenas como apoio conceitual quando ajudar a desenvolver repertorio emocional e situacional; nao cite textualmente o artigo nem diga que Goleman prova o resultado. "
-        "Inclua revisoes informais somente quando a semana 4, 8 ou 12 estiver dentro do intervalo solicitado. "
+        "Inclua revisao informal somente no fechamento do ciclo solicitado, normalmente na semana 4. "
         "Conecte as acoes a indicadores operacionais reais quando possivel, mas nao invente numeros. "
         "Mantenha profundidade consultiva suficiente para o lider perceber que o plano foi feito para aquele grupo especifico. "
         "Nao use saude emocional na devolutiva individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
