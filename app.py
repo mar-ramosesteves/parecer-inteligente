@@ -1811,6 +1811,107 @@ def teste_cache_leadertrack():
         return response, 500
 
 
+@app.route("/salvar-registro-semana-leadertrack", methods=["POST", "OPTIONS"])
+def salvar_registro_semana_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = str(dados.get("empresa") or "").strip().lower()
+        codrodada = str(dados.get("codrodada") or "").strip().lower()
+        email_lider = str(dados.get("emailLider") or "").strip().lower()
+        nome_lider = str(dados.get("nomeLider") or "").strip()
+        contexto = str(dados.get("contexto") or "").strip()
+        equipe_tipo = str(dados.get("equipeTipo") or dados.get("tipoEquipe") or "direta").strip().lower()
+        semana = int(dados.get("semana") or 0)
+        source_key = str(dados.get("sourceKey") or dados.get("gapId") or dados.get("grupoId") or "").strip()
+        feedback = dados.get("feedback") if isinstance(dados.get("feedback"), dict) else {}
+        semana_payload = dados.get("semanaPayload") if isinstance(dados.get("semanaPayload"), dict) else {}
+        gerado_por = dados.get("geradoPor")
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+
+        if not empresa or not codrodada or not email_lider or not source_key or semana < 1:
+            response = jsonify({
+                "erro": "Campos obrigatorios ausentes para salvar registro da semana.",
+                "campos_necessarios": ["empresa", "codrodada", "emailLider", "sourceKey", "semana"]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        if not any(str(value or "").strip() for value in feedback.values()):
+            response = jsonify({
+                "erro": "Registro vazio.",
+                "orientacao": "Preencha pelo menos um campo antes de salvar."
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        cache_key = leadertrack_cache_key(
+            empresa=empresa,
+            codrodada=codrodada,
+            email_lider=email_lider,
+            equipe_tipo=equipe_tipo,
+            gap_id=source_key,
+            etapa="registro_semana",
+            semana_inicio=semana,
+            semana_fim=semana,
+        )
+        evento = {
+            "cliente_id": contexto_ids.get("cliente_id"),
+            "holding_id": contexto_ids.get("holding_id"),
+            "empresa_id": contexto_ids.get("empresa_id"),
+            "filial_id": contexto_ids.get("filial_id"),
+            "profissional_email": email_lider,
+            "profissional_nome": nome_lider,
+            "empresa": empresa,
+            "contexto": contexto,
+            "origem": "leadertrack_pdi_registro_semanal",
+            "tipo_evento": "registro_semana_pdi",
+            "descricao_evento": f"Registro do lider salvo para a semana {semana} do PDI LeaderTrack.",
+            "dados_antes": {
+                "source_key": source_key,
+                "semana": semana,
+                "semana_payload_resumo": {
+                    "foco_da_semana": semana_payload.get("foco_da_semana"),
+                    "objetivo": semana_payload.get("objetivo"),
+                    "indicador": semana_payload.get("indicador"),
+                },
+            },
+            "dados_depois": {
+                "cache_key": cache_key,
+                "source_key": source_key,
+                "semana": semana,
+                "registro_do_lider": feedback,
+            },
+            "registrado_por": gerado_por,
+        }
+        saved = supabase_insert("leadertrack_pdi_historico", evento)
+        response = jsonify({
+            "status": "ok",
+            "historico_id": saved.get("id") if isinstance(saved, dict) else None,
+            "cache_key": cache_key,
+            "mensagem": "Registro da semana salvo no historico LeaderTrack.",
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao salvar registro semanal LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
 @app.route("/gerar-pdi-leadertrack-afirmacao", methods=["POST", "OPTIONS"])
 def gerar_pdi_leadertrack_afirmacao():
     if request.method == "OPTIONS":
