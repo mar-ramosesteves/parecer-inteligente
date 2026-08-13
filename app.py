@@ -1912,6 +1912,94 @@ def salvar_registro_semana_leadertrack():
         return response, 500
 
 
+@app.route("/listar-registros-semana-leadertrack", methods=["POST", "OPTIONS"])
+def listar_registros_semana_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = str(dados.get("empresa") or "").strip().lower()
+        codrodada = str(dados.get("codrodada") or "").strip().lower()
+        email_lider = str(dados.get("emailLider") or "").strip().lower()
+
+        if not empresa or not codrodada or not email_lider:
+            response = jsonify({
+                "erro": "Campos obrigatorios ausentes.",
+                "campos_necessarios": ["empresa", "codrodada", "emailLider"]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        url = f"{SUPABASE_REST_URL}/leadertrack_pdi_historico"
+        params = {
+            "select": "id,dados_depois,data_evento,registrado_por",
+            "empresa": f"eq.{empresa}",
+            "profissional_email": f"eq.{email_lider}",
+            "origem": "eq.leadertrack_pdi_registro_semanal",
+            "tipo_evento": "eq.registro_semana_pdi",
+            "order": "data_evento.desc",
+            "limit": 300,
+        }
+        response_db = requests.get(
+            url,
+            headers=supabase_headers(prefer_return=False, use_service_role=True),
+            params=params,
+            timeout=60,
+        )
+        if response_db.status_code >= 300:
+            raise RuntimeError(f"Erro ao listar registros semanais: HTTP {response_db.status_code} - {response_db.text}")
+
+        registros = {}
+        linhas = []
+        for row in response_db.json() or []:
+            dados_depois = row.get("dados_depois") or {}
+            if isinstance(dados_depois, str):
+                try:
+                    dados_depois = json.loads(dados_depois)
+                except Exception:
+                    dados_depois = {}
+            cache_key = str(dados_depois.get("cache_key") or "")
+            if f"|{codrodada}|" not in cache_key:
+                continue
+            source_key = str(dados_depois.get("source_key") or "").strip()
+            semana = dados_depois.get("semana")
+            feedback = dados_depois.get("registro_do_lider") if isinstance(dados_depois.get("registro_do_lider"), dict) else {}
+            if not source_key or not semana or not feedback:
+                continue
+            key = f"{source_key}:{semana}"
+            if key not in registros:
+                registros[key] = feedback
+                linhas.append({
+                    "key": key,
+                    "source_key": source_key,
+                    "semana": semana,
+                    "feedback": feedback,
+                    "historico_id": row.get("id"),
+                    "data_evento": row.get("data_evento"),
+                    "registrado_por": row.get("registrado_por"),
+                })
+
+        response = jsonify({
+            "status": "ok",
+            "total": len(linhas),
+            "registros": registros,
+            "linhas": linhas,
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao listar registros semanais LeaderTrack:", e)
+        response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
 @app.route("/gerar-pdi-leadertrack-afirmacao", methods=["POST", "OPTIONS"])
 def gerar_pdi_leadertrack_afirmacao():
     if request.method == "OPTIONS":
