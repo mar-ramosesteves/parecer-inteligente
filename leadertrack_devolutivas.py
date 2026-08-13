@@ -721,15 +721,25 @@ def integrated_plan_schema(start_week=1, end_week=12):
     return schema
 
 
-def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiveis, start_week=1, end_week=12):
+def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiveis, start_week=1, end_week=12, feedback_semanas=None):
     start_week = max(1, min(12, int(start_week or 1)))
     end_week = max(start_week, min(12, int(end_week or 12)))
+    if start_week == end_week:
+        return build_integrated_single_week_prompt(
+            leader=leader,
+            arquetipos=arquetipos,
+            group=group,
+            indicadores_disponiveis=indicadores_disponiveis,
+            week_number=start_week,
+            feedback_semanas=feedback_semanas,
+        )
     payload = {
         "lider": leader,
         "arquetipos": arquetipos,
         "grupo_tematico": group,
         "afirmacoes_abrangidas": group.get("afirmacoes") or [],
         "indicadores_operacionais_disponiveis": indicadores_disponiveis,
+        "feedback_do_lider_ja_registrado": feedback_semanas or {},
         "semanas_a_gerar": {
             "inicio": start_week,
             "fim": end_week,
@@ -787,6 +797,53 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         "Conecte as acoes a indicadores operacionais reais quando possivel, mas nao invente numeros. "
         "Mantenha profundidade consultiva suficiente para o lider perceber que o plano foi feito para aquele grupo especifico. "
         "Nao use saude emocional na devolutiva individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
+        f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
+def build_integrated_single_week_prompt(leader, arquetipos, group, indicadores_disponiveis, week_number=2, feedback_semanas=None):
+    week_number = max(1, min(12, int(week_number or 1)))
+    etapas = {
+        1: "diagnostico",
+        2: "planejamento",
+        3: "acao",
+        4: "conclusao_resultados",
+    }
+    entregas = {
+        1: "mapa de evidencias e preparo do lider",
+        2: "pacto comportamental, alinhamento com superior ou comunicacao estruturada",
+        3: "experimento operacional ou pratica diaria observavel",
+        4: "revisao informal, decisao de continuidade e consolidacao de evidencias",
+    }
+    payload = {
+        "lider": leader,
+        "arquetipos": arquetipos,
+        "grupo_tematico": group,
+        "afirmacoes_abrangidas": group.get("afirmacoes") or [],
+        "indicadores_operacionais_disponiveis": indicadores_disponiveis,
+        "feedback_do_lider_ja_registrado": feedback_semanas or {},
+        "semana_a_gerar": week_number,
+        "etapa_recomendada": etapas.get(week_number, "acao"),
+        "entrega_esperada_da_semana": entregas.get(week_number, "intervencao objetiva e nao repetitiva"),
+        "saida_obrigatoria": integrated_plan_schema(week_number, week_number),
+    }
+    return (
+        f"Gere somente a semana {week_number} de um PDI integrado LeaderTrack. "
+        "Esta chamada precisa ser curta, profunda e estavel: responda somente JSON valido, sem markdown e sem texto fora do JSON. "
+        f"A etapa da semana deve ser {etapas.get(week_number, 'acao')} e a entrega concreta deve ser: {entregas.get(week_number, 'intervencao objetiva')}. "
+        "Nao gere outras semanas. Nao force 12 semanas. Este produto trabalha em ciclo recomendado de ate 4 semanas, com maximo de 2 horas por semana. "
+        "Use os feedbacks ja registrados pelo lider, quando existirem, para ajustar a semana atual. "
+        "A semana nao pode repetir a anterior: evite novo diagnostico se a semana anterior ja diagnosticou, e evite nova reuniao se a semana anterior ja foi conversa. "
+        "Inclua assuntos especificos das afirmacoes abrangidas, usando palavras proximas do texto real das afirmacoes. "
+        "As acoes praticas devem ser especificas, observaveis e aplicaveis ao trabalho real. Varie entre autodesenvolvimento, treino de speech, comunicacao, alinhamento com superior, pratica diaria, experimento operacional, observacao em campo e revisao informal. "
+        "Inclua no maximo 4 acoes praticas, no maximo 3 perguntas para equipe, no maximo 3 tarefas do lider e no maximo 2 tarefas da equipe. "
+        "Preencha registro_do_lider_antes_de_avancar com perguntas curtas para o lider responder depois de executar a semana, nao com resposta inventada. "
+        "Preencha autodesenvolvimento_do_lider com pratica emocional, treino de speech, leitura curta e reflexao individual. "
+        "Preencha compromisso_de_agenda com titulo, tipo, duracao em minutos, participantes sugeridos e descricao. "
+        "tempo_total_estimado_minutos deve ser entre 30 e 120, e roteiro_de_tempo deve decompor esse tempo em blocos. "
+        "Use Daniel Goleman apenas como apoio conceitual de repertorio emocional e situacional, sem citacao textual. "
+        "Se nao houver acao nova relevante para esta semana, retorne plano_12_semanas vazio e explique em criterio_de_encerramento por que o ciclo deve encerrar. "
+        "Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
 

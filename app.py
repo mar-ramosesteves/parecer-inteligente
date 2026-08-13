@@ -2045,6 +2045,7 @@ def gerar_pdi_leadertrack_afirmacao():
                     indicadores_disponiveis=indicadores_disponiveis,
                     start_week=inicio,
                     end_week=fim,
+                    feedback_semanas=dados.get("feedbackSemanas") or dados.get("feedback_semanas") or {},
                 )
                 max_tokens = 3200 if inicio == fim else 4500
                 timeout = 25 if inicio == fim else 45
