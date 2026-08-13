@@ -827,24 +827,33 @@ def build_integrated_single_week_prompt(leader, arquetipos, group, indicadores_d
         "entrega_esperada_da_semana": entregas.get(week_number, "intervencao objetiva e nao repetitiva"),
         "saida_obrigatoria": integrated_plan_schema(week_number, week_number),
     }
+    extra_semana_4 = ""
+    if week_number == 4:
+        extra_semana_4 = (
+            "Para a semana 4, faca fechamento leve: nao crie diagnostico novo, nao abra novo ciclo e nao gere revisao extensa. "
+            "Entregue apenas uma retrospectiva pratica com: evidencias observadas, decisao de manter/ajustar/encerrar, uma conversa curta de fechamento se necessaria e proximo indicador a acompanhar. "
+            "Use no maximo 3 acoes praticas, 2 perguntas para equipe, 2 tarefas do lider e 1 tarefa da equipe. "
+        )
     return (
         f"Gere somente a semana {week_number} de um PDI integrado LeaderTrack. "
-        "Esta chamada precisa ser curta, profunda e estavel: responda somente JSON valido, sem markdown e sem texto fora do JSON. "
-        f"A etapa da semana deve ser {etapas.get(week_number, 'acao')} e a entrega concreta deve ser: {entregas.get(week_number, 'intervencao objetiva')}. "
-        "Nao gere outras semanas. Nao force 12 semanas. Este produto trabalha em ciclo recomendado de ate 4 semanas, com maximo de 2 horas por semana. "
-        "Use os feedbacks ja registrados pelo lider, quando existirem, para ajustar a semana atual. "
-        "A semana nao pode repetir a anterior: evite novo diagnostico se a semana anterior ja diagnosticou, e evite nova reuniao se a semana anterior ja foi conversa. "
-        "Inclua assuntos especificos das afirmacoes abrangidas, usando palavras proximas do texto real das afirmacoes. "
-        "As acoes praticas devem ser especificas, observaveis e aplicaveis ao trabalho real. Varie entre autodesenvolvimento, treino de speech, comunicacao, alinhamento com superior, pratica diaria, experimento operacional, observacao em campo e revisao informal. "
-        "Inclua no maximo 4 acoes praticas, no maximo 3 perguntas para equipe, no maximo 3 tarefas do lider e no maximo 2 tarefas da equipe. "
-        "Preencha registro_do_lider_antes_de_avancar com perguntas curtas para o lider responder depois de executar a semana, nao com resposta inventada. "
-        "Preencha autodesenvolvimento_do_lider com pratica emocional, treino de speech, leitura curta e reflexao individual. "
-        "Preencha compromisso_de_agenda com titulo, tipo, duracao em minutos, participantes sugeridos e descricao. "
-        "tempo_total_estimado_minutos deve ser entre 30 e 120, e roteiro_de_tempo deve decompor esse tempo em blocos. "
-        "Use Daniel Goleman apenas como apoio conceitual de repertorio emocional e situacional, sem citacao textual. "
-        "Se nao houver acao nova relevante para esta semana, retorne plano_12_semanas vazio e explique em criterio_de_encerramento por que o ciclo deve encerrar. "
-        "Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
-        f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+        + "Esta chamada precisa ser curta, profunda e estavel: responda somente JSON valido, sem markdown e sem texto fora do JSON. "
+        + f"A etapa da semana deve ser {etapas.get(week_number, 'acao')} e a entrega concreta deve ser: {entregas.get(week_number, 'intervencao objetiva')}. "
+        + extra_semana_4
+        + "Nao gere outras semanas. Nao force 12 semanas. Este produto trabalha em ciclo recomendado de ate 4 semanas, com maximo de 2 horas por semana. "
+        + "Use os feedbacks ja registrados pelo lider, quando existirem, para ajustar a semana atual. "
+        + "A semana nao pode repetir a anterior: evite novo diagnostico se a semana anterior ja diagnosticou, e evite nova reuniao se a semana anterior ja foi conversa. "
+        + "Inclua assuntos especificos das afirmacoes abrangidas, usando palavras proximas do texto real das afirmacoes. "
+        + "As acoes praticas devem ser especificas, observaveis e aplicaveis ao trabalho real. Varie entre autodesenvolvimento, treino de speech, comunicacao, alinhamento com superior, pratica diaria, experimento operacional, observacao em campo e revisao informal. "
+        + "Inclua no maximo 3 acoes praticas, no maximo 3 perguntas para equipe, no maximo 3 tarefas do lider e no maximo 2 tarefas da equipe. "
+        + "Preencha registro_do_lider_antes_de_avancar com perguntas curtas para o lider responder depois de executar a semana, nao com resposta inventada. "
+        + "Preencha autodesenvolvimento_do_lider com pratica emocional, treino de speech, leitura curta e reflexao individual. "
+        + "Preencha compromisso_de_agenda com titulo, tipo, duracao em minutos, participantes sugeridos e descricao. "
+        + "tempo_total_estimado_minutos deve ser entre 30 e 120, e roteiro_de_tempo deve decompor esse tempo em blocos. "
+        + "Use Daniel Goleman apenas como apoio conceitual de repertorio emocional e situacional, sem citacao textual. "
+        + "Se nao houver acao nova relevante para esta semana, retorne plano_12_semanas vazio e explique em criterio_de_encerramento por que o ciclo deve encerrar. "
+        + "Mantenha textos objetivos: nenhum campo de texto deve passar de 450 caracteres. "
+        + "Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
+        + f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
 
 

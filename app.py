@@ -2047,7 +2047,7 @@ def gerar_pdi_leadertrack_afirmacao():
                     end_week=fim,
                     feedback_semanas=dados.get("feedbackSemanas") or dados.get("feedback_semanas") or {},
                 )
-                max_tokens = 3200 if inicio == fim else 4500
+                max_tokens = 2400 if inicio == fim else 4200
                 timeout = 25 if inicio == fim else 45
 
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
