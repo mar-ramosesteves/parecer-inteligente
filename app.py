@@ -639,6 +639,20 @@ def problemas_qualidade_plano_leadertrack(resultado):
             if not _lista_preenchida(semana.get(campo)):
                 problemas.append(f"Semana {numero}: lista ausente ou vazia: {campo}.")
 
+        for campo, subcampos in {
+            "registro_do_lider_antes_de_avancar": ("o_que_fiz", "o_que_observei", "o_que_mudou", "onde_travou"),
+            "autodesenvolvimento_do_lider": ("pratica_emocional", "treino_de_speech", "leitura_curta_recomendada", "reflexao_individual"),
+            "alinhamento_com_superior": ("quando_fazer", "objetivo_do_alinhamento"),
+            "compromisso_de_agenda": ("titulo", "tipo", "duracao_minutos", "descricao"),
+        }.items():
+            bloco = semana.get(campo)
+            if not isinstance(bloco, dict):
+                problemas.append(f"Semana {numero}: bloco ausente ou invalido: {campo}.")
+                continue
+            for subcampo in subcampos:
+                if not str(bloco.get(subcampo) or "").strip():
+                    problemas.append(f"Semana {numero}: campo ausente ou vazio: {campo}.{subcampo}.")
+
         if not _roteiro_tempo_valido(semana.get("roteiro_de_tempo")):
             problemas.append(f"Semana {numero}: roteiro_de_tempo precisa ser lista de atividades com minutos.")
 

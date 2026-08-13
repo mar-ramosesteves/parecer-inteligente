@@ -467,7 +467,31 @@ def weekly_chunk_schema(start_week, end_week):
             "diferenca_objetiva_da_semana_anterior": "",
             "proxima_pratica_observavel": "",
             "feedback_necessario_para_liberar_proxima_semana": "",
+            "registro_do_lider_antes_de_avancar": {
+                "o_que_fiz": "",
+                "o_que_observei": "",
+                "o_que_mudou": "",
+                "onde_travou": "",
+            },
             "criterio_de_conclusao_da_semana": "",
+            "autodesenvolvimento_do_lider": {
+                "pratica_emocional": "",
+                "treino_de_speech": "",
+                "leitura_curta_recomendada": "",
+                "reflexao_individual": "",
+            },
+            "alinhamento_com_superior": {
+                "quando_fazer": "",
+                "objetivo_do_alinhamento": "",
+                "pontos_para_levar": [],
+            },
+            "compromisso_de_agenda": {
+                "titulo": "",
+                "tipo": "preparo_individual|observacao_em_campo|alinhamento_com_superior|conversa_com_equipe|experimento_operacional|revisao",
+                "duracao_minutos": 30,
+                "participantes_sugeridos": [],
+                "descricao": "",
+            },
             "gamificacao": {
                 "marco_de_progresso": "",
                 "sinal_de_vitoria": "",
@@ -571,6 +595,10 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "Nao sugira conversas individuais com todos quando isso puder passar de 120 minutos; use amostragem, observacao em campo ou rituais curtos. "
         "tipo_de_intervencao deve conter uma unica opcao, sem barra vertical e sem lista de tipos. "
         "Cada semana deve ter criterio_de_conclusao_da_semana e feedback_necessario_para_liberar_proxima_semana, para que a proxima acao so faca sentido depois da anterior. "
+        "Cada semana deve preencher registro_do_lider_antes_de_avancar com quatro perguntas simples: o que fiz, o que observei, o que mudou e onde travou. "
+        "Cada semana deve incluir autodesenvolvimento_do_lider com pratica emocional, treino de speech, leitura curta recomendada e reflexao individual, mesmo que sejam breves. "
+        "Inclua alinhamento_com_superior quando a acao depender de prioridade, recursos, mudanca de rotina, definicao de criterio ou apoio institucional; caso nao dependa, explique quando_fazer como 'nao necessario nesta semana'. "
+        "Cada semana deve trazer compromisso_de_agenda com titulo, tipo, duracao em minutos, participantes sugeridos e descricao, para gerar um convite de calendario. "
         "Inclua uma gamificacao simples e adulta: marco_de_progresso e sinal_de_vitoria, sem linguagem infantil. "
         "Varie o tipo_de_intervencao: nao use reuniao como solucao padrao. Inclua, quando fizer sentido, autodesenvolvimento, treino de speech, leitura orientada, observacao em campo, alinhamento com superior, feedback 1:1, comunicacao estruturada, experimento operacional e pratica emocional aplicada. "
         "Limite reuniao/feedback_1a1 a momentos realmente necessarios; depois de uma semana com conversa, a semana seguinte deve transformar o combinado em pratica observavel, comunicacao, experimento, estudo ou acompanhamento de indicador. "
@@ -635,7 +663,31 @@ def integrated_plan_schema(start_week=1, end_week=12):
             "diferenca_objetiva_da_semana_anterior": "",
             "proxima_pratica_observavel": "",
             "feedback_necessario_para_liberar_proxima_semana": "",
+            "registro_do_lider_antes_de_avancar": {
+                "o_que_fiz": "",
+                "o_que_observei": "",
+                "o_que_mudou": "",
+                "onde_travou": "",
+            },
             "criterio_de_conclusao_da_semana": "",
+            "autodesenvolvimento_do_lider": {
+                "pratica_emocional": "",
+                "treino_de_speech": "",
+                "leitura_curta_recomendada": "",
+                "reflexao_individual": "",
+            },
+            "alinhamento_com_superior": {
+                "quando_fazer": "",
+                "objetivo_do_alinhamento": "",
+                "pontos_para_levar": [],
+            },
+            "compromisso_de_agenda": {
+                "titulo": "",
+                "tipo": "preparo_individual|observacao_em_campo|alinhamento_com_superior|conversa_com_equipe|experimento_operacional|revisao",
+                "duracao_minutos": 30,
+                "participantes_sugeridos": [],
+                "descricao": "",
+            },
             "gamificacao": {
                 "marco_de_progresso": "",
                 "sinal_de_vitoria": "",
@@ -716,6 +768,10 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
         "Nao sugira conversas individuais com todos quando isso puder passar de 120 minutos; use amostragem, observacao em campo ou rituais curtos. "
         "tipo_de_intervencao deve conter uma unica opcao, sem barra vertical e sem lista de tipos. "
         "Cada semana deve ter criterio_de_conclusao_da_semana e feedback_necessario_para_liberar_proxima_semana, para que a proxima acao so faca sentido depois da anterior. "
+        "Cada semana deve preencher registro_do_lider_antes_de_avancar com quatro perguntas simples: o que fiz, o que observei, o que mudou e onde travou. "
+        "Cada semana deve incluir autodesenvolvimento_do_lider com pratica emocional, treino de speech, leitura curta recomendada e reflexao individual, mesmo que sejam breves. "
+        "Inclua alinhamento_com_superior quando a acao depender de prioridade, recursos, mudanca de rotina, definicao de criterio ou apoio institucional; caso nao dependa, explique quando_fazer como 'nao necessario nesta semana'. "
+        "Cada semana deve trazer compromisso_de_agenda com titulo, tipo, duracao em minutos, participantes sugeridos e descricao, para gerar um convite de calendario. "
         "Inclua uma gamificacao simples e adulta: marco_de_progresso e sinal_de_vitoria, sem linguagem infantil. "
         "Varie o tipo_de_intervencao: nao use reuniao como solucao padrao. Inclua, quando fizer sentido, autodesenvolvimento, treino de speech, leitura orientada, observacao em campo, alinhamento com superior, feedback 1:1, comunicacao estruturada, experimento operacional e pratica emocional aplicada. "
         "Limite reuniao/feedback_1a1 a momentos realmente necessarios; depois de uma semana com conversa, a semana seguinte deve transformar o combinado em pratica observavel, comunicacao, experimento, estudo ou acompanhamento de indicador. "
@@ -756,7 +812,7 @@ def build_integrated_week1_prompt(leader, arquetipos, group, indicadores_disponi
         "Inclua autodesenvolvimento do lider quando fizer sentido: preparo emocional, treino de comunicacao, escuta, alinhamento com superior ou leitura orientada. "
         "O investimento total da semana nao pode ultrapassar 2 horas. "
         "Na semana 1, use tipo_de_intervencao como uma unica opcao, preferencialmente observacao_em_campo ou autodesenvolvimento. Nao combine tipos com barra vertical. "
-        "Preencha obrigatoriamente: etapa_do_ciclo=diagnostico, investimento_de_tempo_estimado, tempo_total_estimado_minutos, roteiro_de_tempo, tipo_de_intervencao, assunto_especifico_das_afirmacoes, palavras_chave_das_afirmacoes, frases_especificas_para_usar, comentarios_de_observacao, speech_sugerido_do_lider, diferenca_objetiva_da_semana_anterior, proxima_pratica_observavel, feedback_necessario_para_liberar_proxima_semana, criterio_de_conclusao_da_semana, gamificacao, arquetipo_dominante_a_acionar e arquetipo_complementar_a_desenvolver. "
+        "Preencha obrigatoriamente: etapa_do_ciclo=diagnostico, investimento_de_tempo_estimado, tempo_total_estimado_minutos, roteiro_de_tempo, tipo_de_intervencao, assunto_especifico_das_afirmacoes, palavras_chave_das_afirmacoes, frases_especificas_para_usar, comentarios_de_observacao, speech_sugerido_do_lider, diferenca_objetiva_da_semana_anterior, proxima_pratica_observavel, feedback_necessario_para_liberar_proxima_semana, registro_do_lider_antes_de_avancar, autodesenvolvimento_do_lider, alinhamento_com_superior, compromisso_de_agenda, criterio_de_conclusao_da_semana, gamificacao, arquetipo_dominante_a_acionar e arquetipo_complementar_a_desenvolver. "
         "palavras_chave_das_afirmacoes deve usar termos das afirmacoes do grupo. frases_especificas_para_usar deve trazer falas curtas e aplicaveis. comentarios_de_observacao deve listar sinais concretos da rotina que confirmam ou enfraquecem as afirmacoes. "
         "tempo_total_estimado_minutos deve ser no maximo 120, com roteiro_de_tempo somando ate 120 minutos. roteiro_de_tempo deve ser uma lista de objetos no formato {\"atividade\":\"...\",\"minutos\":30}, nao uma lista de textos soltos. "
         "Nao sugira conversas individuais com todos quando isso puder ultrapassar 120 minutos; prefira amostra representativa, observacao em campo, preparo do lider e comunicacao curta. "
