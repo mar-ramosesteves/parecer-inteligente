@@ -289,6 +289,25 @@ def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
             return dados_json
     return None
 
+def guia_caderno_payload(tipo, parecer, graficos=None):
+    graficos = graficos or {}
+    html = ""
+    texto = ""
+    if isinstance(parecer, dict):
+        html = parecer.get("conteudo_html") or parecer.get("html") or parecer.get("conteudo") or ""
+        texto = parecer.get("parecer") or parecer.get("texto") or parecer.get("markdown") or ""
+    elif isinstance(parecer, str):
+        texto = parecer
+
+    return {
+        "tipo": tipo,
+        "disponivel": bool(parecer or any(graficos.values())),
+        "conteudo_html": html,
+        "texto": texto,
+        "dados": parecer if isinstance(parecer, dict) else None,
+        "graficos": graficos,
+    }
+
 
 def supabase_headers(prefer_return=True, use_service_role=False):
     key = SUPABASE_SERVICE_ROLE_KEY if use_service_role and SUPABASE_SERVICE_ROLE_KEY else SUPABASE_KEY
@@ -1371,6 +1390,10 @@ def gerar_devolutiva_leadertrack():
         gerar_apenas_primeiro_ciclo = bool_param(dados.get("gerarApenasPrimeiroCiclo"), True)
         gerar_planos_com_ia = bool_param(dados.get("gerarPlanosComIA"), False)
         persistir = bool_param(dados.get("persistir"), False)
+        incluir_guias_caderno = bool_param(
+            dados.get("incluirGuiasCaderno") or dados.get("incluir_guias_caderno"),
+            False,
+        )
         gerado_por = dados.get("geradoPor")
         indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
 
@@ -1478,6 +1501,27 @@ def gerar_devolutiva_leadertrack():
             ]
         devolutiva["status"] = "gerada_sem_persistencia"
         devolutiva["modo_geracao_planos"] = "com_ia" if gerar_planos_com_ia else "estrutura_sem_ia"
+        if incluir_guias_caderno:
+            devolutiva["guias_caderno"] = {
+                "arquetipos": guia_caderno_payload(
+                    "arquetipos",
+                    guia_arquetipos,
+                    {
+                        "comparativo": dados_arquetipos_comparativo,
+                        "analitico": dados_arquetipos_analitico,
+                    },
+                ),
+                "microambiente": guia_caderno_payload(
+                    "microambiente",
+                    guia_microambiente,
+                    {
+                        "analitico": dados_microambiente_analitico,
+                        "subdimensao": dados_microambiente_subdimensao,
+                        "termometro_gaps": dados_microambiente_termometro_gaps,
+                        "waterfall_gaps": dados_microambiente_waterfall_gaps,
+                    },
+                ),
+            }
         devolutiva["proximo_passo_sugerido"] = (
             "Gerar PDI detalhado por afirmacao, em chamada especifica com IA, para evitar timeout."
             if not gerar_planos_com_ia else
