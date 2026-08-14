@@ -1427,6 +1427,15 @@ def gerar_devolutiva_leadertrack():
         dados_microambiente_analitico = buscar_json_microambiente(
             "microambiente_analitico", empresa, codrodada, email_lider
         )
+        dados_microambiente_auto_dimensao = buscar_json_microambiente(
+            "microambiente_grafico_autoavaliacao_dimensao", empresa, codrodada, email_lider
+        )
+        dados_microambiente_auto_subdimensao = buscar_json_microambiente(
+            "microambiente_grafico_autoavaliacao_subdimensao", empresa, codrodada, email_lider
+        )
+        dados_microambiente_media_dimensao = buscar_json_microambiente(
+            "microambiente_grafico_mediaequipe_dimensao", empresa, codrodada, email_lider
+        )
         dados_microambiente_subdimensao = buscar_json_microambiente(
             "microambiente_grafico_mediaequipe_subdimensao", empresa, codrodada, email_lider
         )
@@ -1516,7 +1525,10 @@ def gerar_devolutiva_leadertrack():
                     guia_microambiente,
                     {
                         "analitico": dados_microambiente_analitico,
-                        "subdimensao": dados_microambiente_subdimensao,
+                        "autoavaliacao_dimensao": dados_microambiente_auto_dimensao,
+                        "autoavaliacao_subdimensao": dados_microambiente_auto_subdimensao,
+                        "mediaequipe_dimensao": dados_microambiente_media_dimensao,
+                        "mediaequipe_subdimensao": dados_microambiente_subdimensao,
                         "termometro_gaps": dados_microambiente_termometro_gaps,
                         "waterfall_gaps": dados_microambiente_waterfall_gaps,
                     },
