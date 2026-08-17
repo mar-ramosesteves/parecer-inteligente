@@ -289,7 +289,7 @@ def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
             return dados_json
     return None
 
-def guia_caderno_payload(tipo, parecer, graficos=None):
+def guia_caderno_payload(tipo, parecer, graficos=None, metadados=None):
     graficos = graficos or {}
     html = ""
     texto = ""
@@ -306,6 +306,7 @@ def guia_caderno_payload(tipo, parecer, graficos=None):
         "texto": texto,
         "dados": parecer if isinstance(parecer, dict) else None,
         "graficos": graficos,
+        "metadados": metadados or {},
     }
 
 
@@ -822,6 +823,9 @@ def avaliar_amostra_leadertrack(*relatorios):
                     "respondentes",
                     "respostasequipe",
                     "respostasdaequipe",
+                    "avaliacoesequipe",
+                    "avaliacoesdeequipe",
+                    "avaliacoesdaequipe",
                     "elegiveismedia",
                     "elegiveisparamedia",
                     "menosde3meses",
@@ -830,6 +834,9 @@ def avaliar_amostra_leadertrack(*relatorios):
                     )
                     or "respondente" in key_norm
                     or "respostaequipe" in key_norm
+                    or "avaliacoesequipe" in key_norm
+                    or "avaliacoesdeequipe" in key_norm
+                    or "avaliacoesdaequipe" in key_norm
                     or "elegivel" in key_norm
                     or "elegivei" in key_norm
                     or "amostra" in key_norm
@@ -854,16 +861,37 @@ def avaliar_amostra_leadertrack(*relatorios):
             return None
 
     elegiveis = campos.get("elegiveismedia", campos.get("elegiveisparamedia"))
-    respostas = campos.get("respostasequipe", campos.get("respostasdaequipe", campos.get("respondentes")))
+    respostas = campos.get(
+        "respostasequipe",
+        campos.get(
+            "respostasdaequipe",
+            campos.get(
+                "avaliacoesequipe",
+                campos.get(
+                    "avaliacoesdeequipe",
+                    campos.get("avaliacoesdaequipe", campos.get("respondentes")),
+                ),
+            ),
+        ),
+    )
     menos_3_meses = campos.get("menosde3meses", campos.get("menos3meses"))
 
     for key, value in campos.items():
         if "elegivel" in key or "elegivei" in key:
             elegiveis = value if elegiveis in (None, "") else elegiveis
-        if "respondente" in key or "respostaequipe" in key:
+        if "respondente" in key or "respostaequipe" in key or "avaliacoesequipe" in key or "avaliacoesdeequipe" in key or "avaliacoesdaequipe" in key:
             respostas = value if respostas in (None, "") else respostas
         if "menosde3" in key:
             menos_3_meses = value if menos_3_meses in (None, "") else menos_3_meses
+
+    if respostas in (None, ""):
+        match = re.search(
+            r"(\d+)\s*avalia[cç][oõ]es?\s*(?:da\s+|de\s+)?equipe",
+            texto_unificado,
+            re.IGNORECASE,
+        )
+        if match:
+            respostas = match.group(1)
 
     elegiveis_num = numero(elegiveis)
     respostas_num = numero(respostas)
@@ -1519,6 +1547,7 @@ def gerar_devolutiva_leadertrack():
                         "comparativo": dados_arquetipos_comparativo,
                         "analitico": dados_arquetipos_analitico,
                     },
+                    {"amostra": amostra},
                 ),
                 "microambiente": guia_caderno_payload(
                     "microambiente",
@@ -1532,6 +1561,7 @@ def gerar_devolutiva_leadertrack():
                         "termometro_gaps": dados_microambiente_termometro_gaps,
                         "waterfall_gaps": dados_microambiente_waterfall_gaps,
                     },
+                    {"amostra": amostra},
                 ),
             }
         devolutiva["proximo_passo_sugerido"] = (
