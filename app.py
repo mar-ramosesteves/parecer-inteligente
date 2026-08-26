@@ -1789,6 +1789,14 @@ def gerar_devolutiva_organizacional_leadertrack():
                 "executada": False,
                 "erro": str(erro_ia),
             }
+            if "resposta_ia" in locals() and resposta_ia:
+                resposta_base["devolutiva"] = {
+                    "texto_gerado_nao_estruturado": str(resposta_ia),
+                    "observacao": (
+                        "A IA retornou texto, mas ele nao veio em JSON valido. "
+                        "O conteudo bruto foi preservado para evitar perda da analise."
+                    ),
+                }
             resposta_base["orientacao"] = (
                 "O pacote analitico foi recebido e validado, mas a IA nao concluiu a geracao "
                 "do texto executivo nesta tentativa. Reenvie a geracao ou reduza filtros/achados."
