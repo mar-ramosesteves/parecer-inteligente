@@ -25,6 +25,10 @@ from leadertrack_devolutivas import (
     parse_json_response,
     slug,
 )
+from leadertrack_organizacional import (
+    build_organizational_feedback_prompt,
+    validate_organizational_package,
+)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -1694,6 +1698,96 @@ def gerar_devolutiva_leadertrack():
     except Exception as e:
         print("Erro ao gerar devolutiva LeaderTrack:", e)
         response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/gerar-devolutiva-organizacional-leadertrack", methods=["POST", "OPTIONS"])
+def gerar_devolutiva_organizacional_leadertrack():
+    if request.method == "OPTIONS":
+        response = jsonify({'status': 'CORS preflight OK'})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        pacote = dados.get("pacote_analitico") or dados.get("pacoteAnalitico") or {}
+        gerar_com_ia = bool_param(dados.get("gerarComIA"), False)
+        persistir = bool_param(dados.get("persistir"), False)
+
+        valido, erro = validate_organizational_package(pacote)
+        if not valido:
+            response = jsonify({
+                "erro": erro,
+                "status": "pacote_organizacional_invalido",
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        if persistir:
+            response = jsonify({
+                "erro": "Persistencia da devolutiva organizacional ainda nao esta habilitada.",
+                "status": "persistencia_bloqueada",
+                "orientacao": (
+                    "Primeiro valide a geracao sem gravacao. Depois crie a tabela/cache "
+                    "organizacional no Supabase com RLS e regra de acesso propria."
+                ),
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        prompt_organizacional = build_organizational_feedback_prompt(pacote)
+        resposta_base = {
+            "status": "preparada_sem_ia" if not gerar_com_ia else "gerada_com_ia",
+            "tipo": "devolutiva_organizacional_leadertrack",
+            "contexto": pacote.get("contexto") or {},
+            "filtros": pacote.get("filtros") or {},
+            "amostra": pacote.get("amostra") or {},
+            "governanca": pacote.get("governanca") or {},
+            "achados_relevantes_recebidos": len(pacote.get("achados_relevantes") or []),
+            "geracao_ia": {
+                "solicitada": gerar_com_ia,
+                "executada": False,
+            },
+        }
+
+        if not gerar_com_ia:
+            resposta_base["proximo_passo"] = (
+                "Enviar gerarComIA=true quando o pacote analitico estiver validado na tela."
+            )
+            response = jsonify(resposta_base)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+
+        prompt_base = carregar_prompt_leadertrack()
+        resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
+            pergunta=prompt_organizacional,
+            prompt_base=prompt_base,
+            model=str(dados.get("modelo") or "gpt-4.1-mini"),
+            max_tokens=int(dados.get("maxTokens") or 6000),
+            timeout=int(dados.get("timeout") or 60),
+            temperature=float(dados.get("temperature") or 0.2),
+        )
+        resposta_json = parse_json_response(resposta_ia)
+        resposta_base["geracao_ia"] = {
+            "solicitada": True,
+            "executada": True,
+            "modelo": str(dados.get("modelo") or "gpt-4.1-mini"),
+        }
+        resposta_base["devolutiva"] = resposta_json
+
+        response = jsonify(resposta_base)
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+
+    except Exception as e:
+        print("Erro ao gerar devolutiva organizacional LeaderTrack:", e)
+        response = jsonify({
+            "erro": str(e),
+            "status": "erro_geracao_devolutiva_organizacional",
+        })
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
 
