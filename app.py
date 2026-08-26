@@ -1776,7 +1776,7 @@ def gerar_devolutiva_organizacional_leadertrack():
                 pergunta=prompt_organizacional,
                 prompt_base=prompt_base,
                 model=modelo_ia,
-                max_tokens=int(dados.get("maxTokens") or 1800),
+                max_tokens=int(dados.get("maxTokens") or 1400),
                 timeout=int(dados.get("timeout") or 15),
                 temperature=float(dados.get("temperature") or 0.2),
             )
