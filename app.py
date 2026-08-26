@@ -1762,14 +1762,22 @@ def gerar_devolutiva_organizacional_leadertrack():
             return response, 200
 
         try:
-            prompt_base = carregar_prompt_leadertrack()
+            prompt_base = (
+                "Voce e o LeaderTrackbot em modo de parecer corporativo para RH, CEO e diretoria. "
+                "Use somente o pacote analitico enviado pelo usuario. Nao invente dados, percentuais, "
+                "nomes, causas, historico ou cruzamentos. Saude emocional deve ser tratada somente "
+                "em nivel organizacional/agregado e nunca como devolutiva individual para lider. "
+                "Nao faca diagnostico clinico nem atribua culpa. Use Daniel Goleman/HBR apenas como "
+                "apoio conceitual prudente sobre lideranca, clima emocional e inteligencia emocional, "
+                "sem citacao textual e sem substituir o modelo LeaderTrack. Responda somente JSON valido."
+            )
             modelo_ia = str(dados.get("modelo") or "gpt-4.1-mini")
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt_organizacional,
                 prompt_base=prompt_base,
                 model=modelo_ia,
-                max_tokens=int(dados.get("maxTokens") or 4000),
-                timeout=int(dados.get("timeout") or 25),
+                max_tokens=int(dados.get("maxTokens") or 1800),
+                timeout=int(dados.get("timeout") or 15),
                 temperature=float(dados.get("temperature") or 0.2),
             )
             resposta_json = parse_json_response(resposta_ia)
