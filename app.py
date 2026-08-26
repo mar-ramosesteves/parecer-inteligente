@@ -1761,20 +1761,38 @@ def gerar_devolutiva_organizacional_leadertrack():
             response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
             return response, 200
 
-        prompt_base = carregar_prompt_leadertrack()
-        resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
-            pergunta=prompt_organizacional,
-            prompt_base=prompt_base,
-            model=str(dados.get("modelo") or "gpt-4.1-mini"),
-            max_tokens=int(dados.get("maxTokens") or 6000),
-            timeout=int(dados.get("timeout") or 60),
-            temperature=float(dados.get("temperature") or 0.2),
-        )
-        resposta_json = parse_json_response(resposta_ia)
+        try:
+            prompt_base = carregar_prompt_leadertrack()
+            modelo_ia = str(dados.get("modelo") or "gpt-4.1-mini")
+            resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
+                pergunta=prompt_organizacional,
+                prompt_base=prompt_base,
+                model=modelo_ia,
+                max_tokens=int(dados.get("maxTokens") or 4000),
+                timeout=int(dados.get("timeout") or 25),
+                temperature=float(dados.get("temperature") or 0.2),
+            )
+            resposta_json = parse_json_response(resposta_ia)
+        except Exception as erro_ia:
+            print("Erro na IA da devolutiva organizacional LeaderTrack:", erro_ia)
+            resposta_base["status"] = "preparada_com_erro_ia"
+            resposta_base["geracao_ia"] = {
+                "solicitada": True,
+                "executada": False,
+                "erro": str(erro_ia),
+            }
+            resposta_base["orientacao"] = (
+                "O pacote analitico foi recebido e validado, mas a IA nao concluiu a geracao "
+                "do texto executivo nesta tentativa. Reenvie a geracao ou reduza filtros/achados."
+            )
+            response = jsonify(resposta_base)
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 200
+
         resposta_base["geracao_ia"] = {
             "solicitada": True,
             "executada": True,
-            "modelo": str(dados.get("modelo") or "gpt-4.1-mini"),
+            "modelo": modelo_ia,
         }
         resposta_base["devolutiva"] = resposta_json
 
