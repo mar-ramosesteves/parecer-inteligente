@@ -1771,7 +1771,7 @@ def gerar_devolutiva_organizacional_leadertrack():
                 "apoio conceitual prudente sobre lideranca, clima emocional e inteligencia emocional, "
                 "sem citacao textual e sem substituir o modelo LeaderTrack. Responda somente JSON valido."
             )
-            modelo_ia = str(dados.get("modelo") or "gpt-4.1-mini")
+            modelo_ia = str(dados.get("modelo") or "gpt-4o-mini")
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt_organizacional,
                 prompt_base=prompt_base,
