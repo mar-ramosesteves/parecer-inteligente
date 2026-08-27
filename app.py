@@ -221,12 +221,19 @@ def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-m
 TERMOS_EXECUTIVOS_NAO_MEDIDOS = {
     "carga de trabalho": "condicoes de trabalho a investigar",
     "turnover": "risco organizacional nao medido nesta base",
+    "rotatividade": "risco organizacional nao medido nesta base",
+    "alta rotatividade": "risco organizacional nao medido nesta base",
     "retenção de talentos": "sustentacao do vinculo organizacional",
     "retencao de talentos": "sustentacao do vinculo organizacional",
+    "reter talentos": "sustentar o vinculo organizacional",
     "intervenção": "atenção executiva",
     "intervencao": "atencao executiva",
+    "intervenções": "atenções executivas",
+    "intervencoes": "atencoes executivas",
     "workshop": "conversa estruturada",
     "team building": "pratica de integracao a validar",
+    "feedback regular": "ritual de reconhecimento a validar",
+    "sistema de feedback": "ritual de reconhecimento a validar",
     "taxa de resposta": "percentual da amostra",
 }
 
