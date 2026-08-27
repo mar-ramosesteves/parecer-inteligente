@@ -219,12 +219,12 @@ def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-m
 
 
 TERMOS_EXECUTIVOS_NAO_MEDIDOS = {
-    "carga de trabalho": "condicoes de trabalho a investigar",
-    "turnover": "risco organizacional nao medido nesta base",
-    "rotatividade": "risco organizacional nao medido nesta base",
     "alta rotatividade": "risco organizacional nao medido nesta base",
     "retenção de talentos": "sustentacao do vinculo organizacional",
     "retencao de talentos": "sustentacao do vinculo organizacional",
+    "carga de trabalho": "condicoes de trabalho a investigar",
+    "turnover": "risco organizacional nao medido nesta base",
+    "rotatividade": "risco organizacional nao medido nesta base",
     "reter talentos": "sustentar o vinculo organizacional",
     "intervenção": "atenção executiva",
     "intervencao": "atencao executiva",
@@ -252,7 +252,12 @@ def _sanitizar_texto_executivo(texto, alertas):
     if not isinstance(texto, str):
         return texto
     ajustado = texto
-    for proibido, substituto in TERMOS_EXECUTIVOS_NAO_MEDIDOS.items():
+    termos_ordenados = sorted(
+        TERMOS_EXECUTIVOS_NAO_MEDIDOS.items(),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    )
+    for proibido, substituto in termos_ordenados:
         if proibido.lower() in ajustado.lower():
             alertas.add(f"Termo sem medicao explicita ajustado: {proibido}")
             ajustado = re.sub(re.escape(proibido), substituto, ajustado, flags=re.IGNORECASE)
@@ -297,7 +302,7 @@ def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
             if not isinstance(leitura, dict):
                 continue
             recorte = str(leitura.get("recorte") or "").strip().lower()
-            match = re.search(r"empresa\s*=\s*([^;,+]+)", recorte)
+            match = re.search(r"empresa\s*[:=]\s*([^;,+]+)", recorte)
             if not match:
                 continue
             empresa = match.group(1).strip().lower()
