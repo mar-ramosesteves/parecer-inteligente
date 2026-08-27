@@ -239,6 +239,17 @@ TERMOS_EXECUTIVOS_NAO_MEDIDOS = {
     "taxa de resposta": "percentual da amostra",
 }
 
+TERMOS_QUE_INVALIDAM_HIPOTESE = {
+    "condicoes de trabalho a investigar",
+    "risco organizacional nao medido nesta base",
+    "carga de trabalho",
+    "turnover",
+    "rotatividade",
+    "retenção",
+    "retencao",
+    "reter talentos",
+}
+
 
 def _texto_recursivo(valor):
     if isinstance(valor, dict):
@@ -290,6 +301,57 @@ def _indice_empresas_analiticas(pacote):
     return indice
 
 
+def _normalizar_texto_validacao(valor):
+    texto = str(valor or "").strip().lower()
+    texto = texto.replace("'", "").replace('"', "")
+    texto = texto.replace("ç", "c").replace("ã", "a").replace("á", "a").replace("à", "a")
+    texto = texto.replace("â", "a").replace("é", "e").replace("ê", "e").replace("í", "i")
+    texto = texto.replace("ó", "o").replace("ô", "o").replace("õ", "o").replace("ú", "u")
+    return texto
+
+
+def _indice_interseccoes_analiticas(pacote):
+    interseccoes = (
+        ((pacote or {}).get("analise_profunda") or {})
+        .get("microambiente_por_interseccao_prioritaria")
+        or []
+    )
+    linhas = []
+    for item in interseccoes:
+        if not isinstance(item, dict):
+            continue
+        rotulo = _normalizar_texto_validacao(
+            item.get("rotulo") or " ".join(str(v) for v in (item.get("valores") or []))
+        )
+        valores = [
+            _normalizar_texto_validacao(v)
+            for v in (item.get("valores") or [])
+            if str(v or "").strip()
+        ]
+        if rotulo or valores:
+            linhas.append({
+                "rotulo": rotulo,
+                "valores": valores,
+                "n": item.get("n"),
+                "gap_medio": item.get("gap_medio"),
+            })
+    return linhas
+
+
+def _filtrar_hipoteses_sem_base(revisada, alertas):
+    hipoteses = revisada.get("hipoteses_e_sugestoes")
+    if not isinstance(hipoteses, list):
+        return
+    filtradas = []
+    for item in hipoteses:
+        texto = _normalizar_texto_validacao(_texto_recursivo(item))
+        if any(termo in texto for termo in TERMOS_QUE_INVALIDAM_HIPOTESE):
+            alertas.add("Hipotese removida por depender de variavel nao medida no pacote.")
+            continue
+        filtradas.append(item)
+    revisada["hipoteses_e_sugestoes"] = filtradas
+
+
 def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
     if not isinstance(devolutiva, dict):
         return devolutiva
@@ -297,6 +359,7 @@ def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
     alertas = set()
     revisada = _sanitizar_json_executivo(devolutiva, alertas)
     empresas = _indice_empresas_analiticas(pacote)
+    interseccoes = _indice_interseccoes_analiticas(pacote)
     amostra = (pacote or {}).get("amostra") or {}
     total_respondentes = amostra.get("respondentes")
 
@@ -326,6 +389,33 @@ def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
             if delta_base is not None:
                 leitura["vs_contexto_delta"] = delta_base
 
+    cruzamentos = revisada.get("cruzamentos_criticos")
+    if isinstance(cruzamentos, list):
+        cruzamentos_filtrados = []
+        for cruzamento in cruzamentos:
+            if not isinstance(cruzamento, dict):
+                continue
+            texto = _normalizar_texto_validacao(_texto_recursivo(cruzamento))
+            base_encontrada = None
+            for base in interseccoes:
+                valores = base.get("valores") or []
+                if valores and all(valor in texto for valor in valores):
+                    base_encontrada = base
+                    break
+            if base_encontrada:
+                n_base = base_encontrada.get("n")
+                if n_base is not None and cruzamento.get("n") != n_base:
+                    cruzamento["n"] = n_base
+                    alertas.add("N de cruzamento critico reaplicado a partir da base analitica.")
+                if base_encontrada.get("gap_medio") is not None:
+                    cruzamento["gap_medio"] = base_encontrada.get("gap_medio")
+                cruzamentos_filtrados.append(cruzamento)
+            elif "spectral_a" in texto:
+                alertas.add("Cruzamento com spectral_a removido por nao bater com a base analitica priorizada.")
+            else:
+                cruzamentos_filtrados.append(cruzamento)
+        revisada["cruzamentos_criticos"] = cruzamentos_filtrados
+
     participacao = revisada.get("participacao_e_aderencia")
     if isinstance(participacao, dict) and total_respondentes is not None:
         for campo in ["leitura", "observacao"]:
@@ -341,6 +431,8 @@ def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
             if ajustado != texto:
                 participacao[campo] = ajustado
                 alertas.add("Total de respondentes na participacao reaplicado a partir da base analitica.")
+
+    _filtrar_hipoteses_sem_base(revisada, alertas)
 
     texto_final = _texto_recursivo(revisada).lower()
     termos_restantes = [
