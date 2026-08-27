@@ -218,6 +218,122 @@ def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-m
     return resposta.choices[0].message.content
 
 
+TERMOS_EXECUTIVOS_NAO_MEDIDOS = {
+    "carga de trabalho": "condicoes de trabalho a investigar",
+    "turnover": "risco organizacional nao medido nesta base",
+    "retenção de talentos": "sustentacao do vinculo organizacional",
+    "retencao de talentos": "sustentacao do vinculo organizacional",
+    "intervenção": "atenção executiva",
+    "intervencao": "atencao executiva",
+    "workshop": "conversa estruturada",
+    "team building": "pratica de integracao a validar",
+    "taxa de resposta": "percentual da amostra",
+}
+
+
+def _texto_recursivo(valor):
+    if isinstance(valor, dict):
+        return " ".join(_texto_recursivo(v) for v in valor.values())
+    if isinstance(valor, list):
+        return " ".join(_texto_recursivo(v) for v in valor)
+    if valor is None:
+        return ""
+    return str(valor)
+
+
+def _sanitizar_texto_executivo(texto, alertas):
+    if not isinstance(texto, str):
+        return texto
+    ajustado = texto
+    for proibido, substituto in TERMOS_EXECUTIVOS_NAO_MEDIDOS.items():
+        if proibido.lower() in ajustado.lower():
+            alertas.add(f"Termo sem medicao explicita ajustado: {proibido}")
+            ajustado = re.sub(re.escape(proibido), substituto, ajustado, flags=re.IGNORECASE)
+    return ajustado
+
+
+def _sanitizar_json_executivo(valor, alertas):
+    if isinstance(valor, dict):
+        return {k: _sanitizar_json_executivo(v, alertas) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_sanitizar_json_executivo(v, alertas) for v in valor]
+    return _sanitizar_texto_executivo(valor, alertas)
+
+
+def _indice_empresas_analiticas(pacote):
+    empresas = (
+        ((pacote or {}).get("analise_profunda") or {})
+        .get("comparativo_empresas_mesma_holding")
+        or []
+    )
+    indice = {}
+    for item in empresas:
+        if not isinstance(item, dict):
+            continue
+        nome = str(item.get("valor") or item.get("empresa") or "").strip().lower()
+        if nome:
+            indice[nome] = item
+    return indice
+
+
+def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
+    if not isinstance(devolutiva, dict):
+        return devolutiva
+
+    alertas = set()
+    revisada = _sanitizar_json_executivo(devolutiva, alertas)
+    empresas = _indice_empresas_analiticas(pacote)
+
+    leituras = revisada.get("leitura_por_recortes")
+    if isinstance(leituras, list):
+        for leitura in leituras:
+            if not isinstance(leitura, dict):
+                continue
+            recorte = str(leitura.get("recorte") or "").strip().lower()
+            match = re.search(r"empresa\s*=\s*([^;,+]+)", recorte)
+            if not match:
+                continue
+            empresa = match.group(1).strip().lower()
+            base = empresas.get(empresa)
+            if not base:
+                continue
+            n_base = base.get("n")
+            gap_base = base.get("gap_medio")
+            comparacao = base.get("comparacao_contexto") or {}
+            delta_base = comparacao.get("delta_gap_medio_vs_contexto")
+            if n_base is not None and leitura.get("n") != n_base:
+                leitura["n"] = n_base
+                alertas.add(f"N de {empresa} reaplicado a partir da base analitica.")
+            if gap_base is not None and leitura.get("gap_medio") != gap_base:
+                leitura["gap_medio"] = gap_base
+                alertas.add(f"Gap medio de {empresa} reaplicado a partir da base analitica.")
+            if delta_base is not None:
+                leitura["vs_contexto_delta"] = delta_base
+
+    texto_final = _texto_recursivo(revisada).lower()
+    termos_restantes = [
+        termo for termo in TERMOS_EXECUTIVOS_NAO_MEDIDOS
+        if termo.lower() in texto_final
+    ]
+    if termos_restantes:
+        alertas.add(
+            "Ainda ha termos que exigem revisao humana: "
+            + ", ".join(sorted(set(termos_restantes)))
+        )
+
+    if alertas:
+        revisada["revisao_qualidade"] = {
+            "status": "ajustada_automaticamente",
+            "alertas": sorted(alertas),
+            "orientacao": (
+                "A IA gerou trechos com inferencias ou metricas que exigiam conferencia. "
+                "O bot reaplicou guardrails antes de devolver a resposta."
+            ),
+        }
+
+    return revisada
+
+
 
 def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lider, tipo):
     url = f"{SUPABASE_REST_URL}/relatorios_gerados"
@@ -1786,6 +1902,7 @@ def gerar_devolutiva_organizacional_leadertrack():
                 temperature=float(dados.get("temperature") or 0.2),
             )
             resposta_json = parse_json_response(resposta_ia)
+            resposta_json = revisar_devolutiva_organizacional_ia(resposta_json, pacote)
         except Exception as erro_ia:
             print("Erro na IA da devolutiva organizacional LeaderTrack:", erro_ia)
             resposta_base["status"] = "preparada_com_erro_ia"
