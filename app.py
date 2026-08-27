@@ -1765,9 +1765,11 @@ def gerar_devolutiva_organizacional_leadertrack():
             prompt_base = (
                 "Voce e o LeaderTrackbot em modo de parecer corporativo para RH, CEO e diretoria. "
                 "Use somente o pacote analitico enviado pelo usuario. Nao invente dados, percentuais, "
-                "nomes, causas, historico ou cruzamentos. Saude emocional deve ser tratada somente "
+                "nomes, causas, historico, modalidade de trabalho, politicas internas ou cruzamentos. "
+                "Nao use recomendacoes genericas se elas nao nascerem de achado medido. "
+                "Saude emocional deve ser tratada somente "
                 "em nivel organizacional/agregado e nunca como devolutiva individual para lider. "
-                "Nao faca diagnostico clinico nem atribua culpa. Use Daniel Goleman/HBR apenas como "
+                "Nao faca diagnostico clinico nem atribua culpa a lideres ou grupos. Use Daniel Goleman/HBR apenas como "
                 "apoio conceitual prudente sobre lideranca, clima emocional e inteligencia emocional, "
                 "sem citacao textual e sem substituir o modelo LeaderTrack. Responda somente JSON valido."
             )
