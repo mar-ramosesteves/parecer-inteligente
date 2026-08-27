@@ -222,6 +222,8 @@ TERMOS_EXECUTIVOS_NAO_MEDIDOS = {
     "alta rotatividade": "risco organizacional nao medido nesta base",
     "retenção de talentos": "sustentacao do vinculo organizacional",
     "retencao de talentos": "sustentacao do vinculo organizacional",
+    "retenção": "sustentacao do vinculo organizacional",
+    "retencao": "sustentacao do vinculo organizacional",
     "carga de trabalho": "condicoes de trabalho a investigar",
     "turnover": "risco organizacional nao medido nesta base",
     "rotatividade": "risco organizacional nao medido nesta base",
@@ -295,6 +297,8 @@ def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
     alertas = set()
     revisada = _sanitizar_json_executivo(devolutiva, alertas)
     empresas = _indice_empresas_analiticas(pacote)
+    amostra = (pacote or {}).get("amostra") or {}
+    total_respondentes = amostra.get("respondentes")
 
     leituras = revisada.get("leitura_por_recortes")
     if isinstance(leituras, list):
@@ -321,6 +325,22 @@ def revisar_devolutiva_organizacional_ia(devolutiva, pacote):
                 alertas.add(f"Gap medio de {empresa} reaplicado a partir da base analitica.")
             if delta_base is not None:
                 leitura["vs_contexto_delta"] = delta_base
+
+    participacao = revisada.get("participacao_e_aderencia")
+    if isinstance(participacao, dict) and total_respondentes is not None:
+        for campo in ["leitura", "observacao"]:
+            texto = participacao.get(campo)
+            if not isinstance(texto, str):
+                continue
+            ajustado = re.sub(
+                r"(participa[cç][aã]o(?:\s+total)?\s+foi\s+de\s+)\d+(\s+respondentes)",
+                rf"\g<1>{total_respondentes}\2",
+                texto,
+                flags=re.IGNORECASE,
+            )
+            if ajustado != texto:
+                participacao[campo] = ajustado
+                alertas.add("Total de respondentes na participacao reaplicado a partir da base analitica.")
 
     texto_final = _texto_recursivo(revisada).lower()
     termos_restantes = [
