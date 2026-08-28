@@ -31,6 +31,7 @@ from leadertrack_organizacional import (
     build_organizational_feedback_prompt,
     validate_organizational_package,
 )
+from leadertrack_snapshot_preview import calcular_saude_emocional_dashboard
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -1146,48 +1147,39 @@ def chave_por_nome(row, nomes):
 def score_arquetipos_saude_emocional(registros):
     matriz = carregar_matriz_arquetipos_rows()
     por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
-    arquetipo_por_questao = {}
+    arquetipos_por_questao = {}
     for row in matriz:
         codigo = str(row.get("COD_AFIRMACAO") or "").strip()
         arquetipo = str(row.get("ARQUETIPO") or "").strip()
         if codigo and arquetipo:
-            # O dashboard original usa o primeiro arquétipo da matriz para cada questão.
-            arquetipo_por_questao.setdefault(codigo, arquetipo)
+            arquetipos_por_questao.setdefault(codigo, set()).add(arquetipo)
     mapa = mapa_saude_emocional()
     categorias = {}
-    for key, categoria in mapa.items():
-        if not key.startswith("arq_"):
+    for registro in registros or []:
+        if registro.get("tipo") != "equipe":
             continue
-        questao = key.replace("arq_", "")
-        arquetipo = arquetipo_por_questao.get(questao)
-        if not arquetipo:
-            continue
-        percentuais = []
-        notas = []
-        for registro in registros or []:
-            if registro.get("tipo") != "equipe":
+        respostas = registro.get("respostas") or {}
+        for key, categoria in mapa.items():
+            if not key.startswith("arq_"):
+                continue
+            questao = key.replace("arq_", "")
+            if questao not in respostas:
                 continue
             try:
-                nota = int((registro.get("respostas") or {}).get(questao))
-            except (TypeError, ValueError):
+                estrelas = int(respostas.get(questao))
+            except Exception:
                 continue
-            row = por_chave.get(f"{arquetipo}{nota}{questao}")
-            percentual = percentual_tendencia_arquetipo(row) if row else None
-            if percentual is not None:
-                percentuais.append(percentual)
-                notas.append(nota)
-        if not percentuais:
-            continue
-        nota_media = round(sum(notas) / len(notas))
-        row_tendencia = por_chave.get(f"{arquetipo}{nota_media}{questao}")
-        tendencia = ""
-        for coluna, valor in (row_tendencia or {}).items():
-            nome = str(coluna or "").strip()
-            if not nome.startswith("%") and re.sub(r"[^a-zA-Z0-9]", "", nome).lower() in ("tendncia", "tendencia"):
-                tendencia = str(valor or "")
-                break
-        valor = round(float(np.mean(percentuais)), 2)
-        categorias.setdefault(categoria, []).append(max(0.0, 100.0 - valor) if "DESFAVOR" in tendencia.upper() else valor)
+            valores = []
+            for arquetipo in sorted(arquetipos_por_questao.get(questao) or []):
+                matriz_row = por_chave.get(f"{arquetipo}{estrelas}{questao}")
+                if not matriz_row:
+                    continue
+                maximo = valor_numerico(matriz_row.get("PONTOS_MAXIMOS"), 0)
+                if not maximo:
+                    continue
+                valores.append((valor_numerico(matriz_row.get("PONTOS_OBTIDOS"), 0) / maximo) * 100)
+            if valores:
+                categorias.setdefault(categoria, []).append(float(np.mean(valores)))
     return categorias
 
 
@@ -1273,8 +1265,8 @@ def filtrar_registros_por_recorte(registros, recorte):
     return [r for r in registros or [] if normalizar_recorte_valor(r.get(campo)).lower() == str(valor).strip().lower()]
 
 
-def resumir_recorte_leadertrack(registros_arq, registros_micro, registros_arq_auto=None):
-    arq_auto = [r.get("respostas") or {} for r in (registros_arq_auto or registros_arq or []) if r.get("tipo") == "autoavaliacao"]
+def resumir_recorte_leadertrack(registros_arq, registros_micro):
+    arq_auto = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "autoavaliacao"]
     arq_equipe = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "equipe"]
     micro_equipe = []
     lideres_micro = set()
@@ -1355,7 +1347,7 @@ def gerar_recortes_executivos(registros_arq, registros_micro, n_minimo=5):
             "n": n,
             "saude_emocional": saude,
             "delta_saude_vs_contexto": delta,
-            "leadertrack": resumir_recorte_leadertrack(arq, micro, registros_arq),
+            "leadertrack": resumir_recorte_leadertrack(arq, micro),
         })
     recortes = sorted(
         recortes,
@@ -2821,6 +2813,93 @@ def chat_leadertrack():
     except Exception as e:
         print("Erro no chat Leadertrack:", e)
         response = jsonify({"erro": str(e)})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 500
+
+
+@app.route("/previsualizar-saude-emocional-leadertrack", methods=["POST", "OPTIONS"])
+def previsualizar_saude_emocional_leadertrack():
+    """Executa somente a previsualizacao rastreavel do snapshot executivo."""
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "CORS preflight OK"})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "POST,OPTIONS"
+        return response
+
+    try:
+        dados = request.get_json() or {}
+        empresa = str(dados.get("empresa") or dados.get("company") or "").strip().lower()
+        codrodada = str(dados.get("codrodada") or "").strip().lower()
+        contexto_ids = {
+            "cliente_id": dados.get("cliente_id") or dados.get("clienteId"),
+            "holding_id": dados.get("holding_id") or dados.get("holdingId"),
+            "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
+            "filial_id": dados.get("filial_id") or dados.get("filialId"),
+        }
+        empresas_contexto = dados.get("empresasContexto") or dados.get("empresas_contexto") or []
+
+        if not codrodada or (not empresa and not any(contexto_ids.values())):
+            return jsonify({
+                "erro": "Informe rodada e empresa ou identificadores de contexto.",
+                "campos_necessarios": ["codrodada", "empresa ou contexto_ids"],
+            }), 400
+
+        arq_consolidados = buscar_consolidados_leadertrack_contexto(
+            "consolidado_arquetipos", empresa, codrodada, contexto_ids,
+            empresas_contexto=empresas_contexto,
+        )
+        micro_consolidados = buscar_consolidados_leadertrack_contexto(
+            "consolidado_microambiente", empresa, codrodada, contexto_ids,
+            empresas_contexto=empresas_contexto,
+        )
+        registros_arq = registros_arquetipos_consolidados(arq_consolidados)
+        registros_micro = registros_micro_consolidados(micro_consolidados)
+        resultado = calcular_saude_emocional_dashboard(
+            registros_arq,
+            registros_micro,
+            carregar_matriz_arquetipos_rows(),
+            carregar_matriz_micro_rows(),
+            carregar_saude_emocional_rows(),
+        )
+        if not resultado.get("quantidade_afirmacoes_calculadas"):
+            return jsonify({
+                "erro": "Nao houve dados suficientes para calcular a previsualizacao de saude emocional.",
+                "amostra": {
+                    "respondentes_arquetipos": resultado.get("respondentes_arquetipos"),
+                    "respondentes_microambiente": resultado.get("respondentes_microambiente"),
+                    "afirmacoes_calculadas": 0,
+                },
+            }), 404
+
+        lideres = {
+            registro.get("email_lider")
+            for registro in registros_arq + registros_micro
+            if registro.get("email_lider")
+        }
+        response = jsonify({
+            "status": "previsualizacao_sem_gravacao",
+            "escopo": "executivo_agregado",
+            "saude_emocional": resultado,
+            "amostra": {
+                "lideres": len(lideres),
+                "respondentes_arquetipos": resultado.get("respondentes_arquetipos"),
+                "respondentes_microambiente": resultado.get("respondentes_microambiente"),
+                "afirmacoes_calculadas": resultado.get("quantidade_afirmacoes_calculadas"),
+            },
+            "rastreabilidade": {
+                "fonte_arquetipos": "consolidado_arquetipos por lider",
+                "fonte_microambiente": "consolidado_microambiente por lider",
+                "regra": "mesma sequencia do dashboard: matriz por respondente, media por afirmacao e media das cinco dimensoes",
+                "gravacao_realizada": False,
+                "ia_chamada": False,
+            },
+        })
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 200
+    except Exception as e:
+        print("Erro na previsualizacao de saude emocional LeaderTrack:", e)
+        response = jsonify({"erro": str(e), "status": "erro_previsualizacao"})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
 
