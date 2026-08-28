@@ -1146,39 +1146,48 @@ def chave_por_nome(row, nomes):
 def score_arquetipos_saude_emocional(registros):
     matriz = carregar_matriz_arquetipos_rows()
     por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
-    arquetipos_por_questao = {}
+    arquetipo_por_questao = {}
     for row in matriz:
         codigo = str(row.get("COD_AFIRMACAO") or "").strip()
         arquetipo = str(row.get("ARQUETIPO") or "").strip()
         if codigo and arquetipo:
-            arquetipos_por_questao.setdefault(codigo, set()).add(arquetipo)
+            # O dashboard original usa o primeiro arquétipo da matriz para cada questão.
+            arquetipo_por_questao.setdefault(codigo, arquetipo)
     mapa = mapa_saude_emocional()
     categorias = {}
-    for registro in registros or []:
-        if registro.get("tipo") != "equipe":
+    for key, categoria in mapa.items():
+        if not key.startswith("arq_"):
             continue
-        respostas = registro.get("respostas") or {}
-        for key, categoria in mapa.items():
-            if not key.startswith("arq_"):
-                continue
-            questao = key.replace("arq_", "")
-            if questao not in respostas:
+        questao = key.replace("arq_", "")
+        arquetipo = arquetipo_por_questao.get(questao)
+        if not arquetipo:
+            continue
+        percentuais = []
+        notas = []
+        for registro in registros or []:
+            if registro.get("tipo") != "equipe":
                 continue
             try:
-                estrelas = int(respostas.get(questao))
-            except Exception:
+                nota = int((registro.get("respostas") or {}).get(questao))
+            except (TypeError, ValueError):
                 continue
-            valores = []
-            for arquetipo in sorted(arquetipos_por_questao.get(questao) or []):
-                matriz_row = por_chave.get(f"{arquetipo}{estrelas}{questao}")
-                if not matriz_row:
-                    continue
-                maximo = valor_numerico(matriz_row.get("PONTOS_MAXIMOS"), 0)
-                if not maximo:
-                    continue
-                valores.append((valor_numerico(matriz_row.get("PONTOS_OBTIDOS"), 0) / maximo) * 100)
-            if valores:
-                categorias.setdefault(categoria, []).append(float(np.mean(valores)))
+            row = por_chave.get(f"{arquetipo}{nota}{questao}")
+            percentual = percentual_tendencia_arquetipo(row) if row else None
+            if percentual is not None:
+                percentuais.append(percentual)
+                notas.append(nota)
+        if not percentuais:
+            continue
+        nota_media = round(sum(notas) / len(notas))
+        row_tendencia = por_chave.get(f"{arquetipo}{nota_media}{questao}")
+        tendencia = ""
+        for coluna, valor in (row_tendencia or {}).items():
+            nome = str(coluna or "").strip()
+            if not nome.startswith("%") and re.sub(r"[^a-zA-Z0-9]", "", nome).lower() in ("tendncia", "tendencia"):
+                tendencia = str(valor or "")
+                break
+        valor = round(float(np.mean(percentuais)), 2)
+        categorias.setdefault(categoria, []).append(max(0.0, 100.0 - valor) if "DESFAVOR" in tendencia.upper() else valor)
     return categorias
 
 
@@ -1264,8 +1273,8 @@ def filtrar_registros_por_recorte(registros, recorte):
     return [r for r in registros or [] if normalizar_recorte_valor(r.get(campo)).lower() == str(valor).strip().lower()]
 
 
-def resumir_recorte_leadertrack(registros_arq, registros_micro):
-    arq_auto = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "autoavaliacao"]
+def resumir_recorte_leadertrack(registros_arq, registros_micro, registros_arq_auto=None):
+    arq_auto = [r.get("respostas") or {} for r in (registros_arq_auto or registros_arq or []) if r.get("tipo") == "autoavaliacao"]
     arq_equipe = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "equipe"]
     micro_equipe = []
     lideres_micro = set()
@@ -1346,7 +1355,7 @@ def gerar_recortes_executivos(registros_arq, registros_micro, n_minimo=5):
             "n": n,
             "saude_emocional": saude,
             "delta_saude_vs_contexto": delta,
-            "leadertrack": resumir_recorte_leadertrack(arq, micro),
+            "leadertrack": resumir_recorte_leadertrack(arq, micro, registros_arq),
         })
     recortes = sorted(
         recortes,
