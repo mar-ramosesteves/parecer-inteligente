@@ -781,9 +781,8 @@ def calcular_arquetipos_respostas(respostas_lista):
     for questao, valores in respostas_por_questao.items():
         if not valores:
             continue
-        estrelas_int = arredondar_escala_likert(float(np.mean(valores)))
-        if estrelas_int is None:
-            continue
+        estrelas_int = int(round(float(np.mean(valores))))
+        estrelas_int = max(1, min(6, estrelas_int))
         for arquetipo in arquetipos:
             row = por_chave.get(f"{arquetipo}{estrelas_int}{questao}")
             if not row:
@@ -893,17 +892,22 @@ def calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe):
             matriz_base.setdefault((codigo, arquetipo), row)
 
     def score_questao_arquetipo(respostas_lista, questao, arquetipo, media_antes_da_matriz=False):
-        estrelas_lista = []
+        notas = []
         percentuais = []
         for respostas in respostas_lista or []:
             if questao not in (respostas or {}):
                 continue
-            estrelas = arredondar_escala_likert((respostas or {}).get(questao))
-            if estrelas is None:
+            try:
+                nota = float((respostas or {}).get(questao))
+            except Exception:
                 continue
-            estrelas_lista.append(estrelas)
+            if nota < 1 or nota > 6:
+                continue
+            notas.append(nota)
             if media_antes_da_matriz:
                 continue
+            # Regra oficial do dashboard: cada resposta da equipe consulta a matriz antes da média.
+            estrelas = int(nota)
             row = por_chave.get(f"{arquetipo}{estrelas}{questao}")
             if not row:
                 continue
@@ -911,11 +915,13 @@ def calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe):
             if percentual is not None:
                 percentuais.append(percentual)
 
-        if not estrelas_lista:
+        if not notas:
             return {}
 
-        media_estrelas = round(float(np.mean(estrelas_lista)), 2)
-        estrelas_aplicadas = arredondar_escala_likert(media_estrelas)
+        media_estrelas = round(float(np.mean(notas)), 2)
+        # A exceção do consolidado: primeiro a média das autoavaliações, depois a matriz.
+        estrelas_aplicadas = int(round(media_estrelas))
+        estrelas_aplicadas = max(1, min(6, estrelas_aplicadas))
         row_tendencia = por_chave.get(f"{arquetipo}{estrelas_aplicadas}{questao}")
         tendencia_info = str(valor_coluna_matriz(row_tendencia, ["Tendência", "Tendencia"]) or "") if row_tendencia else ""
 
@@ -931,7 +937,7 @@ def calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe):
             "classificacao": tendencia_info or classificar_estrelas_arquetipo(estrelas_aplicadas),
             "tendencia": tendencia_info,
             "arquetipo": arquetipo,
-            "n_respostas": len(estrelas_lista),
+            "n_respostas": len(notas),
         }
 
     def questoes_presentes(respostas_lista):
@@ -1372,8 +1378,8 @@ def consolidar_microambiente_respostas_lista(respostas_lista, lideres=None, medi
                     continue
             if not respostas_reais or not respostas_ideais:
                 continue
-            real = arredondar_escala_likert(float(np.mean(respostas_reais)))
-            ideal = arredondar_escala_likert(float(np.mean(respostas_ideais)))
+            real = max(1, min(6, int(round(float(np.mean(respostas_reais))))))
+            ideal = max(1, min(6, int(round(float(np.mean(respostas_ideais))))))
             row = por_chave.get(f"{codigo}_I{ideal}_R{real}")
             if not row:
                 continue
