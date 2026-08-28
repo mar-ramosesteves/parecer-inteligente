@@ -2845,12 +2845,16 @@ def previsualizar_saude_emocional_leadertrack():
                 "campos_necessarios": ["codrodada", "empresa ou contexto_ids"],
             }), 400
 
+        # Quando a tela envia a lista de empresas do contexto, ela e a fonte
+        # explicita do escopo. O dashboard original da PROSPERA tambem consulta
+        # os consolidados pelas empresas, sem restringir antes pelos IDs.
+        contexto_consulta = {} if empresas_contexto else contexto_ids
         arq_consolidados = buscar_consolidados_leadertrack_contexto(
-            "consolidado_arquetipos", empresa, codrodada, contexto_ids,
+            "consolidado_arquetipos", empresa, codrodada, contexto_consulta,
             empresas_contexto=empresas_contexto,
         )
         micro_consolidados = buscar_consolidados_leadertrack_contexto(
-            "consolidado_microambiente", empresa, codrodada, contexto_ids,
+            "consolidado_microambiente", empresa, codrodada, contexto_consulta,
             empresas_contexto=empresas_contexto,
         )
         registros_arq = registros_arquetipos_consolidados(arq_consolidados)
