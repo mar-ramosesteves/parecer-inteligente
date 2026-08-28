@@ -869,101 +869,104 @@ def classificar_estrelas_arquetipo(estrelas):
     return ""
 
 
+def valor_coluna_matriz(row, nomes):
+    chave = chave_por_nome(row, nomes)
+    return row.get(chave) if chave else None
+
+
+def percentual_tendencia_arquetipo(row):
+    valor = valor_numerico(valor_coluna_matriz(row, ["% Tendência", "% Tendencia", "PERCETUAL"]), None)
+    if valor is None:
+        return None
+    return round(valor * 100, 2) if valor <= 1 else round(valor, 2)
+
+
 def calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe):
     matriz = carregar_matriz_arquetipos_rows()
     por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
-    afirmacoes = {}
     arquetipos = ["Imperativo", "Resoluto", "Cuidativo", "Consultivo", "Prescritivo", "Formador"]
-
+    matriz_base = {}
     for row in matriz:
         codigo = str(row.get("COD_AFIRMACAO") or "").strip()
-        if not codigo:
-            continue
-        afirmacoes.setdefault(codigo, {
-            "questao": codigo,
-            "afirmacao": row.get("AFIRMACAO"),
-            "arquetipos": set(),
-        })
-        if row.get("ARQUETIPO"):
-            afirmacoes[codigo]["arquetipos"].add(str(row.get("ARQUETIPO")).strip())
+        arquetipo = str(row.get("ARQUETIPO") or "").strip()
+        if codigo and arquetipo:
+            matriz_base.setdefault((codigo, arquetipo), row)
 
-    def score_por_questao(respostas_lista, media_antes_da_matriz=False):
-        respostas_por_questao = {}
-        arquetipos_por_questao = {}
+    def score_questao_arquetipo(respostas_lista, questao, arquetipo, media_antes_da_matriz=False):
+        estrelas_lista = []
+        percentuais = []
+        for respostas in respostas_lista or []:
+            if questao not in (respostas or {}):
+                continue
+            estrelas = arredondar_escala_likert((respostas or {}).get(questao))
+            if estrelas is None:
+                continue
+            estrelas_lista.append(estrelas)
+            if media_antes_da_matriz:
+                continue
+            row = por_chave.get(f"{arquetipo}{estrelas}{questao}")
+            if not row:
+                continue
+            percentual = percentual_tendencia_arquetipo(row)
+            if percentual is not None:
+                percentuais.append(percentual)
+
+        if not estrelas_lista:
+            return {}
+
+        media_estrelas = round(float(np.mean(estrelas_lista)), 2)
+        estrelas_aplicadas = arredondar_escala_likert(media_estrelas)
+        row_tendencia = por_chave.get(f"{arquetipo}{estrelas_aplicadas}{questao}")
+        tendencia_info = str(valor_coluna_matriz(row_tendencia, ["Tendência", "Tendencia"]) or "") if row_tendencia else ""
+
+        if media_antes_da_matriz:
+            percentual = percentual_tendencia_arquetipo(row_tendencia) if row_tendencia else None
+        else:
+            percentual = round(float(np.mean(percentuais)), 2) if percentuais else None
+
+        return {
+            "percentual": percentual,
+            "estrelas": estrelas_aplicadas,
+            "media_estrelas": media_estrelas,
+            "classificacao": tendencia_info or classificar_estrelas_arquetipo(estrelas_aplicadas),
+            "tendencia": tendencia_info,
+            "arquetipo": arquetipo,
+            "n_respostas": len(estrelas_lista),
+        }
+
+    def questoes_presentes(respostas_lista):
+        questoes = set()
         for respostas in respostas_lista or []:
             for questao, estrelas in (respostas or {}).items():
                 questao = str(questao or "").strip()
                 if not questao.startswith("Q"):
                     continue
                 try:
-                    estrelas_float = float(estrelas)
+                    float(estrelas)
                 except Exception:
                     continue
-                respostas_por_questao.setdefault(questao, []).append(estrelas_float)
-                if media_antes_da_matriz:
-                    continue
-                estrelas_int = arredondar_escala_likert(estrelas_float)
-                if estrelas_int is None:
-                    continue
-                for arquetipo in arquetipos:
-                    row = por_chave.get(f"{arquetipo}{estrelas_int}{questao}")
-                    if not row:
-                        continue
-                    maximo = float(row.get("PONTOS_MAXIMOS") or 0)
-                    if maximo <= 0:
-                        continue
-                    percentual_arquetipo = (float(row.get("PONTOS_OBTIDOS") or 0) / maximo) * 100
-                    arquetipos_por_questao.setdefault(questao, {}).setdefault(arquetipo, []).append(percentual_arquetipo)
-        resultado = {}
-        for questao, valores in respostas_por_questao.items():
-            if not valores:
-                continue
-            media_estrelas = round(float(np.mean(valores)), 2)
-            estrelas_aplicadas = arredondar_escala_likert(media_estrelas)
-            if media_antes_da_matriz:
-                arq_percentuais = {}
-                for arquetipo in arquetipos:
-                    row = por_chave.get(f"{arquetipo}{estrelas_aplicadas}{questao}")
-                    if not row:
-                        continue
-                    maximo = float(row.get("PONTOS_MAXIMOS") or 0)
-                    if maximo <= 0:
-                        continue
-                    arq_percentuais[arquetipo] = round((float(row.get("PONTOS_OBTIDOS") or 0) / maximo) * 100, 2)
-            else:
-                arq_percentuais = {
-                    arquetipo: round(float(np.mean(lista)), 2)
-                    for arquetipo, lista in (arquetipos_por_questao.get(questao) or {}).items()
-                    if lista
-                }
-            dominantes = [nome for nome, valor in arq_percentuais.items() if valor >= 60]
-            suporte = [nome for nome, valor in arq_percentuais.items() if 50 <= valor < 60]
-            resultado[questao] = {
-                "percentual": round(float(np.mean(list(arq_percentuais.values()))), 2) if arq_percentuais else None,
-                "estrelas": estrelas_aplicadas,
-                "media_estrelas": media_estrelas,
-                "classificacao": classificar_estrelas_arquetipo(estrelas_aplicadas),
-                "arquetipos": arq_percentuais,
-                "dominantes": sorted(dominantes),
-                "suporte": sorted(suporte),
-                "n_respostas": len(valores),
-            }
-        return resultado
+                questoes.add(questao)
+        return questoes
 
-    auto_scores = score_por_questao(autoavaliacoes, media_antes_da_matriz=True)
-    equipe_scores = score_por_questao(avaliacoes_equipe, media_antes_da_matriz=False)
+    questoes = questoes_presentes(autoavaliacoes) | questoes_presentes(avaliacoes_equipe)
     linhas = []
-    for questao in sorted(set(auto_scores.keys()) | set(equipe_scores.keys())):
-        base = afirmacoes.get(questao) or {"questao": questao, "afirmacao": questao, "arquetipos": set()}
-        auto = auto_scores.get(questao)
-        equipe = equipe_scores.get(questao)
-        linhas.append({
-            "questao": questao,
-            "afirmacao": base.get("afirmacao") or questao,
-            "grupoArquetipo": " / ".join(sorted(base.get("arquetipos") or [])) or "Arquétipos",
-            "autoavaliacao": auto if auto is not None else {},
-            "mediaEquipe": equipe if equipe is not None else {},
-        })
+    for questao in sorted(questoes):
+        for arquetipo in arquetipos:
+            base = matriz_base.get((questao, arquetipo))
+            if not base:
+                continue
+            auto = score_questao_arquetipo(autoavaliacoes, questao, arquetipo, media_antes_da_matriz=True)
+            equipe = score_questao_arquetipo(avaliacoes_equipe, questao, arquetipo, media_antes_da_matriz=False)
+            if not auto and not equipe:
+                continue
+            linhas.append({
+                "questao": questao,
+                "afirmacao": base.get("AFIRMACAO") or questao,
+                "grupoArquetipo": arquetipo,
+                "arquetipo": arquetipo,
+                "autoavaliacao": auto,
+                "mediaEquipe": equipe,
+            })
 
     return {
         "dados": linhas,
