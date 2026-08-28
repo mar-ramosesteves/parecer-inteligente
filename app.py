@@ -544,6 +544,7 @@ def leadertrack_todos_lideres(value):
         "__todos__",
         "__todos_lideres__",
         "__todos_lideres_contexto__",
+        "__todas_empresas_contexto__",
     }
 
 
@@ -842,6 +843,7 @@ def consolidar_arquetipos_respostas(rows):
         "mediaEquipe": calcular_arquetipos_respostas(avaliacoes_equipe),
         "escopo": "todos_lideres_contexto",
         "quantidade_lideres_consolidados": len(lideres),
+        "quantidade_autoavaliacoes": len(autoavaliacoes),
         "quantidade_respostas_equipe": len(avaliacoes_equipe),
         "fonte": "consolidado_arquetipos",
         "analitico": calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe),
@@ -1149,6 +1151,7 @@ def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
             "fonte_microambiente": "consolidado_microambiente" if micro_consolidado else "relatorios_gerados",
             "lideres_com_arquetipos": len(lideres_arq) if arq_consolidado else len(arq_comparativo_relatorios or []),
             "lideres_com_microambiente": len(lideres_micro) if micro_consolidado else len(micro_analitico_relatorios or []),
+            "autoavaliacoes_arquetipos": (arq_consolidado or {}).get("quantidade_autoavaliacoes"),
             "respostas_arquetipos_equipe": (arq_consolidado or {}).get("quantidade_respostas_equipe"),
             "respostas_microambiente_equipe": (micro_consolidado or {}).get("quantidade_respostas_equipe"),
         },
