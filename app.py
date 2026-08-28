@@ -559,7 +559,7 @@ def normalizar_dados_json_relatorio(row):
     return dados_json
 
 
-def buscar_relatorios_leadertrack_contexto(tipo_relatorio, empresa, rodada, contexto_ids=None, limite=500):
+def buscar_relatorios_leadertrack_contexto(tipo_relatorio, empresa, rodada, contexto_ids=None, limite=500, empresas_contexto=None):
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -581,8 +581,15 @@ def buscar_relatorios_leadertrack_contexto(tipo_relatorio, empresa, rodada, cont
         "order": "data_criacao.desc",
         "limit": str(limite),
     }
+    empresas_contexto = [
+        str(item or "").strip().lower()
+        for item in (empresas_contexto or [])
+        if str(item or "").strip()
+    ]
     if empresa and not leadertrack_todos_lideres(empresa):
         params_base["empresa"] = f"eq.{empresa}"
+    elif empresas_contexto:
+        params_base["empresa"] = "in.(" + ",".join(empresas_contexto) + ")"
 
     empresa_especifica = bool(empresa and not leadertrack_todos_lideres(empresa))
     tem_contexto = any(contexto_ids.get(campo) for campo in ("filial_id", "empresa_id", "holding_id", "cliente_id"))
@@ -652,7 +659,7 @@ def carregar_matriz_micro_rows():
     return _MATRIZ_MICRO_CACHE
 
 
-def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_ids=None, limite=500):
+def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_ids=None, limite=500, empresas_contexto=None):
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -660,6 +667,11 @@ def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_i
     url = f"{SUPABASE_REST_URL}/{tabela}"
     contexto_ids = contexto_ids or {}
     empresa_especifica = bool(empresa and not leadertrack_todos_lideres(empresa))
+    empresas_contexto = [
+        str(item or "").strip().lower()
+        for item in (empresas_contexto or [])
+        if str(item or "").strip()
+    ]
 
     params_base = {
         "select": "*",
@@ -669,6 +681,8 @@ def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_i
     }
     if empresa_especifica:
         params_base["empresa"] = f"eq.{empresa}"
+    elif empresas_contexto:
+        params_base["empresa"] = "in.(" + ",".join(empresas_contexto) + ")"
 
     tentativas = []
     for campo in ("filial_id", "empresa_id", "holding_id", "cliente_id"):
@@ -1094,30 +1108,34 @@ def consolidar_microambiente_analitico(relatorios):
     }
 
 
-def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
+def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids, empresas_contexto=None):
     arq_consolidados = buscar_consolidados_leadertrack_contexto(
         "consolidado_arquetipos",
         empresa,
         codrodada,
         contexto_ids,
+        empresas_contexto=empresas_contexto,
     )
     micro_consolidados = buscar_consolidados_leadertrack_contexto(
         "consolidado_microambiente",
         empresa,
         codrodada,
         contexto_ids,
+        empresas_contexto=empresas_contexto,
     )
     arq_comparativo_relatorios = buscar_relatorios_leadertrack_contexto(
         "arquetipos_grafico_comparativo",
         empresa,
         codrodada,
         contexto_ids,
+        empresas_contexto=empresas_contexto,
     )
     micro_analitico_relatorios = buscar_relatorios_leadertrack_contexto(
         "microambiente_analitico",
         empresa,
         codrodada,
         contexto_ids,
+        empresas_contexto=empresas_contexto,
     )
 
     arq_consolidado = None
@@ -2277,6 +2295,7 @@ def gerar_devolutiva_leadertrack():
             "empresa_id": dados.get("empresa_id") or dados.get("empresaId"),
             "filial_id": dados.get("filial_id") or dados.get("filialId"),
         }
+        empresas_contexto = dados.get("empresasContexto") or dados.get("empresas_contexto") or []
         nome_lider = dados.get("nomeLider", "")
         gap_minimo = float(dados.get("gapMinimo", 20) or 20)
         baixa_referencia_threshold = float(dados.get("baixaReferenciaThreshold", 70) or 70)
@@ -2352,6 +2371,7 @@ def gerar_devolutiva_leadertrack():
                 empresa,
                 codrodada,
                 contexto_ids,
+                empresas_contexto=empresas_contexto,
             )
             dados_arquetipos_comparativo = inputs_consolidados["dados_arquetipos_comparativo"]
             dados_arquetipos_analitico = inputs_consolidados["dados_arquetipos_analitico"]
