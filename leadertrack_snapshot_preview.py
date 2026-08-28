@@ -157,11 +157,17 @@ def calcular_saude_emocional_dashboard(registros_arquetipos, registros_microambi
             "gap": gap, "valor": round(valor, 2),
         })
 
-    categorias = {
-        categoria: round(mean(valores), 1) if valores else 0.0
+    # O dashboard mantem a precisao das medias das categorias para calcular o
+    # score final; o arredondamento para uma casa acontece apenas na exibicao.
+    medias_categorias = {
+        categoria: mean(valores) if valores else 0.0
         for categoria, valores in valores_por_categoria.items()
     }
-    validas = [valor for valor in categorias.values() if valor > 0]
+    categorias = {
+        categoria: round(valor, 1)
+        for categoria, valor in medias_categorias.items()
+    }
+    validas = [valor for valor in medias_categorias.values() if valor > 0]
     score = round(mean(validas), 1) if validas else None
     return {
         "score_final": score,
