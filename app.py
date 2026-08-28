@@ -533,6 +533,212 @@ def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
             return dados_json
     return None
 
+
+def leadertrack_todos_lideres(value):
+    texto = str(value or "").strip().lower()
+    return texto in {
+        "todos",
+        "todas",
+        "all",
+        "__todos__",
+        "__todos_lideres__",
+        "__todos_lideres_contexto__",
+    }
+
+
+def normalizar_dados_json_relatorio(row):
+    dados_json = (row or {}).get("dados_json")
+    if isinstance(dados_json, str):
+        try:
+            return json.loads(dados_json)
+        except Exception as e:
+            print("Erro ao converter dados_json consolidado:", e)
+            return None
+    return dados_json
+
+
+def buscar_relatorios_leadertrack_contexto(tipo_relatorio, empresa, rodada, contexto_ids=None, limite=500):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+    }
+    url = f"{SUPABASE_REST_URL}/relatorios_gerados"
+    contexto_ids = contexto_ids or {}
+
+    def executar(params):
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        if resp.status_code == 200:
+            return resp.json()
+        print("Busca consolidada LeaderTrack ignorada:", resp.status_code, resp.text[:500])
+        return None
+
+    params_base = {
+        "select": "empresa,codrodada,emaillider,tipo_relatorio,dados_json,data_criacao",
+        "codrodada": f"eq.{rodada}",
+        "tipo_relatorio": f"eq.{tipo_relatorio}",
+        "order": "data_criacao.desc",
+        "limit": str(limite),
+    }
+    if empresa and not leadertrack_todos_lideres(empresa):
+        params_base["empresa"] = f"eq.{empresa}"
+
+    empresa_especifica = bool(empresa and not leadertrack_todos_lideres(empresa))
+    tem_contexto = any(contexto_ids.get(campo) for campo in ("filial_id", "empresa_id", "holding_id", "cliente_id"))
+    tentativas = []
+    for campo in ("filial_id", "empresa_id", "holding_id", "cliente_id"):
+        valor = contexto_ids.get(campo)
+        if valor:
+            params = dict(params_base)
+            params[campo] = f"eq.{valor}"
+            tentativas.append(params)
+    if empresa_especifica or not tem_contexto:
+        tentativas.append(dict(params_base))
+
+    rows = []
+    for params in tentativas:
+        dados = executar(params)
+        if dados:
+            rows = dados
+            break
+
+    por_lider = {}
+    for row in rows or []:
+        email = str(row.get("emaillider") or "").strip().lower()
+        if not email or email in por_lider:
+            continue
+        dados_json = normalizar_dados_json_relatorio(row)
+        if dados_json:
+            por_lider[email] = {
+                "empresa": row.get("empresa"),
+                "emaillider": email,
+                "dados_json": dados_json,
+            }
+
+    return list(por_lider.values())
+
+
+def media_dicts_relatorios(relatorios, chave):
+    valores = {}
+    for relatorio in relatorios or []:
+        dados = relatorio.get("dados_json") or {}
+        bloco = dados.get(chave) or {}
+        if not isinstance(bloco, dict):
+            continue
+        for nome, valor in bloco.items():
+            try:
+                valores.setdefault(nome, []).append(float(valor or 0))
+            except Exception:
+                continue
+    return {
+        nome: round(float(np.mean(lista)), 2)
+        for nome, lista in valores.items()
+        if lista
+    }
+
+
+def consolidar_arquetipos_comparativo(relatorios):
+    return {
+        "autoavaliacao": media_dicts_relatorios(relatorios, "autoavaliacao"),
+        "mediaEquipe": media_dicts_relatorios(relatorios, "mediaEquipe"),
+        "escopo": "todos_lideres_contexto",
+        "quantidade_lideres_consolidados": len(relatorios or []),
+    }
+
+
+def consolidar_microambiente_analitico(relatorios):
+    grupos = {}
+    for relatorio in relatorios or []:
+        dados = relatorio.get("dados_json") or {}
+        for row in dados.get("dados") or []:
+            if not isinstance(row, dict):
+                continue
+            chave = (
+                str(row.get("QUESTAO") or row.get("COD") or "").strip(),
+                str(row.get("AFIRMACAO") or "").strip(),
+                str(row.get("DIMENSAO") or "").strip(),
+                str(row.get("SUBDIMENSAO") or "").strip(),
+            )
+            if not any(chave):
+                continue
+            grupo = grupos.setdefault(chave, {
+                "QUESTAO": chave[0],
+                "AFIRMACAO": chave[1],
+                "DIMENSAO": chave[2],
+                "SUBDIMENSAO": chave[3],
+                "PONTUACAO_REAL": [],
+                "PONTUACAO_IDEAL": [],
+                "GAP": [],
+            })
+            for campo in ("PONTUACAO_REAL", "PONTUACAO_IDEAL", "GAP"):
+                valor = row.get(campo)
+                if valor in (None, ""):
+                    continue
+                try:
+                    grupo[campo].append(float(str(valor).replace("%", "").replace(",", ".").strip()))
+                except Exception:
+                    continue
+
+    linhas = []
+    for grupo in grupos.values():
+        real = round(float(np.mean(grupo["PONTUACAO_REAL"])), 2) if grupo["PONTUACAO_REAL"] else 0
+        ideal = round(float(np.mean(grupo["PONTUACAO_IDEAL"])), 2) if grupo["PONTUACAO_IDEAL"] else 0
+        gap = (
+            round(float(np.mean(grupo["GAP"])), 2)
+            if grupo["GAP"]
+            else round(float(ideal) - float(real), 2)
+        )
+        linhas.append({
+            "QUESTAO": grupo["QUESTAO"],
+            "AFIRMACAO": grupo["AFIRMACAO"],
+            "DIMENSAO": grupo["DIMENSAO"],
+            "SUBDIMENSAO": grupo["SUBDIMENSAO"],
+            "PONTUACAO_REAL": real,
+            "PONTUACAO_IDEAL": ideal,
+            "GAP": gap,
+            "N_LIDERES_CONSOLIDADOS": len(relatorios or []),
+        })
+
+    linhas = sorted(linhas, key=lambda item: abs(float(item.get("GAP") or 0)), reverse=True)
+    return {
+        "dados": linhas,
+        "escopo": "todos_lideres_contexto",
+        "quantidade_lideres_consolidados": len(relatorios or []),
+    }
+
+
+def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
+    arq_comparativo_relatorios = buscar_relatorios_leadertrack_contexto(
+        "arquetipos_grafico_comparativo",
+        empresa,
+        codrodada,
+        contexto_ids,
+    )
+    micro_analitico_relatorios = buscar_relatorios_leadertrack_contexto(
+        "microambiente_analitico",
+        empresa,
+        codrodada,
+        contexto_ids,
+    )
+
+    return {
+        "dados_arquetipos_comparativo": consolidar_arquetipos_comparativo(arq_comparativo_relatorios),
+        "dados_arquetipos_analitico": None,
+        "guia_arquetipos": None,
+        "dados_microambiente_analitico": consolidar_microambiente_analitico(micro_analitico_relatorios),
+        "dados_microambiente_auto_dimensao": None,
+        "dados_microambiente_auto_subdimensao": None,
+        "dados_microambiente_media_dimensao": None,
+        "dados_microambiente_subdimensao": None,
+        "dados_microambiente_termometro_gaps": None,
+        "dados_microambiente_waterfall_gaps": None,
+        "guia_microambiente": None,
+        "metadados": {
+            "escopo": "todos_lideres_contexto",
+            "lideres_com_arquetipos": len(arq_comparativo_relatorios or []),
+            "lideres_com_microambiente": len(micro_analitico_relatorios or []),
+        },
+    }
+
 def guia_caderno_payload(tipo, parecer, graficos=None, metadados=None):
     graficos = graficos or {}
     html = ""
@@ -1642,9 +1848,9 @@ def gerar_devolutiva_leadertrack():
 
     try:
         dados = request.get_json() or {}
-        empresa = dados.get("empresa", "").lower()
-        codrodada = dados.get("codrodada", "").lower()
-        email_lider = dados.get("emailLider", "").lower()
+        empresa = str(dados.get("empresa") or dados.get("company") or "").strip().lower()
+        codrodada = str(dados.get("codrodada") or "").strip().lower()
+        email_lider = str(dados.get("emailLider") or "").strip().lower()
         contexto = dados.get("contexto", "")
         equipe_tipo = str(dados.get("equipeTipo") or dados.get("tipoEquipe") or "direta").strip().lower()
         contexto_ids = {
@@ -1668,11 +1874,47 @@ def gerar_devolutiva_leadertrack():
         )
         gerado_por = dados.get("geradoPor")
         indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
+        considerar_todos_lideres = (
+            bool_param(dados.get("considerarTodosLideres"), False)
+            or bool_param(dados.get("todosLideresContexto"), False)
+            or leadertrack_todos_lideres(email_lider)
+        )
 
-        if not empresa or not codrodada or not email_lider:
+        if considerar_todos_lideres and not empresa:
+            empresa = "todos"
+        if considerar_todos_lideres:
+            email_lider = "__todos_lideres_contexto__"
+            nome_lider = nome_lider or "Todos os lideres do contexto"
+
+        if not codrodada or not email_lider or (
+            not empresa and not any(contexto_ids.values())
+        ):
             response = jsonify({
                 "erro": "Campos obrigatorios ausentes.",
-                "campos_necessarios": ["empresa", "codrodada", "emailLider"]
+                "campos_necessarios": ["empresa ou contexto_ids", "codrodada", "emailLider"]
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        if considerar_todos_lideres and persistir:
+            response = jsonify({
+                "erro": "Persistencia bloqueada para devolutiva consolidada de todos os lideres.",
+                "orientacao": (
+                    "A acao consolidada gera a mesma devolutiva em modo contexto, mas nao grava "
+                    "PDI/meta individual automaticamente. Gere com persistir=false, valide a leitura "
+                    "e depois desdobre em acoes individuais quando necessario."
+                ),
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 400
+
+        if considerar_todos_lideres and gerar_planos_com_ia:
+            response = jsonify({
+                "erro": "Geracao profunda de PDI com IA bloqueada para todos os lideres.",
+                "orientacao": (
+                    "Use a devolutiva consolidada para diagnostico do contexto. PDIs profundos "
+                    "continuam sendo gerados por lider/afirmacao para evitar plano individual indevido."
+                ),
             })
             response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
             return response, 400
@@ -1687,39 +1929,75 @@ def gerar_devolutiva_leadertrack():
 
         prompt_base = carregar_prompt_leadertrack() if gerar_planos_com_ia else ""
 
-        dados_arquetipos_comparativo = buscar_json_supabase(
-            "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
-        )
-        dados_arquetipos_analitico = buscar_json_supabase(
-            "arquetipos_analitico", empresa, codrodada, email_lider
-        )
-        guia_arquetipos = buscar_json_supabase(
-            "arquetipos_parecer_ia", empresa, codrodada, email_lider
-        )
-        dados_microambiente_analitico = buscar_json_microambiente(
-            "microambiente_analitico", empresa, codrodada, email_lider
-        )
-        dados_microambiente_auto_dimensao = buscar_json_microambiente(
-            "microambiente_grafico_autoavaliacao_dimensao", empresa, codrodada, email_lider
-        )
-        dados_microambiente_auto_subdimensao = buscar_json_microambiente(
-            "microambiente_grafico_autoavaliacao_subdimensao", empresa, codrodada, email_lider
-        )
-        dados_microambiente_media_dimensao = buscar_json_microambiente(
-            "microambiente_grafico_mediaequipe_dimensao", empresa, codrodada, email_lider
-        )
-        dados_microambiente_subdimensao = buscar_json_microambiente(
-            "microambiente_grafico_mediaequipe_subdimensao", empresa, codrodada, email_lider
-        )
-        dados_microambiente_termometro_gaps = buscar_json_microambiente(
-            "microambiente_termometro_gaps", empresa, codrodada, email_lider
-        )
-        dados_microambiente_waterfall_gaps = buscar_json_microambiente(
-            "microambiente_waterfall_gaps", empresa, codrodada, email_lider
-        )
-        guia_microambiente = buscar_json_microambiente(
-            "microambiente_parecer_ia", empresa, codrodada, email_lider
-        )
+        if considerar_todos_lideres:
+            inputs_consolidados = buscar_inputs_devolutiva_todos_lideres(
+                empresa,
+                codrodada,
+                contexto_ids,
+            )
+            dados_arquetipos_comparativo = inputs_consolidados["dados_arquetipos_comparativo"]
+            dados_arquetipos_analitico = inputs_consolidados["dados_arquetipos_analitico"]
+            guia_arquetipos = inputs_consolidados["guia_arquetipos"]
+            dados_microambiente_analitico = inputs_consolidados["dados_microambiente_analitico"]
+            dados_microambiente_auto_dimensao = inputs_consolidados["dados_microambiente_auto_dimensao"]
+            dados_microambiente_auto_subdimensao = inputs_consolidados["dados_microambiente_auto_subdimensao"]
+            dados_microambiente_media_dimensao = inputs_consolidados["dados_microambiente_media_dimensao"]
+            dados_microambiente_subdimensao = inputs_consolidados["dados_microambiente_subdimensao"]
+            dados_microambiente_termometro_gaps = inputs_consolidados["dados_microambiente_termometro_gaps"]
+            dados_microambiente_waterfall_gaps = inputs_consolidados["dados_microambiente_waterfall_gaps"]
+            guia_microambiente = inputs_consolidados["guia_microambiente"]
+            metadados_consolidado = inputs_consolidados["metadados"]
+        else:
+            metadados_consolidado = {}
+            dados_arquetipos_comparativo = buscar_json_supabase(
+                "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
+            )
+            dados_arquetipos_analitico = buscar_json_supabase(
+                "arquetipos_analitico", empresa, codrodada, email_lider
+            )
+            guia_arquetipos = buscar_json_supabase(
+                "arquetipos_parecer_ia", empresa, codrodada, email_lider
+            )
+            dados_microambiente_analitico = buscar_json_microambiente(
+                "microambiente_analitico", empresa, codrodada, email_lider
+            )
+            dados_microambiente_auto_dimensao = buscar_json_microambiente(
+                "microambiente_grafico_autoavaliacao_dimensao", empresa, codrodada, email_lider
+            )
+            dados_microambiente_auto_subdimensao = buscar_json_microambiente(
+                "microambiente_grafico_autoavaliacao_subdimensao", empresa, codrodada, email_lider
+            )
+            dados_microambiente_media_dimensao = buscar_json_microambiente(
+                "microambiente_grafico_mediaequipe_dimensao", empresa, codrodada, email_lider
+            )
+            dados_microambiente_subdimensao = buscar_json_microambiente(
+                "microambiente_grafico_mediaequipe_subdimensao", empresa, codrodada, email_lider
+            )
+            dados_microambiente_termometro_gaps = buscar_json_microambiente(
+                "microambiente_termometro_gaps", empresa, codrodada, email_lider
+            )
+            dados_microambiente_waterfall_gaps = buscar_json_microambiente(
+                "microambiente_waterfall_gaps", empresa, codrodada, email_lider
+            )
+            guia_microambiente = buscar_json_microambiente(
+                "microambiente_parecer_ia", empresa, codrodada, email_lider
+            )
+
+        if considerar_todos_lideres and (
+            int(metadados_consolidado.get("lideres_com_arquetipos") or 0) == 0
+            or int(metadados_consolidado.get("lideres_com_microambiente") or 0) == 0
+        ):
+            response = jsonify({
+                "erro": "Dados LeaderTrack insuficientes para gerar devolutiva consolidada.",
+                "escopo": "todos_lideres_contexto",
+                "dados_encontrados": metadados_consolidado,
+                "orientacao": (
+                    "Verifique se a rodada e o contexto selecionado possuem relatorios individuais "
+                    "ja calculados para arquetipos e microambiente."
+                ),
+            })
+            response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+            return response, 404
 
         if not dados_arquetipos_comparativo or not dados_microambiente_analitico:
             response = jsonify({
@@ -1746,6 +2024,14 @@ def gerar_devolutiva_leadertrack():
             dados_microambiente_termometro_gaps,
             dados_microambiente_waterfall_gaps,
         )
+        if considerar_todos_lideres:
+            amostra["escopo"] = "todos_lideres_contexto"
+            amostra["lideres_com_arquetipos"] = metadados_consolidado.get("lideres_com_arquetipos")
+            amostra["lideres_com_microambiente"] = metadados_consolidado.get("lideres_com_microambiente")
+            amostra["lideres"] = max(
+                int(metadados_consolidado.get("lideres_com_arquetipos") or 0),
+                int(metadados_consolidado.get("lideres_com_microambiente") or 0),
+            )
         gaps_para_gerar = gaps[:maximo_gaps_por_ciclo] if gerar_apenas_primeiro_ciclo else gaps
         leader = {
             "nome": nome_lider,
@@ -1771,6 +2057,17 @@ def gerar_devolutiva_leadertrack():
         )
         devolutiva["equipe_tipo"] = equipe_tipo
         devolutiva["amostra"] = amostra
+        if considerar_todos_lideres:
+            devolutiva["escopo_devolutiva"] = {
+                "tipo": "todos_lideres_contexto",
+                "descricao": "Mesma devolutiva LeaderTrack, consolidada para todos os lideres e respondentes do contexto selecionado.",
+                "persistencia_automatica": False,
+                "pdi_individual_automatico": False,
+            }
+            devolutiva["avisos"] = (devolutiva.get("avisos") or []) + [
+                "Devolutiva consolidada: representa todos os lideres do contexto selecionado, nao um lider individual.",
+                "Persistencia, PDI individual e meta de desempenho automatica ficam bloqueados neste modo.",
+            ]
         if amostra.get("insuficiente"):
             devolutiva["modo_devolutiva"] = {
                 "modo": "amostra_insuficiente",
