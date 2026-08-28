@@ -5,6 +5,7 @@ openai>=1.0.0
 python-docx
 matplotlib
 numpy
+openpyxl
 gunicorn
 fpdf==1.7.2
 google-api-python-client

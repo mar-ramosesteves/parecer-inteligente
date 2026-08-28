@@ -9,6 +9,7 @@ import base64
 import io
 import numpy as np
 import requests
+from openpyxl import load_workbook
 from openai import OpenAI
 from leadertrack_devolutivas import (
     archetype_summary,
@@ -617,6 +618,218 @@ def buscar_relatorios_leadertrack_contexto(tipo_relatorio, empresa, rodada, cont
     return list(por_lider.values())
 
 
+def workbook_rows(filename):
+    path = os.path.join(os.path.dirname(__file__), filename)
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb.active
+        rows = ws.iter_rows(values_only=True)
+        headers = [str(value or "").strip() for value in next(rows)]
+        return [
+            {headers[index]: value for index, value in enumerate(row)}
+            for row in rows
+        ]
+    finally:
+        wb.close()
+
+
+_MATRIZ_ARQUETIPOS_CACHE = None
+_MATRIZ_MICRO_CACHE = None
+
+
+def carregar_matriz_arquetipos_rows():
+    global _MATRIZ_ARQUETIPOS_CACHE
+    if _MATRIZ_ARQUETIPOS_CACHE is None:
+        _MATRIZ_ARQUETIPOS_CACHE = workbook_rows("TABELA_GERAL_ARQUETIPOS_COM_CHAVE.xlsx")
+    return _MATRIZ_ARQUETIPOS_CACHE
+
+
+def carregar_matriz_micro_rows():
+    global _MATRIZ_MICRO_CACHE
+    if _MATRIZ_MICRO_CACHE is None:
+        _MATRIZ_MICRO_CACHE = workbook_rows("TABELA_GERAL_MICROAMBIENTE_COM_CHAVE.xlsx")
+    return _MATRIZ_MICRO_CACHE
+
+
+def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_ids=None, limite=500):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+    }
+    url = f"{SUPABASE_REST_URL}/{tabela}"
+    contexto_ids = contexto_ids or {}
+    empresa_especifica = bool(empresa and not leadertrack_todos_lideres(empresa))
+
+    params_base = {
+        "select": "*",
+        "codrodada": f"eq.{rodada}",
+        "order": "id.desc",
+        "limit": str(limite),
+    }
+    if empresa_especifica:
+        params_base["empresa"] = f"eq.{empresa}"
+
+    tentativas = []
+    for campo in ("filial_id", "empresa_id", "holding_id", "cliente_id"):
+        valor = contexto_ids.get(campo)
+        if valor:
+            params = dict(params_base)
+            params[campo] = f"eq.{valor}"
+            tentativas.append(params)
+    if empresa_especifica or not tentativas:
+        tentativas.append(dict(params_base))
+
+    for params in tentativas:
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        if resp.status_code == 200 and resp.json():
+            return resp.json()
+        if resp.status_code not in (200, 404):
+            print(f"Busca {tabela} ignorada:", resp.status_code, resp.text[:500])
+    return []
+
+
+def respostas_arquetipos_consolidadas(rows):
+    autoavaliacoes = []
+    avaliacoes_equipe = []
+    lideres = set()
+    for row in rows or []:
+        dados = normalizar_dados_json_relatorio(row) or {}
+        auto = dados.get("autoavaliacao") or {}
+        if isinstance(auto, dict) and isinstance(auto.get("respostas"), dict):
+            autoavaliacoes.append(auto.get("respostas"))
+            if auto.get("emailLider"):
+                lideres.add(str(auto.get("emailLider")).strip().lower())
+        for membro in dados.get("avaliacoesEquipe") or []:
+            if not isinstance(membro, dict) or not isinstance(membro.get("respostas"), dict):
+                continue
+            avaliacoes_equipe.append(membro.get("respostas"))
+            if membro.get("emailLider"):
+                lideres.add(str(membro.get("emailLider")).strip().lower())
+    return autoavaliacoes, avaliacoes_equipe, lideres
+
+
+def calcular_arquetipos_respostas(respostas_lista):
+    matriz = carregar_matriz_arquetipos_rows()
+    por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
+    arquetipos = ["Imperativo", "Resoluto", "Cuidativo", "Consultivo", "Prescritivo", "Formador"]
+    acumulado = {name: [] for name in arquetipos}
+
+    for respostas in respostas_lista or []:
+        pontos = {name: 0.0 for name in arquetipos}
+        maximos = {name: 0.0 for name in arquetipos}
+        for questao, estrelas in (respostas or {}).items():
+            if not str(questao).startswith("Q"):
+                continue
+            try:
+                estrelas_int = int(estrelas)
+            except Exception:
+                continue
+            for arquetipo in arquetipos:
+                row = por_chave.get(f"{arquetipo}{estrelas_int}{questao}")
+                if not row:
+                    continue
+                pontos[arquetipo] += float(row.get("PONTOS_OBTIDOS") or 0)
+                maximos[arquetipo] += float(row.get("PONTOS_MAXIMOS") or 0)
+        for arquetipo in arquetipos:
+            if maximos[arquetipo] > 0:
+                acumulado[arquetipo].append((pontos[arquetipo] / maximos[arquetipo]) * 100)
+
+    return {
+        arquetipo: round(float(np.mean(valores)), 2)
+        for arquetipo, valores in acumulado.items()
+        if valores
+    }
+
+
+def consolidar_arquetipos_respostas(rows):
+    autoavaliacoes, avaliacoes_equipe, lideres = respostas_arquetipos_consolidadas(rows)
+    return {
+        "autoavaliacao": calcular_arquetipos_respostas(autoavaliacoes),
+        "mediaEquipe": calcular_arquetipos_respostas(avaliacoes_equipe),
+        "escopo": "todos_lideres_contexto",
+        "quantidade_lideres_consolidados": len(lideres),
+        "quantidade_respostas_equipe": len(avaliacoes_equipe),
+        "fonte": "consolidado_arquetipos",
+    }, lideres
+
+
+def respostas_micro_consolidadas(rows):
+    respostas = []
+    lideres = set()
+    for row in rows or []:
+        dados = normalizar_dados_json_relatorio(row) or {}
+        for membro in dados.get("avaliacoesEquipe") or []:
+            if not isinstance(membro, dict):
+                continue
+            if any(str(k).startswith("Q") for k in membro.keys()):
+                respostas.append(membro)
+            if membro.get("emailLider"):
+                lideres.add(str(membro.get("emailLider")).strip().lower())
+    return respostas, lideres
+
+
+def consolidar_microambiente_respostas(rows):
+    respostas_lista, lideres = respostas_micro_consolidadas(rows)
+    matriz = carregar_matriz_micro_rows()
+    questoes = {}
+    por_chave = {}
+    for row in matriz:
+        codigo = str(row.get("COD") or "").strip()
+        real_key = str(row.get("name_real") or "").strip()
+        ideal_key = str(row.get("name_ideal") or "").strip()
+        if codigo and real_key and ideal_key:
+            questoes.setdefault(codigo, row)
+        chave = str(row.get("CHAVE") or "").strip()
+        if chave:
+            por_chave[chave] = row
+
+    linhas = []
+    for codigo, questao in questoes.items():
+        real_key = str(questao.get("name_real") or "").strip()
+        ideal_key = str(questao.get("name_ideal") or "").strip()
+        reais = []
+        ideais = []
+        for respostas in respostas_lista:
+            if real_key not in respostas or ideal_key not in respostas:
+                continue
+            try:
+                real = int(respostas.get(real_key))
+                ideal = int(respostas.get(ideal_key))
+            except Exception:
+                continue
+            row = por_chave.get(f"{codigo}_I{ideal}_R{real}")
+            if not row:
+                continue
+            reais.append(float(row.get("PONTUACAO_REAL") or 0))
+            ideais.append(float(row.get("PONTUACAO_IDEAL") or 0))
+
+        if not reais or not ideais:
+            continue
+        real_media = round(float(np.mean(reais)), 2)
+        ideal_media = round(float(np.mean(ideais)), 2)
+        gap = round(ideal_media - real_media, 2)
+        linhas.append({
+            "QUESTAO": codigo,
+            "AFIRMACAO": questao.get("AFIRMACAO"),
+            "DIMENSAO": questao.get("DIMENSAO"),
+            "SUBDIMENSAO": questao.get("SUBDIMENSAO"),
+            "PONTUACAO_REAL": real_media,
+            "PONTUACAO_IDEAL": ideal_media,
+            "GAP": gap,
+            "N_RESPONDENTES_CONSOLIDADOS": min(len(reais), len(ideais)),
+            "N_LIDERES_CONSOLIDADOS": len(lideres),
+        })
+
+    linhas = sorted(linhas, key=lambda item: abs(float(item.get("GAP") or 0)), reverse=True)
+    return {
+        "dados": linhas,
+        "escopo": "todos_lideres_contexto",
+        "quantidade_lideres_consolidados": len(lideres),
+        "quantidade_respostas_equipe": len(respostas_lista),
+        "fonte": "consolidado_microambiente",
+    }, lideres
+
+
 def media_dicts_relatorios(relatorios, chave):
     valores = {}
     for relatorio in relatorios or []:
@@ -707,6 +920,18 @@ def consolidar_microambiente_analitico(relatorios):
 
 
 def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
+    arq_consolidados = buscar_consolidados_leadertrack_contexto(
+        "consolidado_arquetipos",
+        empresa,
+        codrodada,
+        contexto_ids,
+    )
+    micro_consolidados = buscar_consolidados_leadertrack_contexto(
+        "consolidado_microambiente",
+        empresa,
+        codrodada,
+        contexto_ids,
+    )
     arq_comparativo_relatorios = buscar_relatorios_leadertrack_contexto(
         "arquetipos_grafico_comparativo",
         empresa,
@@ -720,11 +945,20 @@ def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
         contexto_ids,
     )
 
+    arq_consolidado = None
+    micro_consolidado = None
+    lideres_arq = set()
+    lideres_micro = set()
+    if arq_consolidados:
+        arq_consolidado, lideres_arq = consolidar_arquetipos_respostas(arq_consolidados)
+    if micro_consolidados:
+        micro_consolidado, lideres_micro = consolidar_microambiente_respostas(micro_consolidados)
+
     return {
-        "dados_arquetipos_comparativo": consolidar_arquetipos_comparativo(arq_comparativo_relatorios),
+        "dados_arquetipos_comparativo": arq_consolidado or consolidar_arquetipos_comparativo(arq_comparativo_relatorios),
         "dados_arquetipos_analitico": None,
         "guia_arquetipos": None,
-        "dados_microambiente_analitico": consolidar_microambiente_analitico(micro_analitico_relatorios),
+        "dados_microambiente_analitico": micro_consolidado or consolidar_microambiente_analitico(micro_analitico_relatorios),
         "dados_microambiente_auto_dimensao": None,
         "dados_microambiente_auto_subdimensao": None,
         "dados_microambiente_media_dimensao": None,
@@ -734,8 +968,12 @@ def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
         "guia_microambiente": None,
         "metadados": {
             "escopo": "todos_lideres_contexto",
-            "lideres_com_arquetipos": len(arq_comparativo_relatorios or []),
-            "lideres_com_microambiente": len(micro_analitico_relatorios or []),
+            "fonte_arquetipos": "consolidado_arquetipos" if arq_consolidado else "relatorios_gerados",
+            "fonte_microambiente": "consolidado_microambiente" if micro_consolidado else "relatorios_gerados",
+            "lideres_com_arquetipos": len(lideres_arq) if arq_consolidado else len(arq_comparativo_relatorios or []),
+            "lideres_com_microambiente": len(lideres_micro) if micro_consolidado else len(micro_analitico_relatorios or []),
+            "respostas_arquetipos_equipe": (arq_consolidado or {}).get("quantidade_respostas_equipe"),
+            "respostas_microambiente_equipe": (micro_consolidado or {}).get("quantidade_respostas_equipe"),
         },
     }
 
@@ -2026,8 +2264,12 @@ def gerar_devolutiva_leadertrack():
         )
         if considerar_todos_lideres:
             amostra["escopo"] = "todos_lideres_contexto"
+            amostra["fonte_arquetipos"] = metadados_consolidado.get("fonte_arquetipos")
+            amostra["fonte_microambiente"] = metadados_consolidado.get("fonte_microambiente")
             amostra["lideres_com_arquetipos"] = metadados_consolidado.get("lideres_com_arquetipos")
             amostra["lideres_com_microambiente"] = metadados_consolidado.get("lideres_com_microambiente")
+            amostra["respostas_arquetipos_equipe"] = metadados_consolidado.get("respostas_arquetipos_equipe")
+            amostra["respostas_microambiente_equipe"] = metadados_consolidado.get("respostas_microambiente_equipe")
             amostra["lideres"] = max(
                 int(metadados_consolidado.get("lideres_com_arquetipos") or 0),
                 int(metadados_consolidado.get("lideres_com_microambiente") or 0),
