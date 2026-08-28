@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 import json
 import re
+import csv
 from datetime import datetime
 import matplotlib.pyplot as plt
 import base64
@@ -641,8 +642,15 @@ def workbook_rows(filename):
         wb.close()
 
 
+def csv_rows(filename, delimiter=";"):
+    path = os.path.join(os.path.dirname(__file__), filename)
+    with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle, delimiter=delimiter))
+
+
 _MATRIZ_ARQUETIPOS_CACHE = None
 _MATRIZ_MICRO_CACHE = None
+_SAUDE_EMOCIONAL_CACHE = None
 
 
 def carregar_matriz_arquetipos_rows():
@@ -657,6 +665,27 @@ def carregar_matriz_micro_rows():
     if _MATRIZ_MICRO_CACHE is None:
         _MATRIZ_MICRO_CACHE = workbook_rows("TABELA_GERAL_MICROAMBIENTE_COM_CHAVE.xlsx")
     return _MATRIZ_MICRO_CACHE
+
+
+def carregar_saude_emocional_rows():
+    global _SAUDE_EMOCIONAL_CACHE
+    if _SAUDE_EMOCIONAL_CACHE is None:
+        _SAUDE_EMOCIONAL_CACHE = csv_rows("TABELA_SAUDE_EMOCIONAL.csv")
+    return _SAUDE_EMOCIONAL_CACHE
+
+
+def normalizar_recorte_valor(value):
+    texto = str(value or "").strip()
+    return texto if texto else "Não informado"
+
+
+def valor_numerico(value, default=None):
+    try:
+        if value in (None, ""):
+            return default
+        return float(str(value).replace("%", "").replace(",", ".").strip())
+    except Exception:
+        return default
 
 
 def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_ids=None, limite=500, empresas_contexto=None):
@@ -877,6 +906,321 @@ def respostas_micro_consolidadas(rows):
             if membro.get("emailLider"):
                 lideres.add(str(membro.get("emailLider")).strip().lower())
     return respostas, lideres
+
+
+def registros_arquetipos_consolidados(rows):
+    registros = []
+    for row in rows or []:
+        dados = normalizar_dados_json_relatorio(row) or {}
+        auto = dados.get("autoavaliacao") or {}
+        if isinstance(auto, dict) and isinstance(auto.get("respostas"), dict):
+            registros.append({
+                "tipo": "autoavaliacao",
+                "respostas": auto.get("respostas") or {},
+                "empresa": normalizar_recorte_valor(auto.get("empresa") or row.get("empresa")),
+                "email_lider": str(auto.get("emailLider") or row.get("emaillider") or "").strip().lower(),
+                "sexo": normalizar_recorte_valor(auto.get("sexo")),
+                "etnia": normalizar_recorte_valor(auto.get("etnia")),
+                "departamento": normalizar_recorte_valor(auto.get("departamento")),
+                "cargo": normalizar_recorte_valor(auto.get("cargo")),
+            })
+        for membro in dados.get("avaliacoesEquipe") or []:
+            if not isinstance(membro, dict) or not isinstance(membro.get("respostas"), dict):
+                continue
+            registros.append({
+                "tipo": "equipe",
+                "respostas": membro.get("respostas") or {},
+                "empresa": normalizar_recorte_valor(membro.get("empresa") or row.get("empresa")),
+                "email_lider": str(membro.get("emailLider") or row.get("emaillider") or "").strip().lower(),
+                "sexo": normalizar_recorte_valor(membro.get("sexo")),
+                "etnia": normalizar_recorte_valor(membro.get("etnia")),
+                "departamento": normalizar_recorte_valor(membro.get("departamento")),
+                "cargo": normalizar_recorte_valor(membro.get("cargo")),
+            })
+    return registros
+
+
+def registros_micro_consolidados(rows):
+    registros = []
+    for row in rows or []:
+        dados = normalizar_dados_json_relatorio(row) or {}
+        auto = dados.get("autoavaliacao") or {}
+        if isinstance(auto, dict):
+            registros.append({
+                "tipo": "autoavaliacao",
+                "respostas": auto,
+                "empresa": normalizar_recorte_valor(auto.get("empresa") or row.get("empresa")),
+                "email_lider": str(auto.get("emailLider") or row.get("emaillider") or "").strip().lower(),
+                "sexo": normalizar_recorte_valor(auto.get("sexo")),
+                "etnia": normalizar_recorte_valor(auto.get("etnia")),
+                "departamento": normalizar_recorte_valor(auto.get("departamento")),
+                "cargo": normalizar_recorte_valor(auto.get("cargo")),
+            })
+        for membro in dados.get("avaliacoesEquipe") or []:
+            if not isinstance(membro, dict):
+                continue
+            registros.append({
+                "tipo": "equipe",
+                "respostas": membro,
+                "empresa": normalizar_recorte_valor(membro.get("empresa") or row.get("empresa")),
+                "email_lider": str(membro.get("emailLider") or row.get("emaillider") or "").strip().lower(),
+                "sexo": normalizar_recorte_valor(membro.get("sexo")),
+                "etnia": normalizar_recorte_valor(membro.get("etnia")),
+                "departamento": normalizar_recorte_valor(membro.get("departamento")),
+                "cargo": normalizar_recorte_valor(membro.get("cargo")),
+            })
+    return registros
+
+
+def mapa_saude_emocional():
+    resultado = {}
+    for row in carregar_saude_emocional_rows():
+        tipo = str(row.get("TIPO") or "").strip().upper()
+        codigo = str(row.get("COD_AFIRMACAO") or "").strip()
+        dimensao = str(row.get("DIMENSAO_SAUDE_EMOCIONAL") or "").strip()
+        if not tipo or not codigo or not dimensao:
+            continue
+        prefixo = "arq" if tipo.startswith("ARQ") else "micro" if tipo.startswith("MICRO") else ""
+        if prefixo:
+            resultado[f"{prefixo}_{codigo}"] = dimensao
+    return resultado
+
+
+def chave_por_nome(row, nomes):
+    normalizados = {re.sub(r"[^a-zA-Z0-9]", "", str(k or "")).lower(): k for k in (row or {}).keys()}
+    for nome in nomes:
+        chave = normalizados.get(re.sub(r"[^a-zA-Z0-9]", "", nome).lower())
+        if chave:
+            return chave
+    return None
+
+
+def score_arquetipos_saude_emocional(registros):
+    matriz = carregar_matriz_arquetipos_rows()
+    por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
+    arquetipos_por_questao = {}
+    for row in matriz:
+        codigo = str(row.get("COD_AFIRMACAO") or "").strip()
+        arquetipo = str(row.get("ARQUETIPO") or "").strip()
+        if codigo and arquetipo:
+            arquetipos_por_questao.setdefault(codigo, set()).add(arquetipo)
+    mapa = mapa_saude_emocional()
+    categorias = {}
+    for registro in registros or []:
+        if registro.get("tipo") != "equipe":
+            continue
+        respostas = registro.get("respostas") or {}
+        for key, categoria in mapa.items():
+            if not key.startswith("arq_"):
+                continue
+            questao = key.replace("arq_", "")
+            if questao not in respostas:
+                continue
+            try:
+                estrelas = int(respostas.get(questao))
+            except Exception:
+                continue
+            valores = []
+            for arquetipo in sorted(arquetipos_por_questao.get(questao) or []):
+                matriz_row = por_chave.get(f"{arquetipo}{estrelas}{questao}")
+                if not matriz_row:
+                    continue
+                maximo = valor_numerico(matriz_row.get("PONTOS_MAXIMOS"), 0)
+                if not maximo:
+                    continue
+                valores.append((valor_numerico(matriz_row.get("PONTOS_OBTIDOS"), 0) / maximo) * 100)
+            if valores:
+                categorias.setdefault(categoria, []).append(float(np.mean(valores)))
+    return categorias
+
+
+def score_micro_saude_emocional(registros):
+    matriz = carregar_matriz_micro_rows()
+    questoes = {}
+    por_chave = {}
+    for row in matriz:
+        codigo = str(row.get("COD") or "").strip()
+        real_key = str(row.get("name_real") or "").strip()
+        ideal_key = str(row.get("name_ideal") or "").strip()
+        if codigo and real_key and ideal_key:
+            questoes.setdefault(codigo, row)
+        chave = str(row.get("CHAVE") or "").strip()
+        if chave:
+            por_chave[chave] = row
+
+    mapa = mapa_saude_emocional()
+    categorias = {}
+    for registro in registros or []:
+        if registro.get("tipo") != "equipe":
+            continue
+        respostas = registro.get("respostas") or {}
+        for key, categoria in mapa.items():
+            if not key.startswith("micro_"):
+                continue
+            codigo = key.replace("micro_", "")
+            questao = questoes.get(codigo)
+            if not questao:
+                continue
+            real_key = str(questao.get("name_real") or "").strip()
+            ideal_key = str(questao.get("name_ideal") or "").strip()
+            if real_key not in respostas or ideal_key not in respostas:
+                continue
+            try:
+                real = int(respostas.get(real_key))
+                ideal = int(respostas.get(ideal_key))
+            except Exception:
+                continue
+            row = por_chave.get(f"{codigo}_I{ideal}_R{real}")
+            if not row:
+                continue
+            gap = valor_numerico(row.get("GAP"), 0)
+            categorias.setdefault(categoria, []).append(max(0.0, 100.0 - abs(gap or 0)))
+    return categorias
+
+
+def consolidar_saude_emocional(registros_arq, registros_micro):
+    categorias_valores = {}
+    for source in (score_arquetipos_saude_emocional(registros_arq), score_micro_saude_emocional(registros_micro)):
+        for categoria, valores in source.items():
+            categorias_valores.setdefault(categoria, []).extend(valores or [])
+    categorias = {
+        categoria: round(float(np.mean(valores)), 1)
+        for categoria, valores in categorias_valores.items()
+        if valores
+    }
+    valores_validos = [valor for valor in categorias.values() if valor > 0]
+    score = round(float(np.mean(valores_validos)), 1) if valores_validos else None
+    if score is None:
+        label = "Sem dados"
+    elif score >= 95:
+        label = "Excelente"
+    elif score >= 85:
+        label = "Ótimo"
+    elif score >= 75:
+        label = "Bom"
+    elif score >= 65:
+        label = "Regular"
+    else:
+        label = "Não adequado"
+    return {
+        "score_final": score,
+        "label": label,
+        "categorias": categorias,
+        "n_respostas_arquetipos": len([r for r in registros_arq or [] if r.get("tipo") == "equipe"]),
+        "n_respostas_microambiente": len([r for r in registros_micro or [] if r.get("tipo") == "equipe"]),
+    }
+
+
+def filtrar_registros_por_recorte(registros, recorte):
+    campo, valor = recorte
+    return [r for r in registros or [] if normalizar_recorte_valor(r.get(campo)).lower() == str(valor).strip().lower()]
+
+
+def resumir_recorte_leadertrack(registros_arq, registros_micro):
+    arq_auto = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "autoavaliacao"]
+    arq_equipe = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "equipe"]
+    micro_equipe = []
+    lideres_micro = set()
+    for registro in registros_micro or []:
+        if registro.get("tipo") != "equipe":
+            continue
+        respostas = dict(registro.get("respostas") or {})
+        if registro.get("email_lider"):
+            respostas["emailLider"] = registro.get("email_lider")
+            lideres_micro.add(registro.get("email_lider"))
+        micro_equipe.append(respostas)
+
+    micro_resumo = None
+    if micro_equipe:
+        micro_resumo, _ = consolidar_microambiente_respostas([
+            {"dados_json": {"avaliacoesEquipe": micro_equipe}}
+        ])
+
+    return {
+        "arquetipos": {
+            "autoavaliacao": calcular_arquetipos_respostas(arq_auto) if arq_auto else {},
+            "mediaEquipe": calcular_arquetipos_respostas(arq_equipe) if arq_equipe else {},
+            "n_autoavaliacoes_lideres": len(arq_auto),
+            "n_avaliacoes_equipe": len(arq_equipe),
+        },
+        "microambiente": {
+            "analitico": micro_resumo,
+            "media_dimensao": consolidar_microambiente_por_campo(micro_resumo, "DIMENSAO") if micro_resumo else None,
+            "media_subdimensao": consolidar_microambiente_por_campo(micro_resumo, "SUBDIMENSAO") if micro_resumo else None,
+            "termometro_gaps": consolidar_microambiente_termometro(micro_resumo) if micro_resumo else None,
+            "waterfall_gaps": consolidar_microambiente_waterfall(micro_resumo) if micro_resumo else None,
+            "n_avaliacoes_equipe": len(micro_equipe),
+            "n_lideres": len(lideres_micro),
+        },
+    }
+
+
+def gerar_recortes_executivos(registros_arq, registros_micro, n_minimo=5):
+    candidatos = []
+    for campo in ("empresa", "sexo", "etnia"):
+        valores = sorted({normalizar_recorte_valor(r.get(campo)) for r in (registros_arq or []) + (registros_micro or [])})
+        for valor in valores:
+            candidatos.append({
+                "tipo": campo,
+                "rotulo": f"{campo}: {valor}",
+                "filtros": [(campo, valor)],
+            })
+    pares = sorted({
+        (normalizar_recorte_valor(r.get("sexo")), normalizar_recorte_valor(r.get("etnia")))
+        for r in (registros_arq or []) + (registros_micro or [])
+    })
+    for sexo, etnia in pares:
+        candidatos.append({
+            "tipo": "sexo_etnia",
+            "rotulo": f"sexo: {sexo} + etnia: {etnia}",
+            "filtros": [("sexo", sexo), ("etnia", etnia)],
+        })
+
+    geral = consolidar_saude_emocional(registros_arq, registros_micro)
+    score_geral = geral.get("score_final")
+    recortes = []
+    for candidato in candidatos:
+        arq = registros_arq
+        micro = registros_micro
+        for filtro in candidato["filtros"]:
+            arq = filtrar_registros_por_recorte(arq, filtro)
+            micro = filtrar_registros_por_recorte(micro, filtro)
+        n = len([r for r in micro if r.get("tipo") == "equipe"]) or len([r for r in arq if r.get("tipo") == "equipe"])
+        if n < n_minimo:
+            continue
+        saude = consolidar_saude_emocional(arq, micro)
+        delta = None
+        if score_geral is not None and saude.get("score_final") is not None:
+            delta = round(float(saude.get("score_final")) - float(score_geral), 1)
+        recortes.append({
+            "tipo": candidato["tipo"],
+            "rotulo": candidato["rotulo"],
+            "n": n,
+            "saude_emocional": saude,
+            "delta_saude_vs_contexto": delta,
+            "leadertrack": resumir_recorte_leadertrack(arq, micro),
+        })
+    recortes = sorted(
+        recortes,
+        key=lambda item: abs(float(item.get("delta_saude_vs_contexto") or 0)),
+        reverse=True,
+    )
+    return {
+        "n_minimo": n_minimo,
+        "saude_emocional_geral": geral,
+        "recortes": recortes[:20],
+        "findings": [
+            {
+                "tipo": "saude_emocional",
+                "recorte": item["rotulo"],
+                "n": item["n"],
+                "delta_pp": item.get("delta_saude_vs_contexto"),
+                "leitura": "Diferença relevante de saúde emocional frente ao consolidado geral; tratar como hipótese de investigação, não como causalidade.",
+            }
+            for item in recortes
+            if item.get("delta_saude_vs_contexto") is not None and abs(float(item.get("delta_saude_vs_contexto"))) >= 5
+        ][:10],
+    }
 
 
 def consolidar_microambiente_respostas(rows):
@@ -1146,6 +1490,8 @@ def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids, emp
         arq_consolidado, lideres_arq = consolidar_arquetipos_respostas(arq_consolidados)
     if micro_consolidados:
         micro_consolidado, lideres_micro = consolidar_microambiente_respostas(micro_consolidados)
+    registros_arq = registros_arquetipos_consolidados(arq_consolidados)
+    registros_micro = registros_micro_consolidados(micro_consolidados)
 
     dados_arquetipos_comparativo = arq_consolidado or consolidar_arquetipos_comparativo(arq_comparativo_relatorios)
     dados_arquetipos_analitico = (arq_consolidado or {}).get("analitico")
@@ -1163,6 +1509,7 @@ def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids, emp
         "dados_microambiente_termometro_gaps": consolidar_microambiente_termometro(dados_microambiente_analitico),
         "dados_microambiente_waterfall_gaps": consolidar_microambiente_waterfall(dados_microambiente_analitico),
         "guia_microambiente": None,
+        "devolutiva_executiva": gerar_recortes_executivos(registros_arq, registros_micro),
         "metadados": {
             "escopo": "todos_lideres_contexto",
             "fonte_arquetipos": "consolidado_arquetipos" if arq_consolidado else "relatorios_gerados",
@@ -2385,8 +2732,10 @@ def gerar_devolutiva_leadertrack():
             dados_microambiente_waterfall_gaps = inputs_consolidados["dados_microambiente_waterfall_gaps"]
             guia_microambiente = inputs_consolidados["guia_microambiente"]
             metadados_consolidado = inputs_consolidados["metadados"]
+            camada_executiva = inputs_consolidados.get("devolutiva_executiva") or {}
         else:
             metadados_consolidado = {}
+            camada_executiva = {}
             dados_arquetipos_comparativo = buscar_json_supabase(
                 "arquetipos_grafico_comparativo", empresa, codrodada, email_lider
             )
@@ -2470,6 +2819,9 @@ def gerar_devolutiva_leadertrack():
             amostra["lideres_com_microambiente"] = metadados_consolidado.get("lideres_com_microambiente")
             amostra["respostas_arquetipos_equipe"] = metadados_consolidado.get("respostas_arquetipos_equipe")
             amostra["respostas_microambiente_equipe"] = metadados_consolidado.get("respostas_microambiente_equipe")
+            amostra["saude_emocional_score"] = (camada_executiva.get("saude_emocional_geral") or {}).get("score_final")
+            amostra["saude_emocional_label"] = (camada_executiva.get("saude_emocional_geral") or {}).get("label")
+            amostra["recortes_executivos"] = len(camada_executiva.get("recortes") or [])
             amostra["lideres"] = max(
                 int(metadados_consolidado.get("lideres_com_arquetipos") or 0),
                 int(metadados_consolidado.get("lideres_com_microambiente") or 0),
@@ -2506,6 +2858,7 @@ def gerar_devolutiva_leadertrack():
                 "persistencia_automatica": False,
                 "pdi_individual_automatico": False,
             }
+            devolutiva["devolutiva_executiva"] = camada_executiva
             devolutiva["avisos"] = (devolutiva.get("avisos") or []) + [
                 "Devolutiva consolidada: representa todos os lideres do contexto selecionado, nao um lider individual.",
                 "Persistencia, PDI individual e meta de desempenho automatica ficam bloqueados neste modo.",
