@@ -650,6 +650,9 @@ def csv_rows(filename, delimiter=";"):
 
 _MATRIZ_ARQUETIPOS_CACHE = None
 _MATRIZ_MICRO_CACHE = None
+_PONTOS_MAXIMOS_DIMENSAO_MICRO_CACHE = None
+_PONTOS_MAXIMOS_SUBDIMENSAO_MICRO_CACHE = None
+_PARES_ARQUETIPOS_CACHE = None
 _SAUDE_EMOCIONAL_CACHE = None
 
 
@@ -665,6 +668,33 @@ def carregar_matriz_micro_rows():
     if _MATRIZ_MICRO_CACHE is None:
         _MATRIZ_MICRO_CACHE = workbook_rows("TABELA_GERAL_MICROAMBIENTE_COM_CHAVE.xlsx")
     return _MATRIZ_MICRO_CACHE
+
+
+def carregar_pontos_maximos_micro_rows(campo):
+    global _PONTOS_MAXIMOS_DIMENSAO_MICRO_CACHE
+    global _PONTOS_MAXIMOS_SUBDIMENSAO_MICRO_CACHE
+    if campo == "DIMENSAO":
+        if _PONTOS_MAXIMOS_DIMENSAO_MICRO_CACHE is None:
+            _PONTOS_MAXIMOS_DIMENSAO_MICRO_CACHE = workbook_rows(
+                "pontos_maximos_dimensao_microambiente.xlsx"
+            )
+        return _PONTOS_MAXIMOS_DIMENSAO_MICRO_CACHE
+    if campo == "SUBDIMENSAO":
+        if _PONTOS_MAXIMOS_SUBDIMENSAO_MICRO_CACHE is None:
+            _PONTOS_MAXIMOS_SUBDIMENSAO_MICRO_CACHE = workbook_rows(
+                "pontos_maximos_subdimensao_microambiente.xlsx"
+            )
+        return _PONTOS_MAXIMOS_SUBDIMENSAO_MICRO_CACHE
+    return []
+
+
+def carregar_pares_arquetipos():
+    global _PARES_ARQUETIPOS_CACHE
+    if _PARES_ARQUETIPOS_CACHE is None:
+        path = os.path.join(os.path.dirname(__file__), "arquetipos_dominantes_por_questao.json")
+        with open(path, "r", encoding="utf-8") as handle:
+            _PARES_ARQUETIPOS_CACHE = json.load(handle)
+    return _PARES_ARQUETIPOS_CACHE
 
 
 def carregar_saude_emocional_rows():
@@ -883,99 +913,96 @@ def percentual_tendencia_arquetipo(row):
 def calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe):
     matriz = carregar_matriz_arquetipos_rows()
     por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
-    arquetipos = ["Imperativo", "Resoluto", "Cuidativo", "Consultivo", "Prescritivo", "Formador"]
-    matriz_base = {}
-    for row in matriz:
-        codigo = str(row.get("COD_AFIRMACAO") or "").strip()
-        arquetipo = str(row.get("ARQUETIPO") or "").strip()
-        if codigo and arquetipo:
-            matriz_base.setdefault((codigo, arquetipo), row)
+    pares_por_questao = carregar_pares_arquetipos()
 
-    def score_questao_arquetipo(respostas_lista, questao, arquetipo, media_antes_da_matriz=False):
-        notas = []
-        percentuais = []
-        for respostas in respostas_lista or []:
-            if questao not in (respostas or {}):
+    def extrair_valor(questao, nota, pares):
+        try:
+            nota = int(round(float(nota)))
+        except (TypeError, ValueError):
+            return None
+        if nota < 1 or nota > 6:
+            return None
+
+        # Cada afirmação pertence somente ao par oficial de arquétipos da matriz.
+        for arquetipo in sorted(pares):
+            row = por_chave.get(f"{arquetipo}{nota}{questao}")
+            percentual = percentual_tendencia_arquetipo(row) if row else None
+            if percentual is None:
                 continue
+            tendencia = ""
+            for coluna, valor in row.items():
+                nome = str(coluna or "").strip()
+                normalizado = re.sub(r"[^a-zA-Z0-9]", "", nome).lower()
+                if not nome.startswith("%") and normalizado in ("tendncia", "tendencia"):
+                    tendencia = str(valor or "")
+                    break
+            return {
+                "tendencia": tendencia,
+                "percentual": round(float(percentual), 1),
+                "afirmacao": valor_coluna_matriz(row, ["AFIRMACAO", "AFIRMAÇÃO"]) or questao,
+            }
+        return None
+
+    linhas = []
+    for questao, pares in pares_por_questao.items():
+        grupo = " e ".join(sorted(pares))
+
+        notas_auto = []
+        for respostas in autoavaliacoes or []:
             try:
                 nota = float((respostas or {}).get(questao))
-            except Exception:
+            except (TypeError, ValueError):
                 continue
-            if nota < 1 or nota > 6:
+            if 1 <= nota <= 6:
+                notas_auto.append(nota)
+        # Única adaptação para o consolidado: média das autoavaliações antes da matriz.
+        info_auto = extrair_valor(questao, float(np.mean(notas_auto)), pares) if notas_auto else None
+
+        percentuais_equipe = []
+        soma_notas = 0
+        qtd_notas = 0
+        for respostas in avaliacoes_equipe or []:
+            try:
+                nota = int(round(float((respostas or {}).get(questao, 0))))
+            except (TypeError, ValueError):
                 continue
-            notas.append(nota)
-            if media_antes_da_matriz:
+            if not 1 <= nota <= 6:
                 continue
-            # Regra oficial do dashboard: cada resposta da equipe consulta a matriz antes da média.
-            estrelas = int(nota)
-            row = por_chave.get(f"{arquetipo}{estrelas}{questao}")
-            if not row:
+            info_individual = extrair_valor(questao, nota, pares)
+            if not info_individual:
                 continue
-            percentual = percentual_tendencia_arquetipo(row)
-            if percentual is not None:
-                percentuais.append(percentual)
+            percentuais_equipe.append(info_individual["percentual"])
+            soma_notas += nota
+            qtd_notas += 1
 
-        if not notas:
-            return {}
+        info_equipe = None
+        if percentuais_equipe:
+            tendencia = extrair_valor(questao, round(soma_notas / qtd_notas), pares)
+            if tendencia:
+                info_equipe = {
+                    "tendencia": tendencia["tendencia"],
+                    "percentual": round(sum(percentuais_equipe) / len(percentuais_equipe), 2),
+                    "afirmacao": tendencia["afirmacao"],
+                }
 
-        media_estrelas = round(float(np.mean(notas)), 2)
-        # A exceção do consolidado: primeiro a média das autoavaliações, depois a matriz.
-        estrelas_aplicadas = int(round(media_estrelas))
-        estrelas_aplicadas = max(1, min(6, estrelas_aplicadas))
-        row_tendencia = por_chave.get(f"{arquetipo}{estrelas_aplicadas}{questao}")
-        tendencia_info = str(valor_coluna_matriz(row_tendencia, ["Tendência", "Tendencia"]) or "") if row_tendencia else ""
-
-        if media_antes_da_matriz:
-            percentual = percentual_tendencia_arquetipo(row_tendencia) if row_tendencia else None
-        else:
-            percentual = round(float(np.mean(percentuais)), 2) if percentuais else None
-
-        return {
-            "percentual": percentual,
-            "estrelas": estrelas_aplicadas,
-            "media_estrelas": media_estrelas,
-            "classificacao": tendencia_info or classificar_estrelas_arquetipo(estrelas_aplicadas),
-            "tendencia": tendencia_info,
-            "arquetipo": arquetipo,
-            "n_respostas": len(notas),
-        }
-
-    def questoes_presentes(respostas_lista):
-        questoes = set()
-        for respostas in respostas_lista or []:
-            for questao, estrelas in (respostas or {}).items():
-                questao = str(questao or "").strip()
-                if not questao.startswith("Q"):
-                    continue
-                try:
-                    float(estrelas)
-                except Exception:
-                    continue
-                questoes.add(questao)
-        return questoes
-
-    questoes = questoes_presentes(autoavaliacoes) | questoes_presentes(avaliacoes_equipe)
-    linhas = []
-    for questao in sorted(questoes):
-        for arquetipo in arquetipos:
-            base = matriz_base.get((questao, arquetipo))
-            if not base:
-                continue
-            auto = score_questao_arquetipo(autoavaliacoes, questao, arquetipo, media_antes_da_matriz=True)
-            equipe = score_questao_arquetipo(avaliacoes_equipe, questao, arquetipo, media_antes_da_matriz=False)
-            if not auto and not equipe:
-                continue
-            linhas.append({
-                "questao": questao,
-                "afirmacao": base.get("AFIRMACAO") or questao,
-                "grupoArquetipo": arquetipo,
-                "arquetipo": arquetipo,
-                "autoavaliacao": auto,
-                "mediaEquipe": equipe,
-            })
+        if not info_auto and not info_equipe:
+            continue
+        linhas.append({
+            "grupoArquetipo": grupo,
+            "codigo": questao,
+            "afirmacao": info_auto["afirmacao"] if info_auto else info_equipe["afirmacao"],
+            "autoavaliacao": {
+                "tendencia": info_auto["tendencia"] if info_auto else "-",
+                "percentual": info_auto["percentual"] if info_auto else 0,
+            },
+            "mediaEquipe": {
+                "tendencia": info_equipe["tendencia"] if info_equipe else "-",
+                "percentual": info_equipe["percentual"] if info_equipe else 0,
+            },
+        })
 
     return {
-        "dados": linhas,
+        "analitico": linhas,
         "escopo": "todos_lideres_contexto",
         "quantidade_autoavaliacoes": len(autoavaliacoes or []),
         "quantidade_respostas_equipe": len(avaliacoes_equipe or []),
@@ -1446,27 +1473,43 @@ def consolidar_microambiente_por_campo(dados_microambiente, campo):
             campo: chave,
             "PONTUACAO_REAL": [],
             "PONTUACAO_IDEAL": [],
-            "GAP": [],
         })
-        for key in ("PONTUACAO_REAL", "PONTUACAO_IDEAL", "GAP"):
+        for key in ("PONTUACAO_REAL", "PONTUACAO_IDEAL"):
             try:
                 grupo[key].append(float(row.get(key) or 0))
             except Exception:
                 continue
+
+    pontos_maximos = {}
+    for row in carregar_pontos_maximos_micro_rows(campo):
+        if campo == "DIMENSAO":
+            chave = str(row.get("DIMENSAO") or "").strip()
+            maximo = valor_numerico(row.get("PONTOS_MAXIMOS_DIMENSAO"), 0)
+        else:
+            chave = str(row.get("SUBDIMENSAO") or "").strip()
+            maximo = valor_numerico(row.get("PONTOS_MAXIMOS_SUBDIMENSAO"), 0)
+        if chave and maximo:
+            pontos_maximos[chave] = float(maximo)
+
+    dados = []
+    for chave, grupo in grupos.items():
+        real = round(float(sum(grupo["PONTUACAO_REAL"])), 2)
+        ideal = round(float(sum(grupo["PONTUACAO_IDEAL"])), 2)
+        maximo = pontos_maximos.get(chave, 0)
+        real_percentual = round((real / maximo) * 100, 1) if maximo else 0
+        ideal_percentual = round((ideal / maximo) * 100, 1) if maximo else 0
+        dados.append({
+            campo: chave,
+            "PONTUACAO_REAL": real,
+            "PONTUACAO_IDEAL": ideal,
+            "PONTOS_MAXIMOS": maximo,
+            "REAL_%": real_percentual,
+            "IDEAL_%": ideal_percentual,
+            "GAP": round(ideal_percentual - real_percentual, 1),
+        })
+
     return {
-        "dados": [
-            {
-                campo: chave,
-                "PONTUACAO_REAL": round(float(np.mean(grupo["PONTUACAO_REAL"])), 2) if grupo["PONTUACAO_REAL"] else 0,
-                "PONTUACAO_IDEAL": round(float(np.mean(grupo["PONTUACAO_IDEAL"])), 2) if grupo["PONTUACAO_IDEAL"] else 0,
-                "GAP": round(float(np.mean(grupo["GAP"])), 2) if grupo["GAP"] else 0,
-            }
-            for chave, grupo in sorted(
-                grupos.items(),
-                key=lambda item: abs(float(np.mean(item[1]["GAP"]))) if item[1]["GAP"] else 0,
-                reverse=True,
-            )
-        ],
+        "dados": sorted(dados, key=lambda item: abs(float(item["GAP"])), reverse=True),
         "escopo": "todos_lideres_contexto",
         "fonte": "consolidado_microambiente",
     }
