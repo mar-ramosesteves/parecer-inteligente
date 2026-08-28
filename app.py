@@ -600,7 +600,7 @@ def buscar_relatorios_leadertrack_contexto(tipo_relatorio, empresa, rodada, cont
             params = dict(params_base)
             params[campo] = f"eq.{valor}"
             tentativas.append(params)
-    if empresa_especifica or not tem_contexto:
+    if empresa_especifica or not tem_contexto or empresas_contexto:
         tentativas.append(dict(params_base))
 
     rows = []
@@ -691,7 +691,7 @@ def buscar_consolidados_leadertrack_contexto(tabela, empresa, rodada, contexto_i
             params = dict(params_base)
             params[campo] = f"eq.{valor}"
             tentativas.append(params)
-    if empresa_especifica or not tentativas:
+    if empresa_especifica or not tentativas or empresas_contexto:
         tentativas.append(dict(params_base))
 
     for params in tentativas:
