@@ -741,6 +741,100 @@ def calcular_arquetipos_respostas(respostas_lista):
     }
 
 
+def classificar_percentual_arquetipo(percentual):
+    try:
+        valor = float(percentual)
+    except Exception:
+        valor = 0.0
+    if valor >= 84:
+        return "Muito favorável"
+    if valor >= 67:
+        return "Favorável"
+    if valor >= 50:
+        return "Pouco favorável"
+    if valor >= 34:
+        return "Pouco desfavorável"
+    if valor >= 17:
+        return "Desfavorável"
+    return "Muito desfavorável"
+
+
+def calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe):
+    matriz = carregar_matriz_arquetipos_rows()
+    por_chave = {str(row.get("CHAVE") or ""): row for row in matriz}
+    afirmacoes = {}
+    arquetipos = ["Imperativo", "Resoluto", "Cuidativo", "Consultivo", "Prescritivo", "Formador"]
+
+    for row in matriz:
+        codigo = str(row.get("COD_AFIRMACAO") or "").strip()
+        if not codigo:
+            continue
+        afirmacoes.setdefault(codigo, {
+            "questao": codigo,
+            "afirmacao": row.get("AFIRMACAO"),
+            "arquetipos": set(),
+        })
+        if row.get("ARQUETIPO"):
+            afirmacoes[codigo]["arquetipos"].add(str(row.get("ARQUETIPO")).strip())
+
+    def score_por_questao(respostas_lista):
+        acumulado = {}
+        for respostas in respostas_lista or []:
+            for questao, estrelas in (respostas or {}).items():
+                questao = str(questao or "").strip()
+                if not questao.startswith("Q"):
+                    continue
+                try:
+                    estrelas_int = int(estrelas)
+                except Exception:
+                    continue
+                valores = []
+                for arquetipo in arquetipos:
+                    row = por_chave.get(f"{arquetipo}{estrelas_int}{questao}")
+                    if not row:
+                        continue
+                    maximo = float(row.get("PONTOS_MAXIMOS") or 0)
+                    if maximo <= 0:
+                        continue
+                    valores.append((float(row.get("PONTOS_OBTIDOS") or 0) / maximo) * 100)
+                if valores:
+                    acumulado.setdefault(questao, []).append(float(np.mean(valores)))
+        return {
+            questao: round(float(np.mean(valores)), 2)
+            for questao, valores in acumulado.items()
+            if valores
+        }
+
+    auto_scores = score_por_questao(autoavaliacoes)
+    equipe_scores = score_por_questao(avaliacoes_equipe)
+    linhas = []
+    for questao in sorted(set(auto_scores.keys()) | set(equipe_scores.keys())):
+        base = afirmacoes.get(questao) or {"questao": questao, "afirmacao": questao, "arquetipos": set()}
+        auto = auto_scores.get(questao)
+        equipe = equipe_scores.get(questao)
+        linhas.append({
+            "questao": questao,
+            "afirmacao": base.get("afirmacao") or questao,
+            "grupoArquetipo": " / ".join(sorted(base.get("arquetipos") or [])) or "Arquétipos",
+            "autoavaliacao": {
+                "percentual": auto,
+                "classificacao": classificar_percentual_arquetipo(auto),
+            } if auto is not None else {},
+            "mediaEquipe": {
+                "percentual": equipe,
+                "classificacao": classificar_percentual_arquetipo(equipe),
+            } if equipe is not None else {},
+        })
+
+    return {
+        "dados": linhas,
+        "escopo": "todos_lideres_contexto",
+        "quantidade_autoavaliacoes": len(autoavaliacoes or []),
+        "quantidade_respostas_equipe": len(avaliacoes_equipe or []),
+        "fonte": "consolidado_arquetipos",
+    }
+
+
 def consolidar_arquetipos_respostas(rows):
     autoavaliacoes, avaliacoes_equipe, lideres = respostas_arquetipos_consolidadas(rows)
     return {
@@ -750,6 +844,7 @@ def consolidar_arquetipos_respostas(rows):
         "quantidade_lideres_consolidados": len(lideres),
         "quantidade_respostas_equipe": len(avaliacoes_equipe),
         "fonte": "consolidado_arquetipos",
+        "analitico": calcular_arquetipos_analitico_respostas(autoavaliacoes, avaliacoes_equipe),
     }, lideres
 
 
@@ -828,6 +923,84 @@ def consolidar_microambiente_respostas(rows):
         "quantidade_respostas_equipe": len(respostas_lista),
         "fonte": "consolidado_microambiente",
     }, lideres
+
+
+def consolidar_microambiente_por_campo(dados_microambiente, campo):
+    grupos = {}
+    for row in (dados_microambiente or {}).get("dados") or []:
+        chave = str(row.get(campo) or "").strip()
+        if not chave:
+            continue
+        grupo = grupos.setdefault(chave, {
+            campo: chave,
+            "PONTUACAO_REAL": [],
+            "PONTUACAO_IDEAL": [],
+            "GAP": [],
+        })
+        for key in ("PONTUACAO_REAL", "PONTUACAO_IDEAL", "GAP"):
+            try:
+                grupo[key].append(float(row.get(key) or 0))
+            except Exception:
+                continue
+    return {
+        "dados": [
+            {
+                campo: chave,
+                "PONTUACAO_REAL": round(float(np.mean(grupo["PONTUACAO_REAL"])), 2) if grupo["PONTUACAO_REAL"] else 0,
+                "PONTUACAO_IDEAL": round(float(np.mean(grupo["PONTUACAO_IDEAL"])), 2) if grupo["PONTUACAO_IDEAL"] else 0,
+                "GAP": round(float(np.mean(grupo["GAP"])), 2) if grupo["GAP"] else 0,
+            }
+            for chave, grupo in sorted(
+                grupos.items(),
+                key=lambda item: abs(float(np.mean(item[1]["GAP"]))) if item[1]["GAP"] else 0,
+                reverse=True,
+            )
+        ],
+        "escopo": "todos_lideres_contexto",
+        "fonte": "consolidado_microambiente",
+    }
+
+
+def consolidar_microambiente_termometro(dados_microambiente):
+    linhas = (dados_microambiente or {}).get("dados") or []
+    total = len(linhas)
+    qtd_gaps = 0
+    for row in linhas:
+        try:
+            if abs(float(row.get("GAP") or 0)) >= 20:
+                qtd_gaps += 1
+        except Exception:
+            continue
+    percentual = round((qtd_gaps / total) * 100, 2) if total else 0
+    if qtd_gaps <= 3:
+        classificacao = "ALTO ESTÍMULO"
+    elif qtd_gaps <= 6:
+        classificacao = "ESTÍMULO"
+    elif qtd_gaps <= 9:
+        classificacao = "NEUTRO"
+    elif qtd_gaps <= 12:
+        classificacao = "BAIXO ESTÍMULO"
+    else:
+        classificacao = "DESMOTIVAÇÃO"
+    return {
+        "qtdGapsAcima20": qtd_gaps,
+        "porcentagemGaps": percentual,
+        "classificacao": classificacao,
+        "total_afirmacoes": total,
+        "escopo": "todos_lideres_contexto",
+        "fonte": "consolidado_microambiente",
+    }
+
+
+def consolidar_microambiente_waterfall(dados_microambiente):
+    return {
+        "dados": {
+            "dimensao": consolidar_microambiente_por_campo(dados_microambiente, "DIMENSAO").get("dados") or [],
+            "subdimensao": consolidar_microambiente_por_campo(dados_microambiente, "SUBDIMENSAO").get("dados") or [],
+        },
+        "escopo": "todos_lideres_contexto",
+        "fonte": "consolidado_microambiente",
+    }
 
 
 def media_dicts_relatorios(relatorios, chave):
@@ -954,17 +1127,21 @@ def buscar_inputs_devolutiva_todos_lideres(empresa, codrodada, contexto_ids):
     if micro_consolidados:
         micro_consolidado, lideres_micro = consolidar_microambiente_respostas(micro_consolidados)
 
+    dados_arquetipos_comparativo = arq_consolidado or consolidar_arquetipos_comparativo(arq_comparativo_relatorios)
+    dados_arquetipos_analitico = (arq_consolidado or {}).get("analitico")
+    dados_microambiente_analitico = micro_consolidado or consolidar_microambiente_analitico(micro_analitico_relatorios)
+
     return {
-        "dados_arquetipos_comparativo": arq_consolidado or consolidar_arquetipos_comparativo(arq_comparativo_relatorios),
-        "dados_arquetipos_analitico": None,
+        "dados_arquetipos_comparativo": dados_arquetipos_comparativo,
+        "dados_arquetipos_analitico": dados_arquetipos_analitico,
         "guia_arquetipos": None,
-        "dados_microambiente_analitico": micro_consolidado or consolidar_microambiente_analitico(micro_analitico_relatorios),
+        "dados_microambiente_analitico": dados_microambiente_analitico,
         "dados_microambiente_auto_dimensao": None,
         "dados_microambiente_auto_subdimensao": None,
-        "dados_microambiente_media_dimensao": None,
-        "dados_microambiente_subdimensao": None,
-        "dados_microambiente_termometro_gaps": None,
-        "dados_microambiente_waterfall_gaps": None,
+        "dados_microambiente_media_dimensao": consolidar_microambiente_por_campo(dados_microambiente_analitico, "DIMENSAO"),
+        "dados_microambiente_subdimensao": consolidar_microambiente_por_campo(dados_microambiente_analitico, "SUBDIMENSAO"),
+        "dados_microambiente_termometro_gaps": consolidar_microambiente_termometro(dados_microambiente_analitico),
+        "dados_microambiente_waterfall_gaps": consolidar_microambiente_waterfall(dados_microambiente_analitico),
         "guia_microambiente": None,
         "metadados": {
             "escopo": "todos_lideres_contexto",
