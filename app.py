@@ -2894,6 +2894,7 @@ def previsualizar_saude_emocional_leadertrack():
             "rastreabilidade": {
                 "fonte_arquetipos": "consolidado_arquetipos por lider",
                 "fonte_microambiente": "consolidado_microambiente por lider",
+                "projeto_supabase": (SUPABASE_REST_URL or "").split("/")[2] if "/" in (SUPABASE_REST_URL or "") else None,
                 "regra": "mesma sequencia do dashboard: matriz por respondente, media por afirmacao e media das cinco dimensoes",
                 "gravacao_realizada": False,
                 "ia_chamada": False,
