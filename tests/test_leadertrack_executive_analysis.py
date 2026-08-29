@@ -41,9 +41,14 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertNotIn("QUESTAO", serialized)
         self.assertEqual(package["recortes_elegiveis"][0]["delta_saude_pp"], 3.2)
         micro = package["leadertrack"]["microambiente_dimensoes"]
-        self.assertNotIn("IDEAL_%", micro["referencia_comparativa_lideres_como_e"][0])
-        self.assertNotIn("GAP_%", micro["referencia_comparativa_lideres_como_e"][0])
-        self.assertEqual(micro["resultado_organizacional_equipe"][0]["IDEAL_%"], 90)
+        dimension = micro["dimensoes_com_comparacao_canonica"][0]
+        self.assertEqual(dimension["equipe_como_deveria_ser"], 90)
+        self.assertEqual(dimension["referencia_lideres_como_e"], 74)
+        self.assertEqual(dimension["delta_equipe_menos_lideres_pp"], 2)
+        self.assertEqual(dimension["relacao"], "equipe percebe acima da referencia dos lideres")
+        archetype = package["leadertrack"]["arquetipos"]["estilos_com_comparacao_canonica"][0]
+        self.assertEqual(archetype["delta_equipe_menos_lideres_pp"], -3)
+        self.assertEqual(archetype["relacao"], "equipe percebe abaixo da referencia dos lideres")
         self.assertEqual(package["saude_emocional"]["base_calculo"], "somente respostas da equipe")
 
     def test_normalization_reapplies_canonical_cut_metrics(self):
@@ -117,6 +122,21 @@ class ExecutiveAnalysisTests(unittest.TestCase):
             "gaps observados",
             normalized["acoes_organizacionais"][0]["justificativa"].lower(),
         )
+
+    def test_demographic_action_is_removed_when_all_health_deltas_are_small(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        analysis = {
+            "acoes_organizacionais": [{
+                "titulo": "Intervencao por genero",
+                "justificativa": "Atuar no recorte demografico.",
+            }, {
+                "titulo": "Investigar Nitidez",
+                "justificativa": "Maior gap observado da equipe.",
+            }],
+        }
+        normalized = normalize_executive_analysis(analysis, package)
+        self.assertEqual(len(normalized["acoes_organizacionais"]), 1)
+        self.assertEqual(normalized["acoes_organizacionais"][0]["titulo"], "Investigar Nitidez")
 
 
 if __name__ == "__main__":

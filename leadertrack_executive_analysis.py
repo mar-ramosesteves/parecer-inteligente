@@ -4,7 +4,7 @@ import json
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v4"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v5"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -19,6 +19,30 @@ ALLOWED_OWNERS = {
 def _fold_text(value):
     text = unicodedata.normalize("NFKD", str(value or ""))
     return "".join(char for char in text if not unicodedata.combining(char)).casefold()
+
+
+def _number(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(str(value).replace("%", "").replace(",", ".").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _comparison(team_value, leader_value):
+    team = _number(team_value)
+    leader = _number(leader_value)
+    if team is None or leader is None:
+        return {"delta_equipe_menos_lideres_pp": None, "relacao": "sem comparacao"}
+    delta = round(team - leader, 1)
+    if abs(delta) < 1:
+        relation = "percepcoes proximas"
+    elif delta > 0:
+        relation = "equipe percebe acima da referencia dos lideres"
+    else:
+        relation = "equipe percebe abaixo da referencia dos lideres"
+    return {"delta_equipe_menos_lideres_pp": delta, "relacao": relation}
 
 
 def _small_delta_overclaim(value):
@@ -76,6 +100,8 @@ def _sanitize_executive_text(value, no_large_health_deltas=False):
             "superior ao consolidado": "proximo ao consolidado",
             "acima do consolidado": "proximo ao consolidado",
             "abaixo do consolidado": "proximo ao consolidado",
+            "maior que o consolidado": "proximo ao consolidado",
+            "menor que o consolidado": "proximo ao consolidado",
         })
     text = value
     for source, target in replacements.items():
@@ -133,9 +159,30 @@ def _leader_current_rows(value):
 
 def _micro_dimensions(micro):
     micro = micro or {}
+    leaders = {
+        _fold_text(row.get("DIMENSAO")): row
+        for row in _leader_current_rows(micro.get("auto_media_dimensao"))
+        if row.get("DIMENSAO")
+    }
+    dimensions = []
+    for row in _data_rows(micro.get("media_dimensao")):
+        if not isinstance(row, dict) or not row.get("DIMENSAO"):
+            continue
+        leader = leaders.get(_fold_text(row.get("DIMENSAO"))) or {}
+        team_current = _number(row.get("REAL_%"))
+        team_expected = _number(row.get("IDEAL_%"))
+        leader_current = _number(leader.get("REAL_%"))
+        item = {
+            "dimensao": row.get("DIMENSAO"),
+            "equipe_como_e": team_current,
+            "equipe_como_deveria_ser": team_expected,
+            "gap_equipe_pp": _number(row.get("GAP")),
+            "referencia_lideres_como_e": leader_current,
+        }
+        item.update(_comparison(team_current, leader_current))
+        dimensions.append(item)
     return {
-        "resultado_organizacional_equipe": _data_rows(micro.get("media_dimensao")),
-        "referencia_comparativa_lideres_como_e": _leader_current_rows(micro.get("auto_media_dimensao")),
+        "dimensoes_com_comparacao_canonica": dimensions,
         "n_avaliacoes_equipe": micro.get("n_avaliacoes_equipe"),
         "n_autoavaliacoes_lideres": micro.get("n_autoavaliacoes_lideres"),
     }
@@ -165,10 +212,21 @@ def _health_summary(health):
 def _leadertrack_summary(leadertrack):
     leadertrack = leadertrack or {}
     archetypes = leadertrack.get("arquetipos") or {}
+    team_archetypes = archetypes.get("mediaEquipe") or {}
+    leader_archetypes = archetypes.get("autoavaliacao") or {}
+    archetype_comparisons = []
+    for name, team_value in team_archetypes.items():
+        leader_value = leader_archetypes.get(name)
+        item = {
+            "arquetipo": name,
+            "equipe": _number(team_value),
+            "referencia_lideres": _number(leader_value),
+        }
+        item.update(_comparison(team_value, leader_value))
+        archetype_comparisons.append(item)
     return {
         "arquetipos": {
-            "resultado_organizacional_equipe": archetypes.get("mediaEquipe") or {},
-            "referencia_comparativa_todos_lideres": archetypes.get("autoavaliacao") or {},
+            "estilos_com_comparacao_canonica": archetype_comparisons,
             "n_avaliacoes_equipe": archetypes.get("n_avaliacoes_equipe"),
             "n_autoavaliacoes_lideres": archetypes.get("n_autoavaliacoes_lideres"),
         },
@@ -260,6 +318,10 @@ def build_executive_analysis_prompt(package):
         "justificar dialogo de calibracao, nunca treinamento para aumentar ou reduzir um estilo. Nao proponha novo "
         "comite sem antes recomendar verificacao das instancias de governanca ja existentes. KPIs devem acompanhar "
         "resultado ou persistencia do sinal, nao apenas contar reunioes, entrevistas ou participantes. "
+        "As comparacoes entre equipe e lideres ja trazem delta e relacao calculados pelo backend. Copie a "
+        "relacao canonica quando precisar menciona-la; nao faca subtracao, nao inverta o sinal e nao trate "
+        "equipe acima ou abaixo dos lideres como forca ou fraqueza. Comparacoes com lideres podem aparecer "
+        "somente como divergencia de percepcao em pontos de atencao, findings ou perguntas, nunca em forcas. "
         "Nao invente metas numericas, cadencias ou instrumentos que nao possam ser acompanhados. "
         "Responda somente JSON valido, com estas chaves exatas: "
         "resumo_executivo, findings, leitura_por_recortes, acoes_organizacionais, governanca, limites. "
@@ -335,6 +397,13 @@ def normalize_executive_analysis(analysis, package):
     for item in analysis.get("acoes_organizacionais") or []:
         if not isinstance(item, dict):
             continue
+        action_text = _fold_text(
+            f"{item.get('titulo') or ''} {item.get('justificativa') or ''}"
+        )
+        if no_large_health_deltas and any(term in action_text for term in (
+            "recorte demograf", "genero", "sexo", "raca", "etnia",
+        )):
+            continue
         owner = str(item.get("dono_recomendado") or "RH").strip()
         if owner not in ALLOWED_OWNERS:
             owner = "RH"
@@ -350,9 +419,17 @@ def normalize_executive_analysis(analysis, package):
             "criterio_de_revisao": item.get("criterio_de_revisao"),
         })
 
+    summary = analysis.get("resumo_executivo") or {}
+    if isinstance(summary, dict):
+        summary = dict(summary)
+        summary["forcas"] = [
+            item for item in summary.get("forcas") or []
+            if "lider" not in _fold_text(item) and "autoavali" not in _fold_text(item)
+        ]
+
     normalized = {
         "versao": EXECUTIVE_ANALYSIS_VERSION,
-        "resumo_executivo": analysis.get("resumo_executivo") or {},
+        "resumo_executivo": summary,
         "findings": (analysis.get("findings") or [])[:12],
         "leitura_por_recortes": normalized_reads[:20],
         "acoes_organizacionais": actions[:5],
