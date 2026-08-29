@@ -4,6 +4,7 @@ import os
 import json
 import re
 import csv
+import hmac
 from datetime import datetime
 import matplotlib.pyplot as plt
 import base64
@@ -32,6 +33,11 @@ from leadertrack_organizacional import (
     validate_organizational_package,
 )
 from leadertrack_snapshot_preview import calcular_saude_emocional_dashboard
+from leadertrack_executive_snapshots import (
+    SNAPSHOT_SCHEMA_VERSION,
+    build_scope_snapshot,
+    group_source_rows_by_company,
+)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -55,6 +61,7 @@ def add_cors_headers(response):
 SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+LEADERTRACK_SNAPSHOT_ADMIN_KEY = os.getenv("LEADERTRACK_SNAPSHOT_ADMIN_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -1765,6 +1772,46 @@ def supabase_insert(table, payload):
     return data
 
 
+def supabase_upsert(table, payload, conflict_column):
+    if not SUPABASE_REST_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Supabase service role nao configurado no ambiente.")
+    url = f"{SUPABASE_REST_URL}/{table}"
+    headers = supabase_headers(use_service_role=True)
+    headers["Prefer"] = "resolution=merge-duplicates,return=representation"
+    response = requests.post(
+        url,
+        headers=headers,
+        params={"on_conflict": conflict_column},
+        json=payload,
+        timeout=90,
+    )
+    if response.status_code >= 300:
+        raise RuntimeError(f"Erro ao atualizar {table}: HTTP {response.status_code} - {response.text}")
+    data = response.json()
+    if isinstance(data, list) and data:
+        return data[0]
+    return data
+
+
+def supabase_patch(table, row_id, payload):
+    if not SUPABASE_REST_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Supabase service role nao configurado no ambiente.")
+    url = f"{SUPABASE_REST_URL}/{table}"
+    response = requests.patch(
+        url,
+        headers=supabase_headers(use_service_role=True),
+        params={"id": f"eq.{row_id}"},
+        json=payload,
+        timeout=60,
+    )
+    if response.status_code >= 300:
+        raise RuntimeError(f"Erro ao atualizar {table}: HTTP {response.status_code} - {response.text}")
+    data = response.json()
+    if isinstance(data, list) and data:
+        return data[0]
+    return data
+
+
 def listar_lideres_relatorios(empresa, codrodada):
     if not SUPABASE_REST_URL or not SUPABASE_KEY:
         raise RuntimeError("Supabase nao configurado no ambiente.")
@@ -2815,6 +2862,270 @@ def chat_leadertrack():
         response = jsonify({"erro": str(e)})
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 500
+
+
+def buscar_todos_consolidados_leadertrack_rodada(tabela, codrodada, limite=500):
+    if not SUPABASE_REST_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Supabase service role nao configurado no ambiente.")
+
+    rows = []
+    offset = 0
+    while True:
+        response = requests.get(
+            f"{SUPABASE_REST_URL}/{tabela}",
+            headers=supabase_headers(prefer_return=False, use_service_role=True),
+            params={
+                "select": "*",
+                "codrodada": f"ilike.{codrodada}",
+                "order": "id.asc",
+                "limit": str(limite),
+                "offset": str(offset),
+            },
+            timeout=60,
+        )
+        if response.status_code >= 300:
+            raise RuntimeError(
+                f"Erro ao consultar {tabela}: HTTP {response.status_code} - {response.text}"
+            )
+        page = response.json() or []
+        rows.extend(page)
+        if len(page) < limite:
+            break
+        offset += limite
+    return rows
+
+
+def calcular_saude_snapshot(registros_arq, registros_micro):
+    return calcular_saude_emocional_dashboard(
+        registros_arq,
+        registros_micro,
+        carregar_matriz_arquetipos_rows(),
+        carregar_matriz_micro_rows(),
+        carregar_saude_emocional_rows(),
+    )
+
+
+def chave_snapshot_executivo(codrodada, scope, source_hash):
+    scope_type = str(scope.get("tipo") or "").strip().lower()
+    scope_key = str(
+        scope.get("empresa")
+        or scope.get("holding_id")
+        or scope.get("contexto_nome")
+        or "contexto"
+    ).strip().lower()
+    raw = f"{SNAPSHOT_SCHEMA_VERSION}|{codrodada.lower()}|{scope_type}|{scope_key}|{source_hash}"
+    return raw[:500]
+
+
+def resumo_snapshot_executivo(snapshot):
+    health = snapshot.get("health") or {}
+    scope = snapshot.get("scope") or {}
+    return {
+        "tipo": scope.get("tipo"),
+        "empresa": scope.get("empresa"),
+        "contexto_nome": scope.get("contexto_nome"),
+        "status": snapshot.get("status"),
+        "amostra": snapshot.get("sample"),
+        "score_saude_emocional": health.get("score_final"),
+        "recortes_elegiveis": len(snapshot.get("cuts") or []),
+        "findings_mecanicos": len(snapshot.get("findings") or []),
+        "hash_origem": snapshot.get("source_hash"),
+    }
+
+
+def construir_snapshots_executivos_rodada(codrodada, empresas_contexto=None, contexto=None, n_minimo=5):
+    rows_arq = buscar_todos_consolidados_leadertrack_rodada("consolidado_arquetipos", codrodada)
+    rows_micro = buscar_todos_consolidados_leadertrack_rodada("consolidado_microambiente", codrodada)
+    arq_by_company = group_source_rows_by_company(rows_arq)
+    micro_by_company = group_source_rows_by_company(rows_micro)
+    companies = sorted(set(arq_by_company) | set(micro_by_company))
+    snapshots = []
+
+    for company in companies:
+        company_arq_rows = arq_by_company.get(company) or []
+        company_micro_rows = micro_by_company.get(company) or []
+        snapshots.append(build_scope_snapshot(
+            scope={"tipo": "empresa", "empresa": company, "codrodada": codrodada},
+            archetype_records=registros_arquetipos_consolidados(company_arq_rows),
+            microenvironment_records=registros_micro_consolidados(company_micro_rows),
+            archetype_rows=company_arq_rows,
+            microenvironment_rows=company_micro_rows,
+            health_calculator=calcular_saude_snapshot,
+            leadertrack_summarizer=resumir_recorte_leadertrack,
+            minimum_sample=n_minimo,
+            include_cuts=False,
+        ))
+
+    selected_companies = {
+        str(item or "").strip().lower()
+        for item in (empresas_contexto or [])
+        if str(item or "").strip()
+    }
+    selected_companies &= set(companies)
+    if selected_companies:
+        context_arq_rows = [row for company in sorted(selected_companies) for row in arq_by_company.get(company, [])]
+        context_micro_rows = [row for company in sorted(selected_companies) for row in micro_by_company.get(company, [])]
+        context_scope = {
+            "tipo": "contexto",
+            "codrodada": codrodada,
+            "empresas": sorted(selected_companies),
+            **(contexto or {}),
+        }
+        snapshots.append(build_scope_snapshot(
+            scope=context_scope,
+            archetype_records=registros_arquetipos_consolidados(context_arq_rows),
+            microenvironment_records=registros_micro_consolidados(context_micro_rows),
+            archetype_rows=context_arq_rows,
+            microenvironment_rows=context_micro_rows,
+            health_calculator=calcular_saude_snapshot,
+            leadertrack_summarizer=resumir_recorte_leadertrack,
+            minimum_sample=n_minimo,
+            include_cuts=True,
+            max_cuts=40,
+        ))
+
+    return {
+        "codrodada": codrodada,
+        "empresas_encontradas": companies,
+        "fontes": {
+            "consolidados_arquetipos": len(rows_arq),
+            "consolidados_microambiente": len(rows_micro),
+        },
+        "snapshots": snapshots,
+    }
+
+
+def persistir_snapshots_executivos(resultado, solicitado_por=None, contexto=None):
+    codrodada = resultado["codrodada"]
+    now_iso = datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+    execution_key = f"{SNAPSHOT_SCHEMA_VERSION}|{codrodada.lower()}|{now_iso}"
+    execution = supabase_insert("leadertrack_execucoes_organizacionais", {
+        "chave_analise": execution_key,
+        "codrodada": codrodada,
+        "nivel_contexto": "rodada_todas_empresas",
+        "contexto": contexto or {},
+        "filtros": {},
+        "parametros": {
+            "empresas_encontradas": resultado.get("empresas_encontradas") or [],
+            "fontes": resultado.get("fontes") or {},
+        },
+        "status": "processando",
+        "versao_regras": SNAPSHOT_SCHEMA_VERSION,
+        "solicitado_por": solicitado_por,
+        "iniciado_em": now_iso,
+    })
+    execution_id = execution.get("id")
+    saved = []
+    try:
+        for snapshot in resultado.get("snapshots") or []:
+            scope = snapshot.get("scope") or {}
+            analysis_key = chave_snapshot_executivo(
+                codrodada,
+                scope,
+                snapshot.get("source_hash") or "sem-hash",
+            )
+            row = supabase_upsert(
+                "leadertrack_pacotes_organizacionais",
+                {
+                    "execucao_id": execution_id,
+                    "chave_analise": analysis_key,
+                    "codrodada": codrodada,
+                    "nivel_contexto": scope.get("tipo") or "contexto",
+                    "empresa_codigo": scope.get("empresa"),
+                    "contexto": scope,
+                    "filtros": {},
+                    "amostra": snapshot.get("sample") or {},
+                    "status": snapshot.get("status") or "concluido",
+                    "pacote_completo": snapshot,
+                    "hash_origem": snapshot.get("source_hash"),
+                    "versao_regras": SNAPSHOT_SCHEMA_VERSION,
+                    "atualizado_em": now_iso,
+                },
+                "chave_analise",
+            )
+            saved.append(row.get("id"))
+        supabase_patch("leadertrack_execucoes_organizacionais", execution_id, {
+            "status": "concluida",
+            "concluido_em": datetime.utcnow().isoformat(timespec="microseconds") + "Z",
+            "atualizado_em": datetime.utcnow().isoformat(timespec="microseconds") + "Z",
+        })
+    except Exception as exc:
+        supabase_patch("leadertrack_execucoes_organizacionais", execution_id, {
+            "status": "erro",
+            "erro_resumido": str(exc)[:1000],
+            "concluido_em": datetime.utcnow().isoformat(timespec="microseconds") + "Z",
+            "atualizado_em": datetime.utcnow().isoformat(timespec="microseconds") + "Z",
+        })
+        raise
+    return {"execucao_id": execution_id, "pacotes_salvos": len(saved)}
+
+
+def autorizado_snapshot_executivo():
+    configured = str(LEADERTRACK_SNAPSHOT_ADMIN_KEY or "")
+    provided = str(request.headers.get("X-HRKey-Snapshot-Key") or "")
+    return bool(configured and provided and hmac.compare_digest(configured, provided))
+
+
+@app.route("/gerar-snapshots-executivos-leadertrack", methods=["POST", "OPTIONS"])
+def gerar_snapshots_executivos_leadertrack():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight OK"}), 200
+    if not LEADERTRACK_SNAPSHOT_ADMIN_KEY:
+        return jsonify({"erro": "Chave administrativa de snapshots nao configurada no backend."}), 503
+    if not autorizado_snapshot_executivo():
+        return jsonify({"erro": "Acao administrativa nao autorizada."}), 403
+
+    dados = request.get_json() or {}
+    codrodada = str(dados.get("codrodada") or "").strip()
+    if not codrodada:
+        return jsonify({"erro": "Informe a rodada a processar."}), 400
+    try:
+        n_minimo = max(3, min(50, int(dados.get("nMinimo") or dados.get("n_minimo") or 5)))
+    except Exception:
+        n_minimo = 5
+    contexto = {
+        key: dados.get(key)
+        for key in (
+            "cliente_id", "holding_id", "empresa_id", "filial_id",
+            "nivel_contexto", "contexto_nome", "holding_nome",
+        )
+        if dados.get(key) not in (None, "")
+    }
+    try:
+        resultado = construir_snapshots_executivos_rodada(
+            codrodada,
+            empresas_contexto=dados.get("empresasContexto") or dados.get("empresas_contexto") or [],
+            contexto=contexto,
+            n_minimo=n_minimo,
+        )
+        if not resultado.get("empresas_encontradas"):
+            return jsonify({
+                "erro": "Nenhuma empresa com consolidados foi encontrada nesta rodada.",
+                "codrodada": codrodada,
+            }), 404
+
+        persistir = bool_param(dados.get("persistir"), True)
+        persistence = None
+        if persistir:
+            persistence = persistir_snapshots_executivos(
+                resultado,
+                solicitado_por=request.headers.get("X-HRKey-Admin-User"),
+                contexto=contexto,
+            )
+        summaries = [resumo_snapshot_executivo(item) for item in resultado.get("snapshots") or []]
+        return jsonify({
+            "status": "concluido" if persistir else "previsualizacao_sem_gravacao",
+            "codrodada": codrodada,
+            "empresas_encontradas": resultado.get("empresas_encontradas"),
+            "quantidade_empresas": len(resultado.get("empresas_encontradas") or []),
+            "fontes": resultado.get("fontes"),
+            "snapshots": summaries,
+            "persistencia": persistence,
+            "versao_regras": SNAPSHOT_SCHEMA_VERSION,
+        }), 200
+    except Exception as exc:
+        print("Erro ao gerar snapshots executivos LeaderTrack:", exc)
+        return jsonify({"erro": str(exc), "status": "erro_snapshots"}), 500
 
 
 @app.route("/previsualizar-saude-emocional-leadertrack", methods=["POST", "OPTIONS"])
