@@ -149,8 +149,21 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         normalized = normalize_executive_analysis(analysis, package)
         synthesis = normalized["resumo_executivo"]["sintese"]
         self.assertNotIn("Imperativo e Prescritivo", synthesis)
-        self.assertIn("Resoluto (64.0%)", synthesis)
-        self.assertTrue(any("Resoluto (64.0%)" in item for item in normalized["findings"]))
+        self.assertIn("Resoluto (64,0%)", synthesis)
+        self.assertTrue(any("Resoluto (64,0%)" in item for item in normalized["findings"]))
+
+    def test_summary_normalization_preserves_decimal_number(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        analysis = {
+            "resumo_executivo": {
+                "sintese": "Saude emocional em 75.9. Os arquetipos predominantes sao incorretos.",
+                "forcas": [],
+            },
+        }
+        normalized = normalize_executive_analysis(analysis, package)
+        synthesis = normalized["resumo_executivo"]["sintese"]
+        self.assertIn("75.9", synthesis)
+        self.assertNotIn("75. 9", synthesis)
 
 
 if __name__ == "__main__":

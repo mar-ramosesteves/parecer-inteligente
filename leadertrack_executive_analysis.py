@@ -1,10 +1,11 @@
 """Contrato enxuto e guardrails da analise executiva LeaderTrack."""
 
 import json
+import re
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v6"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v7"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -24,6 +25,13 @@ def _fold_text(value):
 def _number(value):
     if value in (None, ""):
         return None
+
+
+def _pt_number(value, decimals=1):
+    number = _number(value)
+    if number is None:
+        return "-"
+    return f"{number:.{decimals}f}".replace(".", ",")
     try:
         return float(str(value).replace("%", "").replace(",", ".").strip())
     except (TypeError, ValueError):
@@ -96,6 +104,8 @@ def _sanitize_executive_text(value, no_large_health_deltas=False):
         "gaps mais elevados": "maiores gaps observados",
         "divergencias relevantes": "divergencias observadas",
         "impacto potencial": "possivel relacao a investigar",
+        "gaps expressivos": "gaps observados",
+        "impactam a experiencia": "se relacionam a experiencia",
     }
     if no_large_health_deltas:
         replacements.update({
@@ -105,6 +115,8 @@ def _sanitize_executive_text(value, no_large_health_deltas=False):
             "abaixo do consolidado": "proximo ao consolidado",
             "maior que o consolidado": "proximo ao consolidado",
             "menor que o consolidado": "proximo ao consolidado",
+            "menor que a media geral": "proximo a media geral",
+            "maior que a media geral": "proximo a media geral",
         })
     text = value
     for source, target in replacements.items():
@@ -143,16 +155,16 @@ def _canonical_archetype_sentence(package):
     if not archetypes:
         return ""
     labels = [
-        f"{item.get('arquetipo')} ({_number(item.get('equipe')):.1f}%)"
+        f"{item.get('arquetipo')} ({_pt_number(item.get('equipe'))}%)"
         for item in archetypes
         if item.get("arquetipo") and _number(item.get("equipe")) is not None
     ]
     if not labels:
         return ""
     return (
-        "Na percepcao da equipe, os arquetipos predominantes sao "
+        "Na percepção da equipe, os arquétipos predominantes são "
         + ", ".join(labels)
-        + "; a autoavaliacao media dos lideres e apenas referencia comparativa."
+        + "; a autoavaliação média dos líderes é apenas referência comparativa."
     )
 
 
@@ -161,8 +173,8 @@ def _canonical_findings(package):
     health = package.get("saude_emocional") or {}
     if health.get("score_final") is not None:
         findings.append(
-            f"Saude emocional da equipe: {health.get('score_final')}%, "
-            f"classificacao {health.get('classificacao') or health.get('label') or 'sem classificacao'}."
+            f"Saúde emocional da equipe: {_pt_number(health.get('score_final'))}%, "
+            f"classificação {health.get('classificacao') or health.get('label') or 'sem classificação'}."
         )
     dimensions = health.get("dimensoes") or health.get("categorias") or {}
     if isinstance(dimensions, dict):
@@ -174,12 +186,12 @@ def _canonical_findings(package):
         ranked = [item for item in ranked if item[1] is not None]
         if ranked:
             findings.append(
-                "Maiores dimensoes de saude emocional da equipe: "
-                + ", ".join(f"{name} ({value:.1f}%)" for name, value in ranked[:2])
+                "Maiores dimensões de saúde emocional da equipe: "
+                + ", ".join(f"{name} ({_pt_number(value)}%)" for name, value in ranked[:2])
                 + "."
             )
             findings.append(
-                f"Menor dimensao de saude emocional da equipe: {ranked[-1][0]} ({ranked[-1][1]:.1f}%)."
+                f"Menor dimensão de saúde emocional da equipe: {ranked[-1][0]} ({_pt_number(ranked[-1][1])}%)."
             )
     archetype_sentence = _canonical_archetype_sentence(package)
     if archetype_sentence:
@@ -197,7 +209,7 @@ def _canonical_findings(package):
         findings.append(
             "Maiores gaps observados pela equipe no microambiente: "
             + ", ".join(
-                f"{item.get('dimensao')} ({_number(item.get('gap_equipe_pp')):.1f} p.p.)"
+                f"{item.get('dimensao')} ({_pt_number(item.get('gap_equipe_pp'))} p.p.)"
                 for item in ranked_gaps[:2]
             )
             + "."
@@ -210,7 +222,7 @@ def _canonical_findings(package):
         )
     elif package.get("recortes_elegiveis"):
         findings.append(
-            "Nenhum recorte elegivel atingiu diferenca absoluta de 5 p.p. no score de saude emocional."
+            "Nenhum recorte elegível atingiu diferença absoluta de 5 p.p. no score de saúde emocional."
         )
     return findings[:8]
 
@@ -220,7 +232,11 @@ def _canonicalize_summary(summary, package):
         return {}
     result = dict(summary)
     synthesis = str(result.get("sintese") or "")
-    sentences = [item.strip() for item in synthesis.split(".") if item.strip()]
+    sentences = [
+        item.strip()
+        for item in re.split(r"(?<!\d)\.(?!\d)", synthesis)
+        if item.strip()
+    ]
     sentences = [
         sentence for sentence in sentences
         if not ("arquetip" in _fold_text(sentence) and "predomin" in _fold_text(sentence))
@@ -230,6 +246,46 @@ def _canonicalize_summary(summary, package):
         sentences.append(archetype_sentence.rstrip("."))
     result["sintese"] = ". ".join(sentences) + ("." if sentences else "")
     return result
+
+
+def _canonical_cut_reading(cut, delta):
+    parts = [
+        f"A variação de {_pt_number(delta)} p.p. permanece abaixo do limiar de 5 p.p. "
+        "e deve ser tratada como sinal exploratório de menor intensidade."
+    ]
+    leadertrack = cut.get("leadertrack") or {}
+    archetypes = (
+        (leadertrack.get("arquetipos") or {}).get("predominancias_da_equipe") or []
+    )
+    if archetypes:
+        parts.append(
+            "Arquétipos predominantes na percepção da equipe do recorte: "
+            + ", ".join(
+                f"{item.get('arquetipo')} ({_pt_number(item.get('equipe'))}%)"
+                for item in archetypes
+                if item.get("arquetipo") and _number(item.get("equipe")) is not None
+            )
+            + "."
+        )
+    dimensions = (
+        (leadertrack.get("microambiente_dimensoes") or {})
+        .get("dimensoes_com_comparacao_canonica") or []
+    )
+    ranked_gaps = sorted(
+        (item for item in dimensions if _number(item.get("gap_equipe_pp")) is not None),
+        key=lambda item: abs(_number(item.get("gap_equipe_pp")) or 0),
+        reverse=True,
+    )
+    if ranked_gaps:
+        parts.append(
+            "Maiores gaps observados pela equipe do recorte: "
+            + ", ".join(
+                f"{item.get('dimensao')} ({_pt_number(item.get('gap_equipe_pp'))} p.p.)"
+                for item in ranked_gaps[:2]
+            )
+            + "."
+        )
+    return " ".join(parts)
 
 
 def _data_rows(value):
@@ -488,13 +544,13 @@ def normalize_executive_analysis(analysis, package):
         implication = item.get("implicacao_prudente")
         if small_delta:
             canonical_note = (
-                f"A variacao de {float(delta):+.1f} p.p. permanece abaixo do limiar de 5 p.p. "
-                "e deve ser tratada como sinal exploratorio de menor intensidade."
+                f"A variação de {_pt_number(delta)} p.p. permanece abaixo do limiar de 5 p.p. "
+                "e deve ser tratada como sinal exploratório de menor intensidade."
             )
-            reading = canonical_note
+            reading = _canonical_cut_reading(canonical, delta)
             implication = (
                 canonical_note
-                + " Nao sustenta, isoladamente, intervencao direcionada nem inferencia causal."
+                + " Não sustenta, isoladamente, intervenção direcionada nem inferência causal."
             )
         normalized_reads.append({
             "recorte": canonical.get("recorte"),
