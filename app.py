@@ -40,6 +40,12 @@ from leadertrack_executive_snapshots import (
     snapshot_for_frontend,
     snapshot_matches_context,
 )
+from leadertrack_executive_analysis import (
+    EXECUTIVE_ANALYSIS_VERSION,
+    build_executive_analysis_prompt,
+    compact_snapshot_for_analysis,
+    normalize_executive_analysis,
+)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://gestor.thehrkey.tech"}})
@@ -3095,7 +3101,7 @@ def buscar_snapshots_contexto_rodada(codrodada, limite=100):
         f"{SUPABASE_REST_URL}/leadertrack_pacotes_organizacionais",
         headers=supabase_headers(prefer_return=False, use_service_role=True),
         params={
-            "select": "id,codrodada,nivel_contexto,contexto,amostra,status,pacote_completo,versao_regras,gerado_em,atualizado_em",
+            "select": "id,codrodada,nivel_contexto,contexto,amostra,status,pacote_completo,hash_origem,versao_regras,gerado_em,atualizado_em",
             "codrodada": f"ilike.{codrodada}",
             "nivel_contexto": "eq.contexto",
             "order": "atualizado_em.desc",
@@ -3109,6 +3115,33 @@ def buscar_snapshots_contexto_rodada(codrodada, limite=100):
             f"HTTP {response.status_code} - {response.text}"
         )
     return response.json() or []
+
+
+def buscar_insight_executivo(chave_insight):
+    response = requests.get(
+        f"{SUPABASE_REST_URL}/leadertrack_insights_organizacionais",
+        headers=supabase_headers(prefer_return=False, use_service_role=True),
+        params={
+            "select": "id,chave_insight,status,entrada_hash,modelo,conteudo,gerado_em,atualizado_em",
+            "chave_insight": f"eq.{chave_insight}",
+            "limit": "1",
+        },
+        timeout=30,
+    )
+    if response.status_code >= 300:
+        raise RuntimeError(
+            f"Erro ao consultar analise executiva: HTTP {response.status_code} - {response.text}"
+        )
+    rows = response.json() or []
+    return rows[0] if rows else None
+
+
+def localizar_snapshot_contexto(codrodada, contexto_solicitado):
+    for row in buscar_snapshots_contexto_rodada(codrodada):
+        package = row.get("pacote_completo") or {}
+        if isinstance(package, dict) and snapshot_matches_context(package, contexto_solicitado):
+            return row, package
+    return None, None
 
 
 @app.route("/buscar-snapshot-executivo-leadertrack", methods=["POST", "OPTIONS"])
@@ -3135,13 +3168,8 @@ def buscar_snapshot_executivo_leadertrack():
         return jsonify({"erro": "Contexto obrigatorio para consultar o snapshot."}), 400
 
     try:
-        rows = buscar_snapshots_contexto_rodada(codrodada)
-        for row in rows:
-            package = row.get("pacote_completo") or {}
-            if not isinstance(package, dict):
-                continue
-            if not snapshot_matches_context(package, contexto_solicitado):
-                continue
+        row, package = localizar_snapshot_contexto(codrodada, contexto_solicitado)
+        if row and package:
             return jsonify({
                 "status": "ok",
                 "snapshot": snapshot_for_frontend(package),
@@ -3160,6 +3188,123 @@ def buscar_snapshot_executivo_leadertrack():
     except Exception as exc:
         print("Erro ao buscar snapshot executivo LeaderTrack:", exc)
         return jsonify({"erro": str(exc), "status": "erro_leitura_snapshot"}), 500
+
+
+@app.route("/gerar-analise-executiva-leadertrack", methods=["POST", "OPTIONS"])
+def gerar_analise_executiva_leadertrack():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight OK"}), 200
+    if not LEADERTRACK_SNAPSHOT_ADMIN_KEY:
+        return jsonify({"erro": "Chave executiva nao configurada no backend."}), 503
+    if not autorizado_snapshot_executivo():
+        return jsonify({"erro": "Geracao executiva nao autorizada."}), 403
+
+    dados = request.get_json() or {}
+    codrodada = str(dados.get("codrodada") or "").strip()
+    contexto_solicitado = {
+        key: dados.get(key)
+        for key in (
+            "cliente_id", "holding_id", "contexto_nome", "holding_nome", "contexto"
+        )
+        if dados.get(key) not in (None, "")
+    }
+    if not codrodada or not contexto_solicitado:
+        return jsonify({"erro": "Rodada e contexto sao obrigatorios."}), 400
+
+    try:
+        row, snapshot = localizar_snapshot_contexto(codrodada, contexto_solicitado)
+        if not row or not snapshot:
+            return jsonify({"erro": "Snapshot executivo nao encontrado para esta selecao."}), 404
+        if snapshot.get("status") != "concluido":
+            return jsonify({"erro": "Amostra insuficiente para analise executiva com IA."}), 422
+
+        package = compact_snapshot_for_analysis(snapshot)
+        source_hash = str(row.get("hash_origem") or "sem-hash")
+        insight_key = f"{EXECUTIVE_ANALYSIS_VERSION}|{row.get('id')}|{source_hash}"[:500]
+        regenerate = bool_param(dados.get("regenerar"), False)
+        only_cache = bool_param(dados.get("somenteCache") or dados.get("somente_cache"), False)
+        cached = buscar_insight_executivo(insight_key)
+        if cached and cached.get("status") == "concluida" and not regenerate:
+            return jsonify({
+                "status": "cache",
+                "analise": cached.get("conteudo") or {},
+                "metadados": {
+                    "insight_id": cached.get("id"),
+                    "modelo": cached.get("modelo"),
+                    "gerado_em": cached.get("gerado_em"),
+                    "versao": EXECUTIVE_ANALYSIS_VERSION,
+                },
+            }), 200
+        if only_cache:
+            return jsonify({
+                "status": "sem_analise_salva",
+                "analise": None,
+                "metadados": {"versao": EXECUTIVE_ANALYSIS_VERSION},
+            }), 200
+
+        model = "gpt-4.1-mini"
+        now_iso = datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+        prompt = build_executive_analysis_prompt(package)
+        try:
+            raw = gerar_resposta_ia_leadertrack_enxuta(
+                pergunta=prompt,
+                prompt_base=(
+                    "Voce e o bot executivo separado do LeaderTrack. Nao produza PDI individual. "
+                    "Responda apenas JSON valido e siga integralmente os guardrails do pedido."
+                ),
+                model=model,
+                max_tokens=4200,
+                timeout=75,
+                temperature=0.15,
+            )
+            analysis = normalize_executive_analysis(parse_json_response(raw), package)
+        except Exception as exc:
+            supabase_upsert(
+                "leadertrack_insights_organizacionais",
+                {
+                    "pacote_id": row.get("id"),
+                    "chave_insight": insight_key,
+                    "camada": "resumo_executivo",
+                    "status": "erro",
+                    "entrada_hash": source_hash,
+                    "modelo": model,
+                    "conteudo": None,
+                    "erro_resumido": str(exc)[:1000],
+                    "atualizado_em": now_iso,
+                },
+                "chave_insight",
+            )
+            raise
+
+        saved = supabase_upsert(
+            "leadertrack_insights_organizacionais",
+            {
+                "pacote_id": row.get("id"),
+                "chave_insight": insight_key,
+                "camada": "resumo_executivo",
+                "status": "concluida",
+                "entrada_hash": source_hash,
+                "modelo": model,
+                "conteudo": analysis,
+                "erro_resumido": None,
+                "gerado_em": now_iso,
+                "atualizado_em": now_iso,
+            },
+            "chave_insight",
+        )
+        return jsonify({
+            "status": "gerada",
+            "analise": analysis,
+            "metadados": {
+                "insight_id": saved.get("id"),
+                "modelo": model,
+                "gerado_em": now_iso,
+                "versao": EXECUTIVE_ANALYSIS_VERSION,
+            },
+        }), 200
+    except Exception as exc:
+        print("Erro ao gerar analise executiva LeaderTrack:", exc)
+        return jsonify({"erro": str(exc), "status": "erro_analise_executiva"}), 500
 
 
 @app.route("/gerar-snapshots-executivos-leadertrack", methods=["POST", "OPTIONS"])
