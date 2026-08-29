@@ -1,6 +1,7 @@
 import unittest
 
 from leadertrack_executive_snapshots import (
+    build_executive_microenvironment_gap_summary,
     build_scope_snapshot,
     group_source_rows_by_company,
     snapshot_for_frontend,
@@ -132,6 +133,27 @@ class SnapshotTests(unittest.TestCase):
         self.assertNotIn("rastreio_afirmacoes", public["health"])
         self.assertNotIn("rastreio_afirmacoes", public["cuts"][0]["health"])
         self.assertIn("rastreio_afirmacoes", snapshot["health"])
+
+    def test_executive_gap_summary_uses_10_20_35_bands(self):
+        leadertrack = {
+            "microambiente": {
+                "analitico": {
+                    "dados": [
+                        {"QUESTAO": "Q01", "DIMENSAO": "Nitidez", "GAP": 9.9},
+                        {"QUESTAO": "Q02", "DIMENSAO": "Nitidez", "GAP": 10},
+                        {"QUESTAO": "Q03", "DIMENSAO": "Performance", "GAP": 20},
+                        {"QUESTAO": "Q04", "DIMENSAO": "Reconhecimento", "GAP": 35},
+                    ]
+                }
+            }
+        }
+        summary = build_executive_microenvironment_gap_summary(leadertrack)
+        self.assertEqual(summary["total_afirmacoes"], 4)
+        self.assertEqual(summary["quantidades"]["acima_10"], 3)
+        self.assertEqual(summary["quantidades"]["acima_20"], 2)
+        self.assertEqual(summary["quantidades"]["acima_35"], 1)
+        self.assertEqual(summary["principais_sinais"][0]["faixa"], "critico")
+        self.assertEqual(summary["principais_sinais"][-1]["faixa"], "monitoramento")
 
 
 if __name__ == "__main__":

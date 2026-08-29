@@ -25,12 +25,22 @@ class ExecutiveAnalysisTests(unittest.TestCase):
                     }]},
                 },
             },
+            "microenvironment_gaps": {
+                "total_afirmacoes": 48,
+                "quantidades": {"acima_10": 7, "acima_20": 2, "acima_35": 1},
+                "principais_sinais": [{"dimensao": "Nitidez", "gap_pp": 35, "faixa": "critico"}],
+            },
             "cuts": [{
                 "label": "sexo: feminino",
                 "sample": {"respondentes_arquetipos": 11, "respondentes_microambiente": 12},
                 "health": {"score_final": 79.1},
                 "delta_health_pp": 3.2,
                 "leadertrack": {},
+                "microenvironment_gaps": {
+                    "total_afirmacoes": 48,
+                    "quantidades": {"acima_10": 5, "acima_20": 2, "acima_35": 0},
+                    "principais_sinais": [{"dimensao": "Nitidez", "gap_pp": 24, "faixa": "relevante"}],
+                },
             }],
         }
 
@@ -50,6 +60,14 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertEqual(archetype["delta_equipe_menos_lideres_pp"], -3)
         self.assertEqual(archetype["relacao"], "equipe percebe abaixo da referencia dos lideres")
         self.assertEqual(package["saude_emocional"]["base_calculo"], "somente respostas da equipe")
+        self.assertEqual(
+            package["microambiente_gaps_executivos"]["quantidades"]["acima_10"],
+            7,
+        )
+        self.assertEqual(
+            package["recortes_elegiveis"][0]["microambiente_gaps_executivos"]["quantidades"]["acima_20"],
+            2,
+        )
 
     def test_normalization_reapplies_canonical_cut_metrics(self):
         package = compact_snapshot_for_analysis(self.snapshot)
@@ -78,6 +96,9 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertIn("Percentual baixo nao e deficiencia", prompt)
         self.assertIn("delta absoluto abaixo de 5 p.p.", prompt)
         self.assertIn("variacao exploratoria de menor intensidade", prompt)
+        self.assertIn("10 a 19,9 p.p. e monitoramento", prompt)
+        self.assertIn("20 a 34,9 p.p.", prompt)
+        self.assertIn("35 p.p. ou mais e critico", prompt)
 
     def test_small_cut_delta_overclaim_is_replaced_by_canonical_note(self):
         package = compact_snapshot_for_analysis(self.snapshot)

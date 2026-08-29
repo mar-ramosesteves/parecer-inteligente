@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v8"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v9"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -214,6 +214,46 @@ def _canonical_findings(package):
             )
             + "."
         )
+    executive_gaps = package.get("microambiente_gaps_executivos") or {}
+    gap_counts = executive_gaps.get("quantidades") or {}
+    if executive_gaps.get("total_afirmacoes") is not None:
+        findings.append(
+            "Radar executivo de microambiente da equipe: "
+            f"{gap_counts.get('acima_10', 0)} afirmações em monitoramento (>=10 p.p.), "
+            f"{gap_counts.get('acima_20', 0)} relevantes (>=20 p.p.) e "
+            f"{gap_counts.get('acima_35', 0)} críticas (>=35 p.p.), em "
+            f"{executive_gaps.get('total_afirmacoes', 0)} afirmações calculadas."
+        )
+    pockets = []
+    for cut in package.get("recortes_elegiveis") or []:
+        cut_gaps = cut.get("microambiente_gaps_executivos") or {}
+        counts = cut_gaps.get("quantidades") or {}
+        if int(counts.get("acima_10") or 0) <= 0:
+            continue
+        top_signal = (cut_gaps.get("principais_sinais") or [{}])[0]
+        pockets.append({
+            "recorte": cut.get("recorte"),
+            "acima_10": int(counts.get("acima_10") or 0),
+            "acima_20": int(counts.get("acima_20") or 0),
+            "acima_35": int(counts.get("acima_35") or 0),
+            "maior_gap_pp": _number(top_signal.get("gap_pp")) or 0,
+        })
+    pockets.sort(key=lambda item: (
+        -item["acima_35"],
+        -item["acima_20"],
+        -item["acima_10"],
+        -item["maior_gap_pp"],
+    ))
+    if pockets:
+        findings.append(
+            "Bolsões de atenção no microambiente: "
+            + "; ".join(
+                f"{item['recorte']} ({item['acima_10']} sinais >=10 p.p.; "
+                f"{item['acima_20']} >=20; {item['acima_35']} >=35)"
+                for item in pockets[:3]
+            )
+            + "."
+        )
     quantitative = package.get("findings_quantitativos") or []
     if quantitative:
         findings.extend(
@@ -284,6 +324,15 @@ def _canonical_cut_reading(cut, delta):
                 for item in ranked_gaps[:2]
             )
             + "."
+        )
+    executive_gaps = cut.get("microambiente_gaps_executivos") or {}
+    counts = executive_gaps.get("quantidades") or {}
+    if int(counts.get("acima_10") or 0) > 0:
+        parts.append(
+            "Radar executivo do recorte: "
+            f"{counts.get('acima_10', 0)} afirmações em monitoramento (>=10 p.p.), "
+            f"{counts.get('acima_20', 0)} relevantes (>=20 p.p.) e "
+            f"{counts.get('acima_35', 0)} críticas (>=35 p.p.)."
         )
     return " ".join(parts)
 
@@ -417,6 +466,7 @@ def compact_snapshot_for_analysis(snapshot):
             "saude_emocional": _health_summary(cut.get("health")),
             "delta_saude_pp": cut.get("delta_health_pp"),
             "leadertrack": _leadertrack_summary(cut.get("leadertrack")),
+            "microambiente_gaps_executivos": cut.get("microenvironment_gaps") or {},
         })
     return {
         "versao": EXECUTIVE_ANALYSIS_VERSION,
@@ -424,6 +474,7 @@ def compact_snapshot_for_analysis(snapshot):
         "amostra": snapshot.get("sample") or {},
         "saude_emocional": _health_summary(snapshot.get("health")),
         "leadertrack": _leadertrack_summary(snapshot.get("leadertrack")),
+        "microambiente_gaps_executivos": snapshot.get("microenvironment_gaps") or {},
         "recortes_elegiveis": cuts,
         "findings_quantitativos": snapshot.get("findings") or [],
         "governanca": {
@@ -462,8 +513,10 @@ def build_executive_analysis_prompt(package):
         "'superior', 'inferior', 'desigualdade' ou 'inequidade' para esses deltas e nao proponha intervencao "
         "direcionada com base apenas neles. Se nenhum recorte atingir 5 p.p., declare isso expressamente. "
         "(3) No microambiente, descreva como gap apenas a distancia entre 'como e' e 'como deveria ser'. "
-        "Sem limiar fornecido, use 'maior gap observado' ou 'menor gap observado', nunca 'critico', "
-        "'elevado' ou 'significativo'. (4) Nao diga que uma dimensao e destaque se ela nao estiver entre "
+        "A leitura executiva fornece limiares exclusivos: 10 a 19,9 p.p. e monitoramento; 20 a 34,9 p.p. "
+        "e relevante; 35 p.p. ou mais e critico. Use essas classificacoes somente quando o pacote trouxer "
+        "o gap na faixa correspondente. Esta regra nao se aplica a devolutivas individuais. (4) Nao diga que "
+        "uma dimensao e destaque se ela nao estiver entre "
         "os maiores valores do proprio conjunto apresentado. (5) Classificacoes como Bom ou Regular podem "
         "ser citadas porque sao canonicas; nao as transforme em causalidade. "
         "REGRAS DOS RECORTES: os valores de lideres repetidos dentro de cada recorte sao o benchmark fixo "

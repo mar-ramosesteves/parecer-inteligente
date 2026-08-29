@@ -9,8 +9,12 @@ from hashlib import sha256
 import json
 
 
-SNAPSHOT_SCHEMA_VERSION = "leadertrack-executivo-v1"
+SNAPSHOT_SCHEMA_VERSION = "leadertrack-executivo-v2"
 RECORTE_FIELDS = ("sexo", "etnia", "departamento", "cargo")
+EXECUTIVE_GAP_RULE_VERSION = "microambiente-executivo-v1"
+EXECUTIVE_GAP_MONITORING_PP = 10.0
+EXECUTIVE_GAP_RELEVANT_PP = 20.0
+EXECUTIVE_GAP_CRITICAL_PP = 35.0
 
 
 def _text(value):
@@ -28,6 +32,121 @@ def _team(records):
 
 def _auto(records):
     return [row for row in (records or []) if row.get("tipo") == "autoavaliacao"]
+
+
+def _rows(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        for key in ("dados", "rows", "items"):
+            if isinstance(value.get(key), list):
+                return value[key]
+    return []
+
+
+def _number(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(str(value).replace("%", "").replace(",", ".").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _executive_gap_band(gap_pp):
+    magnitude = abs(float(gap_pp))
+    if magnitude >= EXECUTIVE_GAP_CRITICAL_PP:
+        return "critico"
+    if magnitude >= EXECUTIVE_GAP_RELEVANT_PP:
+        return "relevante"
+    if magnitude >= EXECUTIVE_GAP_MONITORING_PP:
+        return "monitoramento"
+    return None
+
+
+def build_executive_microenvironment_gap_summary(leadertrack, max_signals=12):
+    """Resume gaps da equipe para a leitura executiva sem tocar a regra individual."""
+    micro = (leadertrack or {}).get("microambiente") or {}
+    analytic_rows = _rows(micro.get("analitico"))
+    signals = []
+    by_dimension = {}
+
+    for row in analytic_rows:
+        if not isinstance(row, dict):
+            continue
+        gap = _number(row.get("GAP"))
+        band = _executive_gap_band(gap) if gap is not None else None
+        if not band:
+            continue
+        magnitude = round(abs(gap), 1)
+        dimension = _text(row.get("DIMENSAO")) or "Não identificado"
+        signal = {
+            "questao": row.get("QUESTAO"),
+            "afirmacao": row.get("AFIRMACAO"),
+            "dimensao": dimension,
+            "subdimensao": row.get("SUBDIMENSAO"),
+            "real": _number(row.get("PONTUACAO_REAL")),
+            "ideal": _number(row.get("PONTUACAO_IDEAL")),
+            "gap_pp": magnitude,
+            "faixa": band,
+        }
+        signals.append(signal)
+
+        dimension_summary = by_dimension.setdefault(dimension, {
+            "dimensao": dimension,
+            "sinais_10": 0,
+            "relevantes_20": 0,
+            "criticos_35": 0,
+            "maior_gap_pp": 0.0,
+        })
+        dimension_summary["sinais_10"] += 1
+        if magnitude >= EXECUTIVE_GAP_RELEVANT_PP:
+            dimension_summary["relevantes_20"] += 1
+        if magnitude >= EXECUTIVE_GAP_CRITICAL_PP:
+            dimension_summary["criticos_35"] += 1
+        dimension_summary["maior_gap_pp"] = max(
+            dimension_summary["maior_gap_pp"], magnitude
+        )
+
+    band_priority = {"critico": 0, "relevante": 1, "monitoramento": 2}
+    signals.sort(key=lambda item: (
+        band_priority.get(item.get("faixa"), 9),
+        -float(item.get("gap_pp") or 0),
+        _text(item.get("dimensao")).casefold(),
+        _text(item.get("questao")).casefold(),
+    ))
+    dimensions = sorted(
+        by_dimension.values(),
+        key=lambda item: (
+            -item["criticos_35"],
+            -item["relevantes_20"],
+            -item["sinais_10"],
+            -item["maior_gap_pp"],
+            item["dimensao"].casefold(),
+        ),
+    )
+    total = len(analytic_rows)
+    above_10 = len(signals)
+    above_20 = sum(1 for item in signals if item["gap_pp"] >= EXECUTIVE_GAP_RELEVANT_PP)
+    above_35 = sum(1 for item in signals if item["gap_pp"] >= EXECUTIVE_GAP_CRITICAL_PP)
+    return {
+        "versao_regra": EXECUTIVE_GAP_RULE_VERSION,
+        "base_calculo": "somente respostas da equipe",
+        "limiares_pp": {
+            "monitoramento": EXECUTIVE_GAP_MONITORING_PP,
+            "relevante": EXECUTIVE_GAP_RELEVANT_PP,
+            "critico": EXECUTIVE_GAP_CRITICAL_PP,
+        },
+        "total_afirmacoes": total,
+        "quantidades": {
+            "acima_10": above_10,
+            "acima_20": above_20,
+            "acima_35": above_35,
+        },
+        "percentual_acima_10": round((above_10 / total) * 100, 1) if total else 0.0,
+        "por_dimensao": dimensions,
+        "principais_sinais": signals[:max_signals],
+    }
 
 
 def group_source_rows_by_company(rows):
@@ -186,6 +305,7 @@ def build_scope_snapshot(
         "source_hash": source_hash(archetype_rows, microenvironment_rows),
         "health": None,
         "leadertrack": None,
+        "microenvironment_gaps": None,
         "cuts": [],
         "findings": [],
     }
@@ -195,6 +315,9 @@ def build_scope_snapshot(
     general_health = health_calculator(archetype_records, microenvironment_records)
     package["health"] = general_health
     package["leadertrack"] = leadertrack_summarizer(archetype_records, microenvironment_records)
+    package["microenvironment_gaps"] = build_executive_microenvironment_gap_summary(
+        package["leadertrack"]
+    )
     if not include_cuts:
         return package
     general_score = general_health.get("score_final")
@@ -242,13 +365,17 @@ def build_scope_snapshot(
         delta = None
         if score is not None and general_score is not None:
             delta = round(float(score) - float(general_score), 1)
+        cut_leadertrack = leadertrack_summarizer(archetype_cut, micro_cut)
         cuts.append({
             "type": candidate["type"],
             "label": candidate["label"],
             "filters": dict(candidate["filters"]),
             "sample": cut_sample,
             "health": health,
-            "leadertrack": leadertrack_summarizer(archetype_cut, micro_cut),
+            "leadertrack": cut_leadertrack,
+            "microenvironment_gaps": build_executive_microenvironment_gap_summary(
+                cut_leadertrack
+            ),
             "delta_health_pp": delta,
         })
 
