@@ -3,7 +3,7 @@
 import json
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v1"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v2"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -107,13 +107,29 @@ def build_executive_analysis_prompt(package):
         "Nao faca diagnostico clinico e nao atribua culpa. Diferencas entre grupos sao percepcoes "
         "agregadas e devem ser tratadas como hipoteses para investigacao. "
         "As autoavaliacoes representam todos os lideres e os filtros se aplicam apenas aos respondentes. "
-        "Nao recalcule nenhum numero. Nos textos, evite repetir numeros; use os campos estruturados. "
-        "Quando nao houver diferenca de 5 p.p., ainda procure padroes consistentes entre dimensoes, "
-        "arquetipos e microambiente, deixando claro que sao sinais de menor intensidade. "
+        "Nao recalcule nenhum numero. Toda forca, ponto de atencao, finding e justificativa de acao "
+        "deve indicar a evidencia numerica ou comparativa exata que a sustenta. "
+        "REGRAS CONCEITUAIS OBRIGATORIAS: (1) Arquetipos sao perfis de estilo, nao indicadores de "
+        "qualidade. Percentual baixo nao e deficiencia, gap ou problema; percentual alto nao e, por si, "
+        "forca. Nao recomende elevar, equilibrar ou desenvolver um arquetipo apenas por seu percentual. "
+        "Use arquetipos somente para descrever predominancias e divergencias entre autoavaliacao e "
+        "percepcao da equipe, sem estabelecer perfil ideal. (2) Em saude emocional, delta absoluto abaixo "
+        "de 5 p.p. e variacao exploratoria de menor intensidade. Nao use 'relevante', 'significativo', "
+        "'superior', 'inferior', 'desigualdade' ou 'inequidade' para esses deltas e nao proponha intervencao "
+        "direcionada com base apenas neles. Se nenhum recorte atingir 5 p.p., declare isso expressamente. "
+        "(3) No microambiente, descreva como gap apenas a distancia entre 'como e' e 'como deveria ser'. "
+        "Sem limiar fornecido, use 'maior gap observado' ou 'menor gap observado', nunca 'critico', "
+        "'elevado' ou 'significativo'. (4) Nao diga que uma dimensao e destaque se ela nao estiver entre "
+        "os maiores valores do proprio conjunto apresentado. (5) Classificacoes como Bom ou Regular podem "
+        "ser citadas porque sao canonicas; nao as transforme em causalidade. "
+        "Quando nao houver diferenca de 5 p.p., procure padroes entre dimensoes e microambiente, mas os "
+        "nomeie como sinais exploratorios de menor intensidade. "
         "Proponha acoes organizacionais concretas e proporcionais, que podem envolver RH, Diretoria, "
         "People Analytics, Comunicacao e Endomarketing, Compliance, Diversidade e Inclusao ou Liderancas. "
-        "Comites, campanhas, rituais, KPIs e relatorios devem ser recomendados somente quando o dado "
-        "justificar investigacao ou governanca; nunca como receita generica. Nao invente metas numericas. "
+        "Comites, campanhas, rituais, treinamentos, KPIs e relatorios devem ser recomendados somente quando "
+        "o dado justificar investigacao ou governanca; nunca como receita generica. Antes de uma intervencao "
+        "direcionada, prefira um primeiro passo de validacao qualitativa quando a evidencia for exploratoria. "
+        "Nao invente metas numericas, cadencias ou instrumentos que nao possam ser acompanhados. "
         "Responda somente JSON valido, com estas chaves exatas: "
         "resumo_executivo, findings, leitura_por_recortes, acoes_organizacionais, governanca, limites. "
         "resumo_executivo deve conter sintese, forcas, pontos_de_atencao e perguntas_para_diretoria. "

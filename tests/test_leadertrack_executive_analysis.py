@@ -1,6 +1,7 @@
 import unittest
 
 from leadertrack_executive_analysis import (
+    build_executive_analysis_prompt,
     compact_snapshot_for_analysis,
     normalize_executive_analysis,
 )
@@ -55,6 +56,14 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertEqual(cut["score_saude_emocional"], 79.1)
         self.assertEqual(cut["delta_saude_pp"], 3.2)
         self.assertEqual(normalized["acoes_organizacionais"][0]["dono_recomendado"], "RH")
+
+    def test_prompt_protects_archetype_meaning_and_small_deltas(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        prompt = build_executive_analysis_prompt(package)
+        self.assertIn("Arquetipos sao perfis de estilo", prompt)
+        self.assertIn("Percentual baixo nao e deficiencia", prompt)
+        self.assertIn("delta absoluto abaixo de 5 p.p.", prompt)
+        self.assertIn("variacao exploratoria de menor intensidade", prompt)
 
 
 if __name__ == "__main__":
