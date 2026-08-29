@@ -4,6 +4,7 @@ O modulo trabalha apenas com registros ja normalizados pelo backend. Respostas
 individuais entram no calculo em memoria, mas nunca fazem parte do pacote salvo.
 """
 
+from copy import deepcopy
 from hashlib import sha256
 import json
 
@@ -51,6 +52,48 @@ def source_hash(archetype_rows, microenvironment_rows):
         default=str,
     ).encode("utf-8")
     return sha256(serialized).hexdigest()
+
+
+def snapshot_matches_context(snapshot, requested_context):
+    """Confirma que um pacote pertence ao contexto solicitado."""
+    scope = (snapshot or {}).get("scope") or {}
+    requested = requested_context or {}
+
+    requested_holding = _text(requested.get("holding_id")).lower()
+    if requested_holding:
+        return _text(scope.get("holding_id")).lower() == requested_holding
+
+    requested_client = _text(requested.get("cliente_id")).lower()
+    if requested_client:
+        return _text(scope.get("cliente_id")).lower() == requested_client
+
+    requested_name = _text(
+        requested.get("contexto_nome")
+        or requested.get("holding_nome")
+        or requested.get("contexto")
+    ).casefold()
+    scope_name = _text(
+        scope.get("contexto_nome")
+        or scope.get("holding_nome")
+        or scope.get("contexto")
+    ).casefold()
+    return bool(requested_name and scope_name and requested_name == scope_name)
+
+
+def snapshot_for_frontend(snapshot):
+    """Remove rastreios internos que nao sao necessarios na devolutiva."""
+    public = deepcopy(snapshot or {})
+    public.pop("source_hash", None)
+
+    health = public.get("health")
+    if isinstance(health, dict):
+        health.pop("rastreio_afirmacoes", None)
+
+    for cut in public.get("cuts") or []:
+        cut_health = cut.get("health") if isinstance(cut, dict) else None
+        if isinstance(cut_health, dict):
+            cut_health.pop("rastreio_afirmacoes", None)
+    return public
 
 
 def _candidate_cuts(archetype_records, microenvironment_records):

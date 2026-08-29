@@ -3,6 +3,8 @@ import unittest
 from leadertrack_executive_snapshots import (
     build_scope_snapshot,
     group_source_rows_by_company,
+    snapshot_for_frontend,
+    snapshot_matches_context,
     source_hash,
 )
 
@@ -15,6 +17,7 @@ def health_calculator(archetypes, microenvironment):
 def summarizer(archetypes, microenvironment):
     return {
         "auto_lideres": len([row for row in archetypes if row.get("tipo") == "autoavaliacao"]),
+        "auto_micro_lideres": len([row for row in microenvironment if row.get("tipo") == "autoavaliacao"]),
         "equipe": len([row for row in microenvironment if row.get("tipo") == "equipe"]),
     }
 
@@ -78,6 +81,7 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(women["sample"]["respondentes_microambiente"], 5)
         self.assertEqual(women["sample"]["autoavaliacoes_arquetipos"], 2)
         self.assertEqual(women["leadertrack"]["auto_lideres"], 2)
+        self.assertEqual(women["leadertrack"]["auto_micro_lideres"], 2)
 
     def test_suppresses_cut_below_minimum_sample(self):
         snapshot = self.build()
@@ -108,6 +112,26 @@ class SnapshotTests(unittest.TestCase):
         first = source_hash([{"id": 1, "dados_json": {"b": 2, "a": 1}}], [])
         second = source_hash([{"dados_json": {"a": 1, "b": 2}, "id": 1}], [])
         self.assertEqual(first, second)
+
+    def test_snapshot_context_requires_matching_holding(self):
+        snapshot = {"scope": {"tipo": "contexto", "holding_id": "holding-a"}}
+        self.assertTrue(snapshot_matches_context(snapshot, {"holding_id": "holding-a"}))
+        self.assertFalse(snapshot_matches_context(snapshot, {"holding_id": "holding-b"}))
+
+    def test_frontend_snapshot_removes_internal_health_trace(self):
+        snapshot = {
+            "source_hash": "internal",
+            "health": {"score_final": 80, "rastreio_afirmacoes": [{"codigo": "Q01"}]},
+            "cuts": [{
+                "label": "sexo: Mulher",
+                "health": {"score_final": 78, "rastreio_afirmacoes": [{"codigo": "Q02"}]},
+            }],
+        }
+        public = snapshot_for_frontend(snapshot)
+        self.assertNotIn("source_hash", public)
+        self.assertNotIn("rastreio_afirmacoes", public["health"])
+        self.assertNotIn("rastreio_afirmacoes", public["cuts"][0]["health"])
+        self.assertIn("rastreio_afirmacoes", snapshot["health"])
 
 
 if __name__ == "__main__":

@@ -23,6 +23,49 @@ class SnapshotAdminRouteTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_snapshot_read_rejects_request_without_admin_key(self):
+        response = self.client.post(
+            "/buscar-snapshot-executivo-leadertrack",
+            json={"codrodada": "r1", "holding_id": "holding-a"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @patch.object(backend, "buscar_snapshots_contexto_rodada")
+    def test_snapshot_read_returns_only_matching_holding(self, search):
+        search.return_value = [
+            {
+                "id": 10,
+                "codrodada": "r1",
+                "versao_regras": "v1",
+                "pacote_completo": {
+                    "scope": {"tipo": "contexto", "holding_id": "holding-b"},
+                    "health": {"score_final": 90},
+                },
+            },
+            {
+                "id": 11,
+                "codrodada": "r1",
+                "versao_regras": "v1",
+                "pacote_completo": {
+                    "scope": {"tipo": "contexto", "holding_id": "holding-a"},
+                    "health": {
+                        "score_final": 80,
+                        "rastreio_afirmacoes": [{"codigo": "Q01"}],
+                    },
+                },
+            },
+        ]
+        response = self.client.post(
+            "/buscar-snapshot-executivo-leadertrack",
+            headers={"X-HRKey-Snapshot-Key": "snapshot-test-key"},
+            json={"codrodada": "r1", "holding_id": "holding-a"},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["metadados"]["pacote_id"], 11)
+        self.assertEqual(data["snapshot"]["health"]["score_final"], 80)
+        self.assertNotIn("rastreio_afirmacoes", data["snapshot"]["health"])
+
     @patch.object(backend, "construir_snapshots_executivos_rodada")
     def test_dry_run_returns_all_discovered_companies(self, build):
         build.return_value = {

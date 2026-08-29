@@ -37,6 +37,8 @@ from leadertrack_executive_snapshots import (
     SNAPSHOT_SCHEMA_VERSION,
     build_scope_snapshot,
     group_source_rows_by_company,
+    snapshot_for_frontend,
+    snapshot_matches_context,
 )
 
 app = Flask(__name__)
@@ -1102,9 +1104,10 @@ def registros_micro_consolidados(rows):
         dados = normalizar_dados_json_relatorio(row) or {}
         auto = dados.get("autoavaliacao") or {}
         if isinstance(auto, dict):
+            auto_respostas = auto.get("respostas") if isinstance(auto.get("respostas"), dict) else auto
             registros.append({
                 "tipo": "autoavaliacao",
-                "respostas": auto,
+                "respostas": auto_respostas,
                 "empresa": normalizar_recorte_valor(auto.get("empresa") or row.get("empresa")),
                 "email_lider": str(auto.get("emailLider") or row.get("emaillider") or "").strip().lower(),
                 "sexo": normalizar_recorte_valor(auto.get("sexo")),
@@ -1275,9 +1278,16 @@ def filtrar_registros_por_recorte(registros, recorte):
 def resumir_recorte_leadertrack(registros_arq, registros_micro):
     arq_auto = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "autoavaliacao"]
     arq_equipe = [r.get("respostas") or {} for r in registros_arq or [] if r.get("tipo") == "equipe"]
+    micro_auto = []
+    lideres_micro_auto = set()
     micro_equipe = []
     lideres_micro = set()
     for registro in registros_micro or []:
+        if registro.get("tipo") == "autoavaliacao":
+            micro_auto.append(dict(registro.get("respostas") or {}))
+            if registro.get("email_lider"):
+                lideres_micro_auto.add(registro.get("email_lider"))
+            continue
         if registro.get("tipo") != "equipe":
             continue
         respostas = dict(registro.get("respostas") or {})
@@ -1292,6 +1302,14 @@ def resumir_recorte_leadertrack(registros_arq, registros_micro):
             {"dados_json": {"avaliacoesEquipe": micro_equipe}}
         ])
 
+    micro_auto_resumo = None
+    if micro_auto:
+        micro_auto_resumo, _ = consolidar_microambiente_respostas_lista(
+            micro_auto,
+            lideres_micro_auto,
+            media_antes_da_matriz=True,
+        )
+
     return {
         "arquetipos": {
             "autoavaliacao": calcular_arquetipos_respostas(arq_auto) if arq_auto else {},
@@ -1303,10 +1321,14 @@ def resumir_recorte_leadertrack(registros_arq, registros_micro):
             "analitico": micro_resumo,
             "media_dimensao": consolidar_microambiente_por_campo(micro_resumo, "DIMENSAO") if micro_resumo else None,
             "media_subdimensao": consolidar_microambiente_por_campo(micro_resumo, "SUBDIMENSAO") if micro_resumo else None,
+            "autoavaliacao_analitico": micro_auto_resumo,
+            "auto_media_dimensao": consolidar_microambiente_por_campo(micro_auto_resumo, "DIMENSAO") if micro_auto_resumo else None,
+            "auto_media_subdimensao": consolidar_microambiente_por_campo(micro_auto_resumo, "SUBDIMENSAO") if micro_auto_resumo else None,
             "termometro_gaps": consolidar_microambiente_termometro(micro_resumo) if micro_resumo else None,
             "waterfall_gaps": consolidar_microambiente_waterfall(micro_resumo) if micro_resumo else None,
             "n_avaliacoes_equipe": len(micro_equipe),
             "n_lideres": len(lideres_micro),
+            "n_autoavaliacoes_lideres": len(micro_auto),
         },
     }
 
@@ -3064,6 +3086,80 @@ def autorizado_snapshot_executivo():
     configured = str(LEADERTRACK_SNAPSHOT_ADMIN_KEY or "")
     provided = str(request.headers.get("X-HRKey-Snapshot-Key") or "")
     return bool(configured and provided and hmac.compare_digest(configured, provided))
+
+
+def buscar_snapshots_contexto_rodada(codrodada, limite=100):
+    if not SUPABASE_REST_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Supabase service role nao configurado no ambiente.")
+    response = requests.get(
+        f"{SUPABASE_REST_URL}/leadertrack_pacotes_organizacionais",
+        headers=supabase_headers(prefer_return=False, use_service_role=True),
+        params={
+            "select": "id,codrodada,nivel_contexto,contexto,amostra,status,pacote_completo,versao_regras,gerado_em,atualizado_em",
+            "codrodada": f"ilike.{codrodada}",
+            "nivel_contexto": "eq.contexto",
+            "order": "atualizado_em.desc",
+            "limit": str(limite),
+        },
+        timeout=60,
+    )
+    if response.status_code >= 300:
+        raise RuntimeError(
+            "Erro ao consultar snapshots executivos: "
+            f"HTTP {response.status_code} - {response.text}"
+        )
+    return response.json() or []
+
+
+@app.route("/buscar-snapshot-executivo-leadertrack", methods=["POST", "OPTIONS"])
+def buscar_snapshot_executivo_leadertrack():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight OK"}), 200
+    if not LEADERTRACK_SNAPSHOT_ADMIN_KEY:
+        return jsonify({"erro": "Chave de snapshots nao configurada no backend."}), 503
+    if not autorizado_snapshot_executivo():
+        return jsonify({"erro": "Leitura executiva nao autorizada."}), 403
+
+    dados = request.get_json() or {}
+    codrodada = str(dados.get("codrodada") or "").strip()
+    contexto_solicitado = {
+        key: dados.get(key)
+        for key in (
+            "cliente_id", "holding_id", "contexto_nome", "holding_nome", "contexto"
+        )
+        if dados.get(key) not in (None, "")
+    }
+    if not codrodada:
+        return jsonify({"erro": "Informe a rodada do snapshot."}), 400
+    if not contexto_solicitado:
+        return jsonify({"erro": "Contexto obrigatorio para consultar o snapshot."}), 400
+
+    try:
+        rows = buscar_snapshots_contexto_rodada(codrodada)
+        for row in rows:
+            package = row.get("pacote_completo") or {}
+            if not isinstance(package, dict):
+                continue
+            if not snapshot_matches_context(package, contexto_solicitado):
+                continue
+            return jsonify({
+                "status": "ok",
+                "snapshot": snapshot_for_frontend(package),
+                "metadados": {
+                    "pacote_id": row.get("id"),
+                    "codrodada": row.get("codrodada"),
+                    "versao_regras": row.get("versao_regras"),
+                    "gerado_em": row.get("gerado_em"),
+                    "atualizado_em": row.get("atualizado_em"),
+                },
+            }), 200
+        return jsonify({
+            "erro": "Nenhum snapshot executivo encontrado para esta rodada e contexto.",
+            "codrodada": codrodada,
+        }), 404
+    except Exception as exc:
+        print("Erro ao buscar snapshot executivo LeaderTrack:", exc)
+        return jsonify({"erro": str(exc), "status": "erro_leitura_snapshot"}), 500
 
 
 @app.route("/gerar-snapshots-executivos-leadertrack", methods=["POST", "OPTIONS"])
