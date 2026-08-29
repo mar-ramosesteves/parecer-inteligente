@@ -3094,19 +3094,23 @@ def autorizado_snapshot_executivo():
     return bool(configured and provided and hmac.compare_digest(configured, provided))
 
 
-def buscar_snapshots_contexto_rodada(codrodada, limite=100):
+def buscar_snapshots_contexto_rodada(codrodada, limite=100, empresa=None):
     if not SUPABASE_REST_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise RuntimeError("Supabase service role nao configurado no ambiente.")
+    empresa = str(empresa or "").strip().lower()
+    params = {
+        "select": "id,codrodada,nivel_contexto,empresa_codigo,contexto,amostra,status,pacote_completo,hash_origem,versao_regras,gerado_em,atualizado_em",
+        "codrodada": f"ilike.{codrodada}",
+        "nivel_contexto": "eq.empresa" if empresa else "eq.contexto",
+        "order": "atualizado_em.desc",
+        "limit": str(limite),
+    }
+    if empresa:
+        params["empresa_codigo"] = f"ilike.{empresa}"
     response = requests.get(
         f"{SUPABASE_REST_URL}/leadertrack_pacotes_organizacionais",
         headers=supabase_headers(prefer_return=False, use_service_role=True),
-        params={
-            "select": "id,codrodada,nivel_contexto,contexto,amostra,status,pacote_completo,hash_origem,versao_regras,gerado_em,atualizado_em",
-            "codrodada": f"ilike.{codrodada}",
-            "nivel_contexto": "eq.contexto",
-            "order": "atualizado_em.desc",
-            "limit": str(limite),
-        },
+        params=params,
         timeout=60,
     )
     if response.status_code >= 300:
@@ -3136,9 +3140,19 @@ def buscar_insight_executivo(chave_insight):
     return rows[0] if rows else None
 
 
-def localizar_snapshot_contexto(codrodada, contexto_solicitado):
-    for row in buscar_snapshots_contexto_rodada(codrodada):
+def localizar_snapshot_contexto(codrodada, contexto_solicitado, empresa=None):
+    empresa = str(empresa or "").strip().lower()
+    for row in buscar_snapshots_contexto_rodada(codrodada, empresa=empresa or None):
         package = row.get("pacote_completo") or {}
+        if empresa:
+            scope_empresa = str(
+                ((package.get("scope") or {}).get("empresa"))
+                or row.get("empresa_codigo")
+                or ""
+            ).strip().lower()
+            if scope_empresa == empresa:
+                return row, package
+            continue
         if isinstance(package, dict) and snapshot_matches_context(package, contexto_solicitado):
             return row, package
     return None, None
@@ -3155,6 +3169,7 @@ def buscar_snapshot_executivo_leadertrack():
 
     dados = request.get_json() or {}
     codrodada = str(dados.get("codrodada") or "").strip()
+    empresa = str(dados.get("empresa") or "").strip().lower()
     contexto_solicitado = {
         key: dados.get(key)
         for key in (
@@ -3168,7 +3183,11 @@ def buscar_snapshot_executivo_leadertrack():
         return jsonify({"erro": "Contexto obrigatorio para consultar o snapshot."}), 400
 
     try:
-        row, package = localizar_snapshot_contexto(codrodada, contexto_solicitado)
+        row, package = localizar_snapshot_contexto(
+            codrodada,
+            contexto_solicitado,
+            empresa=empresa or None,
+        )
         if row and package:
             return jsonify({
                 "status": "ok",
@@ -3201,6 +3220,7 @@ def gerar_analise_executiva_leadertrack():
 
     dados = request.get_json() or {}
     codrodada = str(dados.get("codrodada") or "").strip()
+    empresa = str(dados.get("empresa") or "").strip().lower()
     contexto_solicitado = {
         key: dados.get(key)
         for key in (
@@ -3212,7 +3232,11 @@ def gerar_analise_executiva_leadertrack():
         return jsonify({"erro": "Rodada e contexto sao obrigatorios."}), 400
 
     try:
-        row, snapshot = localizar_snapshot_contexto(codrodada, contexto_solicitado)
+        row, snapshot = localizar_snapshot_contexto(
+            codrodada,
+            contexto_solicitado,
+            empresa=empresa or None,
+        )
         if not row or not snapshot:
             return jsonify({"erro": "Snapshot executivo nao encontrado para esta selecao."}), 404
         if snapshot.get("status") != "concluido":
