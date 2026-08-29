@@ -65,6 +65,25 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertIn("delta absoluto abaixo de 5 p.p.", prompt)
         self.assertIn("variacao exploratoria de menor intensidade", prompt)
 
+    def test_small_cut_delta_overclaim_is_replaced_by_canonical_note(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        analysis = {
+            "leitura_por_recortes": [{
+                "recorte": "sexo: feminino",
+                "leitura": "O grupo tem saude superior e acima da media.",
+                "implicacao_prudente": "Intervencao direcionada imediata.",
+                "perguntas_de_investigacao": [
+                    "Por que este grupo tem maior saude?",
+                    "Quais condicoes organizacionais sao percebidas?",
+                ],
+            }],
+        }
+        normalized = normalize_executive_analysis(analysis, package)
+        cut = normalized["leitura_por_recortes"][0]
+        self.assertIn("abaixo do limiar de 5 p.p.", cut["leitura"])
+        self.assertIn("Nao sustenta, isoladamente", cut["implicacao_prudente"])
+        self.assertNotIn("maior saude", " ".join(cut["perguntas_de_investigacao"]).lower())
+
 
 if __name__ == "__main__":
     unittest.main()

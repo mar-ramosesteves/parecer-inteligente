@@ -1,9 +1,10 @@
 """Contrato enxuto e guardrails da analise executiva LeaderTrack."""
 
 import json
+import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v2"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v3"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -13,6 +14,46 @@ ALLOWED_OWNERS = {
     "Diversidade e Inclusao",
     "Liderancas",
 }
+
+
+def _fold_text(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(char for char in text if not unicodedata.combining(char)).casefold()
+
+
+def _small_delta_overclaim(value):
+    text = _fold_text(value)
+    return any(term in text for term in (
+        "acima da media",
+        "abaixo da media",
+        "superior",
+        "inferior",
+        "maior saude",
+        "menor saude",
+        "mais saudavel",
+        "menos saudavel",
+        "diferenca relevante",
+        "diferenca significativa",
+    ))
+
+
+def _safe_cut_questions(questions, cut_label, small_delta):
+    clean = []
+    for question in questions or []:
+        folded = _fold_text(question)
+        if small_delta and (
+            _small_delta_overclaim(question)
+            or ("por que" in folded and any(word in folded for word in ("maior", "menor", "melhor", "pior")))
+            or ("influenc" in folded and any(word in folded for word in ("genero", "mascul", "feminin", "raca", "etnia")))
+        ):
+            continue
+        clean.append(question)
+    if small_delta and not clean:
+        clean = [
+            f"O sinal observado em {cut_label} persiste em uma proxima medicao?",
+            "Quais condicoes organizacionais os respondentes relatam ao explicar sua experiencia?",
+        ]
+    return clean[:5]
 
 
 def _data_rows(value):
@@ -122,6 +163,17 @@ def build_executive_analysis_prompt(package):
         "'elevado' ou 'significativo'. (4) Nao diga que uma dimensao e destaque se ela nao estiver entre "
         "os maiores valores do proprio conjunto apresentado. (5) Classificacoes como Bom ou Regular podem "
         "ser citadas porque sao canonicas; nao as transforme em causalidade. "
+        "REGRAS DOS RECORTES: os valores de lideres repetidos dentro de cada recorte sao o benchmark fixo "
+        "de todos os lideres, sem filtro demografico. Nunca os atribua ao genero, raca/etnia ou departamento "
+        "do recorte e nunca escreva 'gap dos lideres deste recorte'. Para microambiente por recorte, priorize "
+        "o gap da equipe entre como e e como deveria ser e compare o como e da equipe ao benchmark atual dos "
+        "lideres. Nao exponha nem calcule gap entre atual e ideal dos lideres, pois essa nao e a comparacao "
+        "mostrada na leitura executiva. Para delta de saude abaixo de 5 p.p., use exatamente a ideia de que "
+        "o score permanece proximo ao consolidado e a variacao esta abaixo do limiar. Nao pergunte por que um "
+        "grupo tem saude maior ou menor e nao associe genero ou raca a comportamento, influencia ou capacidade. "
+        "Pergunte se o sinal persiste e quais condicoes organizacionais os respondentes relatam. Uma classificacao "
+        "Regular pode justificar investigacao por seu valor absoluto, mas nao por comparacao com o consolidado "
+        "quando a diferenca for menor que 5 p.p. "
         "Quando nao houver diferenca de 5 p.p., procure padroes entre dimensoes e microambiente, mas os "
         "nomeie como sinais exploratorios de menor intensidade. "
         "Proponha acoes organizacionais concretas e proporcionais, que podem envolver RH, Diretoria, "
@@ -129,6 +181,11 @@ def build_executive_analysis_prompt(package):
         "Comites, campanhas, rituais, treinamentos, KPIs e relatorios devem ser recomendados somente quando "
         "o dado justificar investigacao ou governanca; nunca como receita generica. Antes de uma intervencao "
         "direcionada, prefira um primeiro passo de validacao qualitativa quando a evidencia for exploratoria. "
+        "Nao presuma que comunicacao, treinamento ou workshop resolva uma dimensao baixa: primeiro investigue "
+        "determinantes organizacionais e somente depois escolha a intervencao. Divergencia entre arquetipos pode "
+        "justificar dialogo de calibracao, nunca treinamento para aumentar ou reduzir um estilo. Nao proponha novo "
+        "comite sem antes recomendar verificacao das instancias de governanca ja existentes. KPIs devem acompanhar "
+        "resultado ou persistencia do sinal, nao apenas contar reunioes, entrevistas ou participantes. "
         "Nao invente metas numericas, cadencias ou instrumentos que nao possam ser acompanhados. "
         "Responda somente JSON valido, com estas chaves exatas: "
         "resumo_executivo, findings, leitura_por_recortes, acoes_organizacionais, governanca, limites. "
@@ -161,14 +218,36 @@ def normalize_executive_analysis(analysis, package):
         canonical = cuts.get(str(item.get("recorte") or "").strip().casefold())
         if not canonical:
             continue
+        delta = canonical.get("delta_saude_pp")
+        try:
+            small_delta = delta is not None and abs(float(delta)) < 5
+        except (TypeError, ValueError):
+            small_delta = False
+        reading = item.get("leitura")
+        implication = item.get("implicacao_prudente")
+        if small_delta:
+            canonical_note = (
+                f"A variacao de {float(delta):+.1f} p.p. permanece abaixo do limiar de 5 p.p. "
+                "e deve ser tratada como sinal exploratorio de menor intensidade."
+            )
+            if _small_delta_overclaim(reading):
+                reading = canonical_note
+            implication = (
+                canonical_note
+                + " Nao sustenta, isoladamente, intervencao direcionada nem inferencia causal."
+            )
         normalized_reads.append({
             "recorte": canonical.get("recorte"),
             "amostra": canonical.get("amostra") or {},
             "score_saude_emocional": (canonical.get("saude_emocional") or {}).get("score_final"),
-            "delta_saude_pp": canonical.get("delta_saude_pp"),
-            "leitura": item.get("leitura"),
-            "implicacao_prudente": item.get("implicacao_prudente"),
-            "perguntas_de_investigacao": item.get("perguntas_de_investigacao") or [],
+            "delta_saude_pp": delta,
+            "leitura": reading,
+            "implicacao_prudente": implication,
+            "perguntas_de_investigacao": _safe_cut_questions(
+                item.get("perguntas_de_investigacao") or [],
+                canonical.get("recorte"),
+                small_delta,
+            ),
         })
 
     actions = []
