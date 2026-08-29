@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v7"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v8"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -25,6 +25,10 @@ def _fold_text(value):
 def _number(value):
     if value in (None, ""):
         return None
+    try:
+        return float(str(value).replace("%", "").replace(",", ".").strip())
+    except (TypeError, ValueError):
+        return None
 
 
 def _pt_number(value, decimals=1):
@@ -32,10 +36,6 @@ def _pt_number(value, decimals=1):
     if number is None:
         return "-"
     return f"{number:.{decimals}f}".replace(".", ",")
-    try:
-        return float(str(value).replace("%", "").replace(",", ".").strip())
-    except (TypeError, ValueError):
-        return None
 
 
 def _comparison(team_value, leader_value):
@@ -234,7 +234,7 @@ def _canonicalize_summary(summary, package):
     synthesis = str(result.get("sintese") or "")
     sentences = [
         item.strip()
-        for item in re.split(r"(?<!\d)\.(?!\d)", synthesis)
+        for item in re.split(r"\.(?!\d)", synthesis)
         if item.strip()
     ]
     sentences = [

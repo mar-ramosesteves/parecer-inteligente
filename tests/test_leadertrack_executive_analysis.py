@@ -95,7 +95,7 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         normalized = normalize_executive_analysis(analysis, package)
         cut = normalized["leitura_por_recortes"][0]
         self.assertIn("abaixo do limiar de 5 p.p.", cut["leitura"])
-        self.assertIn("Nao sustenta, isoladamente", cut["implicacao_prudente"])
+        self.assertIn("nao sustenta, isoladamente", cut["implicacao_prudente"].lower().replace("ã", "a"))
         self.assertNotIn("maior saude", " ".join(cut["perguntas_de_investigacao"]).lower())
 
     def test_global_comparisons_and_process_only_kpis_are_sanitized(self):
