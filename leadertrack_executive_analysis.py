@@ -4,7 +4,7 @@ import json
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v3"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v4"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -56,6 +56,56 @@ def _safe_cut_questions(questions, cut_label, small_delta):
     return clean[:5]
 
 
+def _sanitize_executive_text(value, no_large_health_deltas=False):
+    if isinstance(value, list):
+        return [_sanitize_executive_text(item, no_large_health_deltas) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_executive_text(item, no_large_health_deltas)
+            for key, item in value.items()
+        }
+    if not isinstance(value, str):
+        return value
+    replacements = {
+        "gaps elevados": "gaps observados",
+        "gap elevado": "gap observado",
+    }
+    if no_large_health_deltas:
+        replacements.update({
+            "inferior ao consolidado": "proximo ao consolidado",
+            "superior ao consolidado": "proximo ao consolidado",
+            "acima do consolidado": "proximo ao consolidado",
+            "abaixo do consolidado": "proximo ao consolidado",
+        })
+    text = value
+    for source, target in replacements.items():
+        text = text.replace(source, target).replace(source.capitalize(), target.capitalize())
+    return text
+
+
+def _outcome_kpis(values):
+    process_terms = (
+        "numero de",
+        "quantidade de",
+        "frequencia de",
+        "alcance da",
+        "alcance das",
+        "participantes",
+        "participacao",
+        "entrevistas realizadas",
+        "sessoes realizadas",
+        "reunioes realizadas",
+    )
+    clean = [
+        value for value in values or []
+        if value and not any(term in _fold_text(value) for term in process_terms)
+    ]
+    return clean[:5] or [
+        "Evolucao do indicador que originou a acao",
+        "Persistencia do sinal na proxima medicao comparavel",
+    ]
+
+
 def _data_rows(value):
     if isinstance(value, list):
         return value
@@ -66,19 +116,34 @@ def _data_rows(value):
     return []
 
 
+def _leader_current_rows(value):
+    """Remove expectativa e gaps dos lideres, ausentes da leitura executiva."""
+    blocked = ("ideal", "deveria", "esperad", "expect", "gap")
+    clean = []
+    for row in _data_rows(value):
+        if not isinstance(row, dict):
+            continue
+        clean.append({
+            key: item
+            for key, item in row.items()
+            if not any(term in _fold_text(key) for term in blocked)
+        })
+    return clean
+
+
 def _micro_dimensions(micro):
     micro = micro or {}
     return {
-        "lideres": _data_rows(micro.get("auto_media_dimensao")),
-        "equipe": _data_rows(micro.get("media_dimensao")),
-        "n_autoavaliacoes_lideres": micro.get("n_autoavaliacoes_lideres"),
+        "resultado_organizacional_equipe": _data_rows(micro.get("media_dimensao")),
+        "referencia_comparativa_lideres_como_e": _leader_current_rows(micro.get("auto_media_dimensao")),
         "n_avaliacoes_equipe": micro.get("n_avaliacoes_equipe"),
+        "n_autoavaliacoes_lideres": micro.get("n_autoavaliacoes_lideres"),
     }
 
 
 def _health_summary(health):
     health = health or {}
-    return {
+    summary = {
         key: health.get(key)
         for key in (
             "score_final",
@@ -93,6 +158,8 @@ def _health_summary(health):
         )
         if health.get(key) is not None
     }
+    summary["base_calculo"] = "somente respostas da equipe"
+    return summary
 
 
 def _leadertrack_summary(leadertrack):
@@ -100,10 +167,10 @@ def _leadertrack_summary(leadertrack):
     archetypes = leadertrack.get("arquetipos") or {}
     return {
         "arquetipos": {
-            "autoavaliacao_todos_lideres": archetypes.get("autoavaliacao") or {},
-            "percepcao_equipe": archetypes.get("mediaEquipe") or {},
-            "n_autoavaliacoes_lideres": archetypes.get("n_autoavaliacoes_lideres"),
+            "resultado_organizacional_equipe": archetypes.get("mediaEquipe") or {},
+            "referencia_comparativa_todos_lideres": archetypes.get("autoavaliacao") or {},
             "n_avaliacoes_equipe": archetypes.get("n_avaliacoes_equipe"),
+            "n_autoavaliacoes_lideres": archetypes.get("n_autoavaliacoes_lideres"),
         },
         "microambiente_dimensoes": _micro_dimensions(leadertrack.get("microambiente")),
     }
@@ -148,6 +215,13 @@ def build_executive_analysis_prompt(package):
         "Nao faca diagnostico clinico e nao atribua culpa. Diferencas entre grupos sao percepcoes "
         "agregadas e devem ser tratadas como hipoteses para investigacao. "
         "As autoavaliacoes representam todos os lideres e os filtros se aplicam apenas aos respondentes. "
+        "HIERARQUIA OBRIGATORIA: o resultado organizacional e sempre a media da equipe. O score e as "
+        "dimensoes de saude emocional usam somente respostas da equipe. Em arquetipos, descreva primeiro "
+        "as predominancias percebidas pela equipe; a media das autoavaliacoes dos lideres serve apenas para "
+        "comparacao de percepcao. Em microambiente, use como resultado principal o como e e o como deveria "
+        "ser da equipe; o como e dos lideres e apenas referencia comparativa. Nunca classifique uma "
+        "autoavaliacao como forca, fragilidade ou resultado da organizacao e nunca fundamente uma acao apenas "
+        "na autoavaliacao. "
         "Nao recalcule nenhum numero. Toda forca, ponto de atencao, finding e justificativa de acao "
         "deve indicar a evidencia numerica ou comparativa exata que a sustenta. "
         "REGRAS CONCEITUAIS OBRIGATORIAS: (1) Arquetipos sao perfis de estilo, nao indicadores de "
@@ -195,7 +269,7 @@ def build_executive_analysis_prompt(package):
         "backend as reaplicara. acoes_organizacionais deve conter titulo, justificativa, dono_recomendado, "
         "areas_envolvidas, horizonte, primeiro_passo, entregavel, kpis_sem_meta_inventada e criterio_de_revisao. "
         "governanca deve conter cadencia, comites_a_considerar, comunicacao_e_endomarketing, "
-        "compliance_e_diversidade e people_analytics. Gere no maximo 8 acoes e priorize qualidade.\n\n"
+        "compliance_e_diversidade e people_analytics. Gere no maximo 5 acoes e priorize qualidade.\n\n"
         "SNAPSHOT_EXECUTIVO_JSON:\n"
         + json.dumps(package, ensure_ascii=False, separators=(",", ":"), default=str)
     )
@@ -211,6 +285,14 @@ def normalize_executive_analysis(analysis, package):
         for item in package.get("recortes_elegiveis") or []
         if str(item.get("recorte") or "").strip()
     }
+    cut_deltas = [item.get("delta_saude_pp") for item in cuts.values()]
+    numeric_deltas = []
+    for value in cut_deltas:
+        try:
+            numeric_deltas.append(abs(float(value)))
+        except (TypeError, ValueError):
+            continue
+    no_large_health_deltas = bool(numeric_deltas) and all(value < 5 for value in numeric_deltas)
     normalized_reads = []
     for item in analysis.get("leitura_por_recortes") or []:
         if not isinstance(item, dict):
@@ -230,8 +312,7 @@ def normalize_executive_analysis(analysis, package):
                 f"A variacao de {float(delta):+.1f} p.p. permanece abaixo do limiar de 5 p.p. "
                 "e deve ser tratada como sinal exploratorio de menor intensidade."
             )
-            if _small_delta_overclaim(reading):
-                reading = canonical_note
+            reading = canonical_note
             implication = (
                 canonical_note
                 + " Nao sustenta, isoladamente, intervencao direcionada nem inferencia causal."
@@ -244,7 +325,7 @@ def normalize_executive_analysis(analysis, package):
             "leitura": reading,
             "implicacao_prudente": implication,
             "perguntas_de_investigacao": _safe_cut_questions(
-                item.get("perguntas_de_investigacao") or [],
+                [] if small_delta else item.get("perguntas_de_investigacao") or [],
                 canonical.get("recorte"),
                 small_delta,
             ),
@@ -265,18 +346,19 @@ def normalize_executive_analysis(analysis, package):
             "horizonte": item.get("horizonte"),
             "primeiro_passo": item.get("primeiro_passo"),
             "entregavel": item.get("entregavel"),
-            "kpis_sem_meta_inventada": item.get("kpis_sem_meta_inventada") or [],
+            "kpis_sem_meta_inventada": _outcome_kpis(item.get("kpis_sem_meta_inventada") or []),
             "criterio_de_revisao": item.get("criterio_de_revisao"),
         })
 
-    return {
+    normalized = {
         "versao": EXECUTIVE_ANALYSIS_VERSION,
         "resumo_executivo": analysis.get("resumo_executivo") or {},
         "findings": (analysis.get("findings") or [])[:12],
         "leitura_por_recortes": normalized_reads[:20],
-        "acoes_organizacionais": actions[:8],
+        "acoes_organizacionais": actions[:5],
         "governanca": analysis.get("governanca") or {},
         "limites": analysis.get("limites") or (
             "Leitura agregada e exploratoria; nao estabelece causalidade nem diagnostico individual."
         ),
     }
+    return _sanitize_executive_text(normalized, no_large_health_deltas)

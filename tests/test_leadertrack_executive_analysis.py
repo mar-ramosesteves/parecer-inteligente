@@ -17,8 +17,12 @@ class ExecutiveAnalysisTests(unittest.TestCase):
                 "arquetipos": {"autoavaliacao": {"Resoluto": 67}, "mediaEquipe": {"Resoluto": 64}},
                 "microambiente": {
                     "analitico": {"dados": [{"QUESTAO": "Q01"}]},
-                    "auto_media_dimensao": {"dados": [{"DIMENSAO": "Nitidez", "REAL_%": 74}]},
-                    "media_dimensao": {"dados": [{"DIMENSAO": "Nitidez", "REAL_%": 76}]},
+                    "auto_media_dimensao": {"dados": [{
+                        "DIMENSAO": "Nitidez", "REAL_%": 74, "IDEAL_%": 93, "GAP_%": 19,
+                    }]},
+                    "media_dimensao": {"dados": [{
+                        "DIMENSAO": "Nitidez", "REAL_%": 76, "IDEAL_%": 90, "GAP_%": 14,
+                    }]},
                 },
             },
             "cuts": [{
@@ -36,6 +40,11 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertNotIn("rastreio_afirmacoes", serialized)
         self.assertNotIn("QUESTAO", serialized)
         self.assertEqual(package["recortes_elegiveis"][0]["delta_saude_pp"], 3.2)
+        micro = package["leadertrack"]["microambiente_dimensoes"]
+        self.assertNotIn("IDEAL_%", micro["referencia_comparativa_lideres_como_e"][0])
+        self.assertNotIn("GAP_%", micro["referencia_comparativa_lideres_como_e"][0])
+        self.assertEqual(micro["resultado_organizacional_equipe"][0]["IDEAL_%"], 90)
+        self.assertEqual(package["saude_emocional"]["base_calculo"], "somente respostas da equipe")
 
     def test_normalization_reapplies_canonical_cut_metrics(self):
         package = compact_snapshot_for_analysis(self.snapshot)
@@ -83,6 +92,31 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertIn("abaixo do limiar de 5 p.p.", cut["leitura"])
         self.assertIn("Nao sustenta, isoladamente", cut["implicacao_prudente"])
         self.assertNotIn("maior saude", " ".join(cut["perguntas_de_investigacao"]).lower())
+
+    def test_global_comparisons_and_process_only_kpis_are_sanitized(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        analysis = {
+            "resumo_executivo": {"pontos_de_atencao": ["Comercial inferior ao consolidado."]},
+            "acoes_organizacionais": [{
+                "titulo": "Investigar gap elevado",
+                "justificativa": "Gaps elevados no microambiente.",
+                "kpis_sem_meta_inventada": ["Numero de entrevistas realizadas"],
+            }] * 7,
+        }
+        normalized = normalize_executive_analysis(analysis, package)
+        self.assertIn(
+            "proximo ao consolidado",
+            normalized["resumo_executivo"]["pontos_de_atencao"][0],
+        )
+        self.assertEqual(len(normalized["acoes_organizacionais"]), 5)
+        self.assertNotIn(
+            "Numero de entrevistas realizadas",
+            normalized["acoes_organizacionais"][0]["kpis_sem_meta_inventada"],
+        )
+        self.assertIn(
+            "gaps observados",
+            normalized["acoes_organizacionais"][0]["justificativa"].lower(),
+        )
 
 
 if __name__ == "__main__":
