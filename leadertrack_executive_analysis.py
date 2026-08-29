@@ -4,7 +4,7 @@ import json
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v5"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v6"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -93,6 +93,9 @@ def _sanitize_executive_text(value, no_large_health_deltas=False):
     replacements = {
         "gaps elevados": "gaps observados",
         "gap elevado": "gap observado",
+        "gaps mais elevados": "maiores gaps observados",
+        "divergencias relevantes": "divergencias observadas",
+        "impacto potencial": "possivel relacao a investigar",
     }
     if no_large_health_deltas:
         replacements.update({
@@ -130,6 +133,103 @@ def _outcome_kpis(values):
         "Evolucao do indicador que originou a acao",
         "Persistencia do sinal na proxima medicao comparavel",
     ]
+
+
+def _canonical_archetype_sentence(package):
+    archetypes = (
+        ((package.get("leadertrack") or {}).get("arquetipos") or {})
+        .get("predominancias_da_equipe") or []
+    )
+    if not archetypes:
+        return ""
+    labels = [
+        f"{item.get('arquetipo')} ({_number(item.get('equipe')):.1f}%)"
+        for item in archetypes
+        if item.get("arquetipo") and _number(item.get("equipe")) is not None
+    ]
+    if not labels:
+        return ""
+    return (
+        "Na percepcao da equipe, os arquetipos predominantes sao "
+        + ", ".join(labels)
+        + "; a autoavaliacao media dos lideres e apenas referencia comparativa."
+    )
+
+
+def _canonical_findings(package):
+    findings = []
+    health = package.get("saude_emocional") or {}
+    if health.get("score_final") is not None:
+        findings.append(
+            f"Saude emocional da equipe: {health.get('score_final')}%, "
+            f"classificacao {health.get('classificacao') or health.get('label') or 'sem classificacao'}."
+        )
+    dimensions = health.get("dimensoes") or health.get("categorias") or {}
+    if isinstance(dimensions, dict):
+        ranked = sorted(
+            ((name, _number(value)) for name, value in dimensions.items()),
+            key=lambda item: item[1] if item[1] is not None else -1,
+            reverse=True,
+        )
+        ranked = [item for item in ranked if item[1] is not None]
+        if ranked:
+            findings.append(
+                "Maiores dimensoes de saude emocional da equipe: "
+                + ", ".join(f"{name} ({value:.1f}%)" for name, value in ranked[:2])
+                + "."
+            )
+            findings.append(
+                f"Menor dimensao de saude emocional da equipe: {ranked[-1][0]} ({ranked[-1][1]:.1f}%)."
+            )
+    archetype_sentence = _canonical_archetype_sentence(package)
+    if archetype_sentence:
+        findings.append(archetype_sentence)
+    micro = (
+        ((package.get("leadertrack") or {}).get("microambiente_dimensoes") or {})
+        .get("dimensoes_com_comparacao_canonica") or []
+    )
+    ranked_gaps = sorted(
+        (item for item in micro if _number(item.get("gap_equipe_pp")) is not None),
+        key=lambda item: abs(_number(item.get("gap_equipe_pp")) or 0),
+        reverse=True,
+    )
+    if ranked_gaps:
+        findings.append(
+            "Maiores gaps observados pela equipe no microambiente: "
+            + ", ".join(
+                f"{item.get('dimensao')} ({_number(item.get('gap_equipe_pp')):.1f} p.p.)"
+                for item in ranked_gaps[:2]
+            )
+            + "."
+        )
+    quantitative = package.get("findings_quantitativos") or []
+    if quantitative:
+        findings.extend(
+            str(item.get("interpretation") or item)
+            for item in quantitative[:5]
+        )
+    elif package.get("recortes_elegiveis"):
+        findings.append(
+            "Nenhum recorte elegivel atingiu diferenca absoluta de 5 p.p. no score de saude emocional."
+        )
+    return findings[:8]
+
+
+def _canonicalize_summary(summary, package):
+    if not isinstance(summary, dict):
+        return {}
+    result = dict(summary)
+    synthesis = str(result.get("sintese") or "")
+    sentences = [item.strip() for item in synthesis.split(".") if item.strip()]
+    sentences = [
+        sentence for sentence in sentences
+        if not ("arquetip" in _fold_text(sentence) and "predomin" in _fold_text(sentence))
+    ]
+    archetype_sentence = _canonical_archetype_sentence(package)
+    if archetype_sentence:
+        sentences.append(archetype_sentence.rstrip("."))
+    result["sintese"] = ". ".join(sentences) + ("." if sentences else "")
+    return result
 
 
 def _data_rows(value):
@@ -224,9 +324,24 @@ def _leadertrack_summary(leadertrack):
         }
         item.update(_comparison(team_value, leader_value))
         archetype_comparisons.append(item)
+    predominances = sorted(
+        (item for item in archetype_comparisons if item.get("equipe") is not None),
+        key=lambda item: item.get("equipe"),
+        reverse=True,
+    )[:3]
+    divergences = sorted(
+        (
+            item for item in archetype_comparisons
+            if item.get("delta_equipe_menos_lideres_pp") is not None
+        ),
+        key=lambda item: abs(item.get("delta_equipe_menos_lideres_pp")),
+        reverse=True,
+    )[:3]
     return {
         "arquetipos": {
             "estilos_com_comparacao_canonica": archetype_comparisons,
+            "predominancias_da_equipe": predominances,
+            "maiores_divergencias_de_percepcao": divergences,
             "n_avaliacoes_equipe": archetypes.get("n_avaliacoes_equipe"),
             "n_autoavaliacoes_lideres": archetypes.get("n_autoavaliacoes_lideres"),
         },
@@ -322,6 +437,8 @@ def build_executive_analysis_prompt(package):
         "relacao canonica quando precisar menciona-la; nao faca subtracao, nao inverta o sinal e nao trate "
         "equipe acima ou abaixo dos lideres como forca ou fraqueza. Comparacoes com lideres podem aparecer "
         "somente como divergencia de percepcao em pontos de atencao, findings ou perguntas, nunca em forcas. "
+        "A ordem dos arquetipos predominantes tambem esta pronta em predominancias_da_equipe. Copie essa lista; "
+        "nunca confunda maior delta frente aos lideres com maior predominancia na equipe. "
         "Nao invente metas numericas, cadencias ou instrumentos que nao possam ser acompanhados. "
         "Responda somente JSON valido, com estas chaves exatas: "
         "resumo_executivo, findings, leitura_por_recortes, acoes_organizacionais, governanca, limites. "
@@ -419,7 +536,7 @@ def normalize_executive_analysis(analysis, package):
             "criterio_de_revisao": item.get("criterio_de_revisao"),
         })
 
-    summary = analysis.get("resumo_executivo") or {}
+    summary = _canonicalize_summary(analysis.get("resumo_executivo") or {}, package)
     if isinstance(summary, dict):
         summary = dict(summary)
         summary["forcas"] = [
@@ -430,7 +547,7 @@ def normalize_executive_analysis(analysis, package):
     normalized = {
         "versao": EXECUTIVE_ANALYSIS_VERSION,
         "resumo_executivo": summary,
-        "findings": (analysis.get("findings") or [])[:12],
+        "findings": _canonical_findings(package),
         "leitura_por_recortes": normalized_reads[:20],
         "acoes_organizacionais": actions[:5],
         "governanca": analysis.get("governanca") or {},

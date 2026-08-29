@@ -138,6 +138,20 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertEqual(len(normalized["acoes_organizacionais"]), 1)
         self.assertEqual(normalized["acoes_organizacionais"][0]["titulo"], "Investigar Nitidez")
 
+    def test_wrong_ai_archetype_predominance_is_replaced_by_canonical_ranking(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        analysis = {
+            "resumo_executivo": {
+                "sintese": "Os arquetipos predominantes sao Imperativo e Prescritivo.",
+                "forcas": [],
+            },
+        }
+        normalized = normalize_executive_analysis(analysis, package)
+        synthesis = normalized["resumo_executivo"]["sintese"]
+        self.assertNotIn("Imperativo e Prescritivo", synthesis)
+        self.assertIn("Resoluto (64.0%)", synthesis)
+        self.assertTrue(any("Resoluto (64.0%)" in item for item in normalized["findings"]))
+
 
 if __name__ == "__main__":
     unittest.main()
