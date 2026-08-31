@@ -30,6 +30,51 @@ def parse_percent(value, default=0):
         return default
 
 
+def repair_truncated_json(text):
+    """Fecha somente estruturas JSON interrompidas no fim da resposta da IA."""
+    source = str(text or "").rstrip()
+    if not source or source[0] not in "{[":
+        return source
+
+    stack = []
+    in_string = False
+    escaped = False
+    for char in source:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char == "}" and stack and stack[-1] == "{":
+            stack.pop()
+        elif char == "]" and stack and stack[-1] == "[":
+            stack.pop()
+
+    repaired = source
+    if in_string:
+        if escaped:
+            repaired += "\\"
+        repaired += '"'
+    else:
+        repaired = repaired.rstrip()
+        if repaired.endswith(":"):
+            repaired += " null"
+        elif repaired.endswith(","):
+            repaired = repaired[:-1].rstrip()
+
+    for opener in reversed(stack):
+        repaired += "}" if opener == "{" else "]"
+    return repaired
+
+
 def parse_json_response(raw):
     if isinstance(raw, dict):
         parsed = raw
@@ -38,7 +83,13 @@ def parse_json_response(raw):
         if text.startswith("```"):
             text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
             text = re.sub(r"\s*```$", "", text)
-        parsed = json.loads(text)
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            repaired = repair_truncated_json(text)
+            if repaired == text:
+                raise
+            parsed = json.loads(repaired)
     else:
         raise ValueError("Resposta da IA nao e texto nem objeto JSON.")
 

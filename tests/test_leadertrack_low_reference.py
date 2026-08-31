@@ -5,6 +5,8 @@ from leadertrack_devolutivas import (
     build_weekly_prompt,
     integrated_attention_items,
     low_reference_prompt_rules,
+    parse_json_response,
+    repair_truncated_json,
     single_week_schema,
 )
 
@@ -122,6 +124,22 @@ class IntegratedAttentionItemsTests(unittest.TestCase):
         self.assertIn("indicador", week)
         self.assertNotIn("gamificacao", week)
         self.assertNotIn("visao_geral_do_plano", schema)
+
+    def test_parse_json_response_repairs_string_truncated_at_end(self):
+        raw = '{"plano_12_semanas":[{"semana":4,"resultado_esperado":"Decisao registrada'
+
+        parsed = parse_json_response(raw)
+
+        self.assertEqual(4, parsed["plano_12_semanas"][0]["semana"])
+        self.assertEqual("Decisao registrada", parsed["plano_12_semanas"][0]["resultado_esperado"])
+
+    def test_repair_truncated_json_removes_trailing_comma(self):
+        raw = '{"plano_12_semanas":[{"semana":4},'
+
+        repaired = repair_truncated_json(raw)
+        parsed = parse_json_response(repaired)
+
+        self.assertEqual(4, parsed["plano_12_semanas"][0]["semana"])
 
 
 if __name__ == "__main__":
