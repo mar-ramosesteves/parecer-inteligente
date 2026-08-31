@@ -5,6 +5,7 @@ from leadertrack_devolutivas import (
     build_weekly_prompt,
     integrated_attention_items,
     low_reference_prompt_rules,
+    single_week_schema,
 )
 
 
@@ -109,6 +110,18 @@ class IntegratedAttentionItemsTests(unittest.TestCase):
         self.assertIn("no maximo 2 itens por lista", prompt)
         self.assertIn("Priorize roteiro pratico, speech, evidencias", prompt)
         self.assertIn("terminar como JSON valido", prompt)
+
+    def test_single_week_schema_keeps_execution_fields_without_redundancy(self):
+        schema = single_week_schema(1)
+        week = schema["plano_12_semanas"][0]
+
+        self.assertEqual(1, week["semana"])
+        self.assertIn("speech_sugerido_do_lider", week)
+        self.assertIn("registro_do_lider_antes_de_avancar", week)
+        self.assertIn("compromisso_de_agenda", week)
+        self.assertIn("indicador", week)
+        self.assertNotIn("gamificacao", week)
+        self.assertNotIn("visao_geral_do_plano", schema)
 
 
 if __name__ == "__main__":

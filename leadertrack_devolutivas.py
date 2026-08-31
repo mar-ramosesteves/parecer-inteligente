@@ -655,6 +655,70 @@ def weekly_chunk_schema(start_week, end_week):
     return schema
 
 
+def single_week_schema(week_number):
+    """Formato completo para execucao, sem blocos redundantes de planos multisemana."""
+    return {
+        "criterio_de_encerramento": "",
+        "plano_12_semanas": [
+            {
+                "semana": week_number,
+                "etapa_do_ciclo": "diagnostico|planejamento|acao|conclusao_resultados",
+                "foco_da_semana": "",
+                "tipo_de_intervencao": "observacao_em_campo|comunicacao|experimento_operacional|revisao_informal",
+                "investimento_de_tempo_estimado": "",
+                "tempo_total_estimado_minutos": 0,
+                "roteiro_de_tempo": [{"atividade": "", "minutos": 0}],
+                "assunto_especifico_das_afirmacoes": "",
+                "palavras_chave_das_afirmacoes": [],
+                "frases_especificas_para_usar": [],
+                "comentarios_de_observacao": [],
+                "diferenca_objetiva_da_semana_anterior": "",
+                "proxima_pratica_observavel": "",
+                "speech_sugerido_do_lider": "",
+                "feedback_necessario_para_liberar_proxima_semana": "",
+                "criterio_de_conclusao_da_semana": "",
+                "registro_do_lider_antes_de_avancar": {
+                    "o_que_fiz": "",
+                    "o_que_observei": "",
+                    "o_que_mudou": "",
+                    "onde_travou": "",
+                },
+                "autodesenvolvimento_do_lider": {
+                    "pratica_emocional": "",
+                    "treino_de_speech": "",
+                    "leitura_curta_recomendada": "",
+                    "reflexao_individual": "",
+                },
+                "alinhamento_com_superior": {
+                    "quando_fazer": "",
+                    "objetivo_do_alinhamento": "",
+                    "pontos_para_levar": [],
+                },
+                "compromisso_de_agenda": {
+                    "titulo": "",
+                    "tipo": "observacao_em_campo|conversa_com_equipe|experimento_operacional|revisao",
+                    "duracao_minutos": 30,
+                    "participantes_sugeridos": [],
+                    "descricao": "",
+                },
+                "objetivo": "",
+                "arquetipo_dominante_a_acionar": "",
+                "como_usar_arquetipo_dominante": "",
+                "arquetipo_complementar_a_desenvolver": "",
+                "pratica_para_desenvolver_arquetipo": "",
+                "acoes_praticas": [],
+                "perguntas_para_equipe": [],
+                "tarefa_do_lider": [],
+                "tarefa_da_equipe": [],
+                "afirmacoes_impactadas": [],
+                "indicador": "",
+                "resultado_esperado": "",
+                "status": "nao_iniciado",
+            }
+        ],
+    }
+
+
 def low_reference_prompt_rules():
     return (
         "Considere origens_atencao e tipo_ponto_atencao informados em cada afirmacao. "
@@ -708,16 +772,20 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "diagnostico_tecnico": diagnostic_resumo,
         "indicadores_operacionais_disponiveis": indicadores_disponiveis,
         "semanas_a_gerar": [start_week, end_week],
-        "saida_obrigatoria": weekly_chunk_schema(start_week, end_week),
+        "saida_obrigatoria": (
+            single_week_schema(start_week)
+            if start_week == end_week
+            else weekly_chunk_schema(start_week, end_week)
+        ),
     }
     single_week_rules = ""
     if start_week == end_week:
         single_week_rules = (
             "Esta chamada gera exatamente uma semana. Mantenha profundidade com concisao: "
-            "use no maximo 2 itens por lista, frases de ate 240 caracteres e apenas 1 objeto em plano_12_semanas. "
+            "use no maximo 2 itens por lista, textos de ate 120 caracteres e apenas 1 objeto em plano_12_semanas. "
             "Nao repita diagnostico, contexto ou a mesma orientacao em campos diferentes. "
             "Priorize roteiro pratico, speech, evidencias, criterio de conclusao e proxima pratica observavel. "
-            "A resposta completa deve caber em ate 3000 tokens e terminar como JSON valido. "
+            "Nao adicione campos fora de saida_obrigatoria. A resposta completa deve caber em ate 2800 tokens e terminar como JSON valido. "
         )
     return (
         f"Gere as semanas {start_week} a {end_week} de um PDI LeaderTrack, mas inclua somente semanas com intervencao nova e util. "
