@@ -23,6 +23,7 @@ from leadertrack_devolutivas import (
     build_performance_goal_suggestion,
     build_weekly_prompt,
     filter_gaps,
+    integrated_attention_items,
     low_reference_affirmations,
     microenvironment_affirmations,
     parse_json_response,
@@ -3691,7 +3692,6 @@ def gerar_devolutiva_leadertrack():
                 int(metadados_consolidado.get("lideres_com_arquetipos") or 0),
                 int(metadados_consolidado.get("lideres_com_microambiente") or 0),
             )
-        gaps_para_gerar = gaps[:maximo_gaps_por_ciclo] if gerar_apenas_primeiro_ciclo else gaps
         leader = {
             "nome": nome_lider,
             "email": email_lider,
@@ -3713,6 +3713,14 @@ def gerar_devolutiva_leadertrack():
             gap_minimo=gap_minimo,
             baixa_referencia_threshold=baixa_referencia_threshold,
             contexto_ids=contexto_ids,
+            integrar_baixa_referencia_no_pdi=not considerar_todos_lideres,
+        )
+        pontos_atencao = devolutiva.get("pontos_atencao_integrados") or []
+        itens_para_gerar = gaps if considerar_todos_lideres else pontos_atencao
+        gaps_para_gerar = (
+            itens_para_gerar[:maximo_gaps_por_ciclo]
+            if gerar_apenas_primeiro_ciclo
+            else itens_para_gerar
         )
         devolutiva["equipe_tipo"] = equipe_tipo
         devolutiva["amostra"] = amostra
@@ -4456,6 +4464,18 @@ def gerar_pdi_leadertrack_afirmacao():
             return response, 400
 
         grupo_enviado = dados.get("grupo") if isinstance(dados.get("grupo"), dict) else {}
+        gap_enviado = dados.get("gap") if isinstance(dados.get("gap"), dict) else {}
+        usa_regra_baixa_referencia = bool(
+            gap_enviado.get("baixa_referencia")
+            or gap_enviado.get("tipo_ponto_atencao") in {"baixa_referencia", "gap_e_baixa_referencia"}
+            or int(grupo_enviado.get("total_baixa_referencia") or 0) > 0
+            or "baixa_referencia" in (grupo_enviado.get("origens_atencao") or [])
+        )
+
+        def cache_id_regra_atencao(cache_id):
+            cache_id = str(cache_id or "").strip()
+            return f"{cache_id}__atencao_br_v1" if cache_id and usa_regra_baixa_referencia else cache_id
+
         grupo_id_previo = str(
             dados.get("grupoId")
             or dados.get("grupo_id")
@@ -4463,7 +4483,9 @@ def gerar_pdi_leadertrack_afirmacao():
             or ""
         ).strip()
         gap_id_previo = str(dados.get("gapId") or dados.get("gap_id") or "").strip()
-        cache_id_previo = grupo_id_previo if etapa == "integrado" else gap_id_previo
+        cache_id_previo = cache_id_regra_atencao(
+            grupo_id_previo if etapa == "integrado" else gap_id_previo
+        )
         if usar_cache and cache_id_previo:
             intervalo_previo = None
             if etapa != "diagnostico":
@@ -4536,7 +4558,21 @@ def gerar_pdi_leadertrack_afirmacao():
 
         arquetipos = archetype_summary(dados_arquetipos_comparativo)
         todas_afirmacoes = microenvironment_affirmations(dados_microambiente_analitico)
-        gap = None if etapa == "integrado" else selecionar_gap_leadertrack(todas_afirmacoes, dados)
+        gap_minimo = float(dados.get("gapMinimo") or dados.get("gap_minimo") or 20)
+        baixa_referencia_threshold = float(
+            dados.get("baixaReferenciaThreshold")
+            or dados.get("baixa_referencia_threshold")
+            or 70
+        )
+        gaps_relevantes = filter_gaps(todas_afirmacoes, gap_minimo)
+        baixas_referencias = low_reference_affirmations(
+            todas_afirmacoes,
+            baixa_referencia_threshold,
+        )
+        pontos_atencao = integrated_attention_items(gaps_relevantes, baixas_referencias)
+        gap = None if etapa == "integrado" else selecionar_gap_leadertrack(pontos_atencao, dados)
+        if etapa != "integrado" and not gap:
+            gap = selecionar_gap_leadertrack(todas_afirmacoes, dados)
         if etapa != "integrado" and not gap:
             response = jsonify({
                 "erro": "Afirmacao/gap nao encontrado.",
@@ -4555,9 +4591,10 @@ def gerar_pdi_leadertrack_afirmacao():
         }
         prompt_base = carregar_prompt_leadertrack()
         gap_id = leadertrack_gap_id(gap) if gap else grupo_id_previo
+        cache_gap_id = cache_id_regra_atencao(gap_id)
 
         if etapa == "diagnostico":
-            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa)
+            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, cache_gap_id, etapa)
             if usar_cache:
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
                 if cached_payload:
@@ -4626,7 +4663,16 @@ def gerar_pdi_leadertrack_afirmacao():
                 return response, 400
 
             inicio, fim = intervalo_etapa_leadertrack(etapa, dados) or (1, 4)
-            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, grupo_id, etapa, inicio, fim)
+            cache_key = leadertrack_cache_key(
+                empresa,
+                codrodada,
+                email_lider,
+                equipe_tipo,
+                cache_id_regra_atencao(grupo_id),
+                etapa,
+                inicio,
+                fim,
+            )
             if usar_cache:
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
                 if cached_payload:
@@ -4717,7 +4763,16 @@ def gerar_pdi_leadertrack_afirmacao():
                 "orientacao": "Use preferencialmente o diagnostico gerado na etapa diagnostico como entrada desta chamada.",
             }
             inicio, fim = intervalo
-            cache_key = leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, etapa, inicio, fim)
+            cache_key = leadertrack_cache_key(
+                empresa,
+                codrodada,
+                email_lider,
+                equipe_tipo,
+                cache_gap_id,
+                etapa,
+                inicio,
+                fim,
+            )
             if usar_cache:
                 cached_payload = buscar_cache_leadertrack(empresa, email_lider, cache_key)
                 if cached_payload:

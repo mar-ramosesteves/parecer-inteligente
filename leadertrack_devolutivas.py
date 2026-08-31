@@ -108,14 +108,75 @@ def low_reference_affirmations(items, threshold=70):
     ]
 
 
+def integrated_attention_items(gaps, low_reference_items=None):
+    """Unifica gaps relevantes e baixa referencia sem duplicar afirmacoes."""
+    gaps = gaps or []
+    low_reference_items = low_reference_items or []
+    combined = {}
+
+    def item_key(item):
+        return (
+            fix_text(item.get("questao")).strip().lower(),
+            fix_text(item.get("dimensao")).strip().lower(),
+            fix_text(item.get("subdimensao")).strip().lower(),
+        )
+
+    def ensure_item(item):
+        key = item_key(item)
+        if key not in combined:
+            combined[key] = dict(item)
+            combined[key]["origens_atencao"] = []
+            combined[key]["gap_relevante"] = False
+            combined[key]["baixa_referencia"] = False
+        return combined[key]
+
+    for gap in gaps:
+        target = ensure_item(gap)
+        target["gap_relevante"] = True
+        if "gap_relevante" not in target["origens_atencao"]:
+            target["origens_atencao"].append("gap_relevante")
+
+    for item in low_reference_items:
+        target = ensure_item(item)
+        target["baixa_referencia"] = True
+        if "baixa_referencia" not in target["origens_atencao"]:
+            target["origens_atencao"].append("baixa_referencia")
+
+    result = []
+    for item in combined.values():
+        if item["gap_relevante"] and item["baixa_referencia"]:
+            item["tipo_ponto_atencao"] = "gap_e_baixa_referencia"
+        elif item["baixa_referencia"]:
+            item["tipo_ponto_atencao"] = "baixa_referencia"
+            item["criticidade"] = "baixa_referencia"
+        else:
+            item["tipo_ponto_atencao"] = "gap_relevante"
+        result.append(item)
+
+    return sorted(
+        result,
+        key=lambda item: (
+            1 if item.get("gap_relevante") else 0,
+            1 if item.get("baixa_referencia") else 0,
+            float(item.get("gap_percentual") or 0),
+            -float(item.get("real_percentual") or 0),
+        ),
+        reverse=True,
+    )
+
+
 def severity_summary(items, low_reference_items=None):
     low_reference_items = low_reference_items or []
+    relevant_gaps = filter_gaps(items, 20)
+    attention_items = integrated_attention_items(relevant_gaps, low_reference_items)
     return {
         "total_afirmacoes": len(items),
-        "gaps_relevantes_acima_20": len(filter_gaps(items, 20)),
+        "gaps_relevantes_acima_20": len(relevant_gaps),
         "gaps_moderados_altos_acima_25": len(filter_gaps(items, 25)),
         "gaps_criticos_acima_35": len(filter_gaps(items, 35)),
         "baixa_referencia_abaixo_70": len(low_reference_items),
+        "pontos_atencao_integrados": len(attention_items),
+        "regra_pontos_atencao": "uniao_sem_duplicidade_de_gap_relevante_e_baixa_referencia",
         "regua_sugerida": {
             "20": "todos_os_gaps_relevantes",
             "25": "gaps_moderados_altos",
@@ -134,6 +195,16 @@ def feedback_mode(gaps, low_reference_items=None, few_gaps_limit=3):
             "leitura": (
                 "O lider nao deve ficar sem devolutiva. O foco passa a ser manter os niveis positivos, "
                 "prevenir queda de qualidade do microambiente e ampliar repertorio de arquetipos."
+            ),
+        }
+    if gap_count == 0 and low_reference_items:
+        return {
+            "modo": "elevacao_de_referencia",
+            "titulo": "Sem gaps relevantes, com baixa referencia",
+            "leitura": (
+                "A proximidade entre real e ideal nao deve ser interpretada isoladamente como alto estimulo. "
+                "O foco da devolutiva e investigar por que o padrao desejado permanece abaixo de 70% e "
+                "construir referencias mais altas, concretas e observaveis com a equipe."
             ),
         }
     if gap_count <= few_gaps_limit:
@@ -157,8 +228,13 @@ def feedback_mode(gaps, low_reference_items=None, few_gaps_limit=3):
 
 def build_sustainability_plan(gaps, low_reference_items=None):
     low_reference_items = low_reference_items or []
+    has_low_reference = bool(low_reference_items)
     return {
-        "objetivo": "Manter niveis positivos de microambiente e evitar regressao dos gaps baixos.",
+        "objetivo": (
+            "Investigar e elevar referencias baixas, preservando os pontos positivos do microambiente."
+            if has_low_reference and not gaps
+            else "Manter niveis positivos de microambiente e evitar regressao dos gaps baixos."
+        ),
         "quando_usar": "Usar quando nao houver gaps relevantes ou quando houver poucos gaps no corte definido.",
         "acoes_sugeridas": [
             "Identificar quais praticas de gestao sustentam os melhores resultados atuais.",
@@ -178,10 +254,11 @@ def build_sustainability_plan(gaps, low_reference_items=None):
             "Evidencias de continuidade dos rituais de gestao.",
         ],
         "baixa_referencia": {
-            "existe": bool(low_reference_items),
+            "existe": has_low_reference,
             "leitura": (
-                "Quando real e ideal ficam abaixo de 70%, o plano deve elevar ambicao de referencia, "
-                "pois a equipe pode estar se contentando com um patamar baixo."
+                "Quando real e ideal ficam abaixo de 70%, o plano deve primeiro investigar o significado "
+                "desse padrao desejado e depois construir uma referencia mais alta, concreta e observavel. "
+                "Baixa referencia nao prova desmotivacao; e uma hipotese que exige validacao qualitativa."
             ),
             "afirmacoes": low_reference_items,
         },
@@ -268,7 +345,12 @@ def thematic_grouping(items, max_items_per_group=6):
     for group in groups_by_key.values():
         afirmacoes = sorted(
             group["afirmacoes"],
-            key=lambda gap: float(gap.get("gap_percentual") or 0),
+            key=lambda item: (
+                1 if item.get("gap_relevante") else 0,
+                1 if item.get("baixa_referencia") else 0,
+                float(item.get("gap_percentual") or 0),
+                -float(item.get("real_percentual") or 0),
+            ),
             reverse=True,
         )
         gap_medio = (
@@ -276,13 +358,32 @@ def thematic_grouping(items, max_items_per_group=6):
             if afirmacoes else 0
         )
         gap_maximo = max((float(gap.get("gap_percentual") or 0) for gap in afirmacoes), default=0)
+        total_gaps_relevantes = sum(1 for item in afirmacoes if item.get("gap_relevante"))
+        total_baixa_referencia = sum(1 for item in afirmacoes if item.get("baixa_referencia"))
+        total_sobrepostos = sum(
+            1 for item in afirmacoes
+            if item.get("gap_relevante") and item.get("baixa_referencia")
+        )
         questoes = [gap.get("questao") for gap in afirmacoes if gap.get("questao")]
         group["afirmacoes"] = afirmacoes[:max_items_per_group]
         group["total_afirmacoes"] = len(afirmacoes)
         group["questoes"] = questoes
         group["gap_medio_percentual"] = round(gap_medio, 2)
         group["gap_maximo_percentual"] = round(gap_maximo, 2)
-        group["criticidade"] = classify_gap(gap_maximo)
+        group["total_gaps_relevantes"] = total_gaps_relevantes
+        group["total_baixa_referencia"] = total_baixa_referencia
+        group["total_sobrepostos"] = total_sobrepostos
+        group["origens_atencao"] = [
+            origem for origem, quantidade in (
+                ("gap_relevante", total_gaps_relevantes),
+                ("baixa_referencia", total_baixa_referencia),
+            ) if quantidade
+        ]
+        group["criticidade"] = (
+            classify_gap(gap_maximo)
+            if total_gaps_relevantes
+            else "baixa_referencia"
+        )
         total_texto = len(afirmacoes)
         if total_texto == 1:
             objetivo_integrado = (
@@ -315,6 +416,38 @@ def thematic_grouping(items, max_items_per_group=6):
                 "Registrar semanalmente quais afirmacoes foram impactadas por cada acao.",
                 "Revisar evidencias ao final do ciclo antes de abrir novo bloco de desenvolvimento.",
             ]
+        if total_baixa_referencia and not total_gaps_relevantes:
+            objetivo_integrado = (
+                f"Investigar e elevar a referencia de {total_texto} afirmacao(oes) conectada(s) "
+                f"a {group['dimensao']} / {group['subdimensao']}."
+            )
+            premissa_integrada = (
+                "Real e ideal abaixo de 70% nao provam desmotivacao. Indicam uma hipotese de acomodacao, "
+                "baixa ambicao coletiva, descrenca na melhoria ou referencia limitada que deve ser validada "
+                "qualitativamente antes da intervencao."
+            )
+            como_usar_integrado = [
+                "Investigar o significado atribuido pela equipe ao padrao desejado sem expor respostas individuais.",
+                "Definir uma referencia mais alta por meio de comportamentos e resultados observaveis.",
+                "Testar uma pratica de lideranca ou rotina operacional conectada ao tema.",
+                "Revisar evidencias e decidir se a nova referencia e realista, compreendida e sustentavel.",
+            ]
+        elif total_baixa_referencia and total_gaps_relevantes:
+            objetivo_integrado = (
+                f"Reduzir gaps e elevar referencias em {total_texto} afirmacao(oes) conectada(s) "
+                f"a {group['dimensao']} / {group['subdimensao']}."
+            )
+            premissa_integrada = (
+                "O grupo combina distancia entre realidade e expectativa com referencias desejadas abaixo de 70%. "
+                "O plano deve tratar as duas origens sem duplicar afirmacoes nem presumir desmotivacao como fato."
+            )
+            como_usar_integrado = [
+                "Separar quais afirmacoes pedem reducao de distancia e quais pedem elevacao de referencia.",
+                "Validar causas e contexto antes de escolher a intervencao.",
+                "Aplicar poucas praticas observaveis que possam impactar o tema comum.",
+                "Revisar evidencias dos gaps e da referencia desejada ao final do ciclo.",
+            ]
+
         group["plano_integrado_sugerido"] = {
             "tipo": "estrutura_sem_ia",
             "objetivo": objetivo_integrado,
@@ -331,6 +464,7 @@ def thematic_grouping(items, max_items_per_group=6):
         groups,
         key=lambda group: (
             int(group.get("total_afirmacoes") or 0),
+            int(group.get("total_baixa_referencia") or 0),
             float(group.get("gap_maximo_percentual") or 0),
         ),
         reverse=True,
@@ -521,6 +655,19 @@ def weekly_chunk_schema(start_week, end_week):
     return schema
 
 
+def low_reference_prompt_rules():
+    return (
+        "Considere origens_atencao e tipo_ponto_atencao informados em cada afirmacao. "
+        "Gap relevante pede reducao da distancia entre real e ideal. Baixa referencia pede investigacao "
+        "e elevacao do padrao desejado quando real e ideal ficam abaixo de 70%. "
+        "Baixa referencia nao e prova automatica de desmotivacao: trate acomodacao, baixa ambicao coletiva, descrenca na "
+        "melhoria ou referencia limitada apenas como hipoteses a validar qualitativamente. "
+        "Quando houver baixa referencia, comece por compreender o significado do ideal para a equipe, "
+        "defina um padrao mais alto em comportamentos observaveis, teste uma pratica e acompanhe evidencias. "
+        "Se a mesma afirmacao tiver as duas origens, produza um unico plano que trate ambas sem duplicacao. "
+    )
+
+
 def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
     payload = {
         "lider": leader,
@@ -532,7 +679,8 @@ def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
     return (
         "Gere apenas o diagnostico tecnico para uma devolutiva individual LeaderTrack, sem plano semanal. "
         "Analise o gap, a dimensao/subdimensao de microambiente, os arquetipos dominantes, riscos de excesso e arquetipos a desenvolver. "
-        "Inclua impacto operacional esperado e indicadores reais que a empresa deveria acompanhar para avaliar efetividade. "
+        + low_reference_prompt_rules()
+        + "Inclua impacto operacional esperado e indicadores reais que a empresa deveria acompanhar para avaliar efetividade. "
         "Nao invente valores nem metas. Se nao houver indicador operacional disponivel, sugira o que coletar como linha de base. "
         "Nao use saude emocional no relatorio individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
@@ -564,7 +712,8 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
     }
     return (
         f"Gere as semanas {start_week} a {end_week} de um PDI LeaderTrack, mas inclua somente semanas com intervencao nova e util. "
-        "A rodada oficial e anual; estas semanas sao acompanhamento informal, sem nova rodada e sem novo inventario. "
+        + low_reference_prompt_rules()
+        + "A rodada oficial e anual; estas semanas sao acompanhamento informal, sem nova rodada e sem novo inventario. "
         "Apresente logo no inicio a visao geral do plano, com duracao recomendada, investimento de tempo por semana e investimento estimado por mes. "
         "O investimento total nao pode ultrapassar 2 horas por semana; se a acao exigir mais que isso, reduza escopo ou quebre em ciclo futuro. "
         "Use preferencialmente um ciclo de ate 4 semanas: semana 1 diagnostico, semana 2 planejamento, semana 3 acao, semana 4 conclusao_resultados. "
@@ -632,6 +781,8 @@ def integrated_plan_schema(start_week=1, end_week=12):
             "sintese_executiva": "",
             "causa_comum_provavel": "",
             "como_os_gaps_se_conectam": [],
+            "como_os_pontos_de_atencao_se_conectam": [],
+            "hipoteses_de_baixa_referencia_a_validar": [],
         },
         "cruzamento_arquetipos": {
             "arquetipos_dominantes_que_ajudam": [],
@@ -748,7 +899,8 @@ def build_integrated_plan_prompt(leader, arquetipos, group, indicadores_disponiv
     }
     return (
         f"Gere as semanas {start_week} a {end_week} de um PDI integrado LeaderTrack para um grupo de afirmacoes relacionadas ao mesmo tema de microambiente, mas inclua somente semanas com intervencao nova e util. "
-        "Apresente logo no inicio a visao geral do plano, com duracao recomendada, investimento de tempo por semana e investimento estimado por mes. "
+        + low_reference_prompt_rules()
+        + "Apresente logo no inicio a visao geral do plano, com duracao recomendada, investimento de tempo por semana e investimento estimado por mes. "
         "O investimento total nao pode ultrapassar 2 horas por semana; se a acao exigir mais que isso, reduza escopo ou quebre em ciclo futuro. "
         "Use preferencialmente um ciclo de ate 4 semanas: semana 1 diagnostico, semana 2 planejamento, semana 3 acao, semana 4 conclusao_resultados. "
         "A sequencia recomendada de intervencao e: semana 1 observacao_em_campo ou autodesenvolvimento; semana 2 comunicacao ou alinhamento_com_superior; semana 3 experimento_operacional ou pratica_diaria; semana 4 revisao_informal ou observacao_em_campo. "
@@ -837,6 +989,7 @@ def build_integrated_single_week_prompt(leader, arquetipos, group, indicadores_d
     return (
         f"Gere somente a semana {week_number} de um PDI integrado LeaderTrack. "
         + "Esta chamada precisa ser curta, profunda e estavel: responda somente JSON valido, sem markdown e sem texto fora do JSON. "
+        + low_reference_prompt_rules()
         + f"A etapa da semana deve ser {etapas.get(week_number, 'acao')} e a entrega concreta deve ser: {entregas.get(week_number, 'intervencao objetiva')}. "
         + extra_semana_4
         + "Nao gere outras semanas. Nao force 12 semanas. Este produto trabalha em ciclo recomendado de ate 4 semanas, com maximo de 2 horas por semana. "
@@ -869,7 +1022,8 @@ def build_integrated_week1_prompt(leader, arquetipos, group, indicadores_disponi
     }
     return (
         "Gere somente a semana 1 de um PDI integrado LeaderTrack para o grupo tematico informado. "
-        "Esta chamada existe para evitar timeout: nao gere semanas 2, 3 ou 4. "
+        + low_reference_prompt_rules()
+        + "Esta chamada existe para evitar timeout: nao gere semanas 2, 3 ou 4. "
         "A semana 1 deve ser profunda, mas objetiva, com foco em diagnostico pratico e preparacao do terreno para o plano. "
         "Use exclusivamente as afirmacoes, gaps, dimensao, subdimensao, arquetipos e contexto enviados. "
         "Nao invente dados, indicadores numericos, nomes ou historico. "
@@ -903,12 +1057,19 @@ def build_empty_devolutiva(
     gap_minimo=20,
     baixa_referencia_threshold=70,
     contexto_ids=None,
+    integrar_baixa_referencia_no_pdi=True,
 ):
     todas_afirmacoes = todas_afirmacoes or []
     baixa_referencia = baixa_referencia or []
     contexto_ids = contexto_ids or {}
-    modo_devolutiva = feedback_mode(gaps, baixa_referencia)
-    agrupamentos = thematic_grouping(gaps, maximo_gaps_por_ciclo + 2)
+    baixa_referencia_pdi = baixa_referencia if integrar_baixa_referencia_no_pdi else []
+    modo_devolutiva = feedback_mode(gaps, baixa_referencia_pdi)
+    pontos_atencao = (
+        integrated_attention_items(gaps, baixa_referencia_pdi)
+        if integrar_baixa_referencia_no_pdi
+        else list(gaps or [])
+    )
+    agrupamentos = thematic_grouping(pontos_atencao, maximo_gaps_por_ciclo + 2)
     if not agrupamentos:
         agrupamentos = maintenance_grouping(todas_afirmacoes, baixa_referencia, maximo_gaps_por_ciclo + 2)
     return {
@@ -935,11 +1096,12 @@ def build_empty_devolutiva(
         "todas_afirmacoes_microambiente": todas_afirmacoes,
         "gaps_priorizados": gaps,
         "baixa_referencia": baixa_referencia,
+        "pontos_atencao_integrados": pontos_atencao,
         "modo_devolutiva": modo_devolutiva,
         "resumo_severidade": severity_summary(todas_afirmacoes, baixa_referencia),
-        "plano_sustentacao_microambiente": build_sustainability_plan(gaps, baixa_referencia),
+        "plano_sustentacao_microambiente": build_sustainability_plan(gaps, baixa_referencia_pdi),
         "plano_desenvolvimento_arquetipos": build_archetype_development_plan(arquetipos),
-        "faseamento_anual_sugerido": annual_phasing(gaps, maximo_gaps_por_ciclo),
+        "faseamento_anual_sugerido": annual_phasing(pontos_atencao, maximo_gaps_por_ciclo),
         "agrupamentos_tematicos": agrupamentos,
         "pdis": [],
         "historico_profissional": {
