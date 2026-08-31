@@ -113,6 +113,22 @@ class IntegratedAttentionItemsTests(unittest.TestCase):
         self.assertIn("Priorize roteiro pratico, speech, evidencias", prompt)
         self.assertIn("terminar como JSON valido", prompt)
 
+    def test_week_four_prompt_requires_closure_instead_of_new_diagnosis(self):
+        prompt = build_weekly_prompt(
+            leader={"nome": "Lider"},
+            arquetipos={},
+            gap=item("Q1", 55, 65, 10),
+            diagnostic={},
+            start_week=4,
+            end_week=4,
+            indicadores_disponiveis=[],
+        )
+
+        self.assertIn("etapa_do_ciclo=conclusao_resultados", prompt)
+        self.assertIn("tipo_de_intervencao=revisao_informal", prompt)
+        self.assertIn("Nao crie novo diagnostico", prompt)
+        self.assertIn("manter, ajustar ou encerrar", prompt)
+
     def test_single_week_schema_keeps_execution_fields_without_redundancy(self):
         schema = single_week_schema(1)
         week = schema["plano_12_semanas"][0]

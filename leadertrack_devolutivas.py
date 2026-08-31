@@ -838,6 +838,16 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
             "Priorize roteiro pratico, speech, evidencias, criterio de conclusao e proxima pratica observavel. "
             "Nao adicione campos fora de saida_obrigatoria. A resposta completa deve caber em ate 2800 tokens e terminar como JSON valido. "
         )
+        if start_week == 4:
+            single_week_rules += (
+                "REGRA OBRIGATORIA DA SEMANA 4: use etapa_do_ciclo=conclusao_resultados e "
+                "tipo_de_intervencao=revisao_informal. Considere que a semana 1 ja mapeou evidencias, "
+                "a semana 2 ja alinhou um pacto e a semana 3 ja executou um experimento operacional. "
+                "Nao crie novo diagnostico, novo mapeamento ou nova observacao inicial e nunca descreva "
+                "esta semana como primeira intervencao. Revise as evidencias das semanas anteriores, "
+                "compare o resultado do experimento com o pacto, registre aprendizados e produza uma "
+                "decisao explicita entre manter, ajustar ou encerrar o ciclo. "
+            )
     return (
         f"Gere as semanas {start_week} a {end_week} de um PDI LeaderTrack, mas inclua somente semanas com intervencao nova e util. "
         + low_reference_prompt_rules()
@@ -846,7 +856,7 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "Apresente logo no inicio a visao geral do plano, com duracao recomendada, investimento de tempo por semana e investimento estimado por mes. "
         "O investimento total nao pode ultrapassar 2 horas por semana; se a acao exigir mais que isso, reduza escopo ou quebre em ciclo futuro. "
         "Use preferencialmente um ciclo de ate 4 semanas: semana 1 diagnostico, semana 2 planejamento, semana 3 acao, semana 4 conclusao_resultados. "
-        "A sequencia recomendada de intervencao e: semana 1 observacao_em_campo ou autodesenvolvimento; semana 2 comunicacao ou alinhamento_com_superior; semana 3 experimento_operacional ou pratica_diaria; semana 4 revisao_informal ou observacao_em_campo. "
+        "A sequencia recomendada de intervencao e: semana 1 observacao_em_campo ou autodesenvolvimento; semana 2 comunicacao ou alinhamento_com_superior; semana 3 experimento_operacional ou pratica_diaria; semana 4 obrigatoriamente revisao_informal. "
         "Cada semana deve ter uma entrega concreta diferente: semana 1 mapa de evidencias e sinais observados; semana 2 pacto ou acordo simples com a equipe ou superior; semana 3 experimento operacional com comportamento novo observavel; semana 4 decisao de manutencao, ajuste ou encerramento do ciclo. "
         "Nao use titulos crus como 'revisao_informal' ou 'conclusao_resultados'; transforme o titulo em linguagem humana, consultiva e especifica do tema. "
         "Acoes praticas precisam citar atividades especificas do trabalho real e do tema das afirmacoes, nao apenas 'conduzir reuniao', 'registrar acordos' ou 'observar comportamentos'. "
