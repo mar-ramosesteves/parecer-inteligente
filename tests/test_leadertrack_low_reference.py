@@ -2,6 +2,7 @@ import unittest
 
 from leadertrack_devolutivas import (
     build_empty_devolutiva,
+    build_weekly_prompt,
     integrated_attention_items,
     low_reference_prompt_rules,
 )
@@ -92,6 +93,22 @@ class IntegratedAttentionItemsTests(unittest.TestCase):
 
         self.assertEqual("sustentacao_e_repertorio", result["modo_devolutiva"]["modo"])
         self.assertEqual([], result["pontos_atencao_integrados"])
+
+    def test_single_week_prompt_limits_output_without_removing_depth(self):
+        prompt = build_weekly_prompt(
+            leader={"nome": "Lider"},
+            arquetipos={},
+            gap=item("Q1", 55, 65, 10),
+            diagnostic={},
+            start_week=1,
+            end_week=1,
+            indicadores_disponiveis=[],
+        )
+
+        self.assertIn("exatamente uma semana", prompt)
+        self.assertIn("no maximo 2 itens por lista", prompt)
+        self.assertIn("Priorize roteiro pratico, speech, evidencias", prompt)
+        self.assertIn("terminar como JSON valido", prompt)
 
 
 if __name__ == "__main__":

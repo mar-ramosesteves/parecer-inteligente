@@ -710,9 +710,19 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "semanas_a_gerar": [start_week, end_week],
         "saida_obrigatoria": weekly_chunk_schema(start_week, end_week),
     }
+    single_week_rules = ""
+    if start_week == end_week:
+        single_week_rules = (
+            "Esta chamada gera exatamente uma semana. Mantenha profundidade com concisao: "
+            "use no maximo 2 itens por lista, frases de ate 240 caracteres e apenas 1 objeto em plano_12_semanas. "
+            "Nao repita diagnostico, contexto ou a mesma orientacao em campos diferentes. "
+            "Priorize roteiro pratico, speech, evidencias, criterio de conclusao e proxima pratica observavel. "
+            "A resposta completa deve caber em ate 3000 tokens e terminar como JSON valido. "
+        )
     return (
         f"Gere as semanas {start_week} a {end_week} de um PDI LeaderTrack, mas inclua somente semanas com intervencao nova e util. "
         + low_reference_prompt_rules()
+        + single_week_rules
         + "A rodada oficial e anual; estas semanas sao acompanhamento informal, sem nova rodada e sem novo inventario. "
         "Apresente logo no inicio a visao geral do plano, com duracao recomendada, investimento de tempo por semana e investimento estimado por mes. "
         "O investimento total nao pode ultrapassar 2 horas por semana; se a acao exigir mais que isso, reduza escopo ou quebre em ciclo futuro. "
