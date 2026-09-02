@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g, has_request_context
 from flask_cors import CORS
 import os
 import json
@@ -48,6 +48,10 @@ from leadertrack_executive_analysis import (
     build_executive_analysis_prompt,
     compact_snapshot_for_analysis,
     normalize_executive_analysis,
+)
+from leadertrack_admission import (
+    ADMISSION_VERSION, admission_enabled, build_individual_reports,
+    fetch_admission_rows, sample_fingerprint,
 )
 
 app = Flask(__name__)
@@ -499,7 +503,50 @@ def salvar_relatorio_analitico_no_supabase(dados, empresa, codrodada, email_lide
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
+def calcular_blocos_individuais_admissao(module, equipe, auto):
+    if module == "arquetipos":
+        return {
+            "arquetipos_grafico_comparativo": {
+                "autoavaliacao": calcular_arquetipos_respostas(auto),
+                "mediaEquipe": calcular_arquetipos_respostas_por_respondente(equipe),
+            },
+            "arquetipos_analitico": calcular_arquetipos_analitico_respostas(auto, equipe),
+            "arquetipos_parecer_ia": {},
+        }
+    analitico, _ = consolidar_microambiente_respostas_lista(equipe)
+    auto_analitico, _ = consolidar_microambiente_respostas_lista(auto)
+    return {
+        "microambiente_analitico": analitico,
+        "microambiente_grafico_mediaequipe_dimensao": consolidar_microambiente_por_campo(analitico, "DIMENSAO"),
+        "microambiente_grafico_mediaequipe_subdimensao": consolidar_microambiente_por_campo(analitico, "SUBDIMENSAO"),
+        "microambiente_grafico_autoavaliacao_dimensao": consolidar_microambiente_por_campo(auto_analitico, "DIMENSAO"),
+        "microambiente_grafico_autoavaliacao_subdimensao": consolidar_microambiente_por_campo(auto_analitico, "SUBDIMENSAO"),
+        "microambiente_termometro_gaps": consolidar_microambiente_termometro(analitico),
+        "microambiente_waterfall_gaps": consolidar_microambiente_waterfall(analitico),
+        "microambiente_parecer_ia": {},
+    }
+
+
+def buscar_pacote_admissao(empresa, rodada, email_lider):
+    # Activate only audited rounds. Executive snapshots continue on their own path.
+    if not admission_enabled(rodada) or leadertrack_todos_lideres(email_lider):
+        return None
+    key = (str(empresa).lower(), str(rodada).lower(), str(email_lider).lower())
+    cache = g.setdefault("leadertrack_admission_packages", {}) if has_request_context() else {}
+    if key in cache:
+        return cache[key]
+    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+    rows = fetch_admission_rows(SUPABASE_REST_URL, headers, *key)
+    package = {"fingerprint": sample_fingerprint(rows),
+               "reports": build_individual_reports(rows, calcular_blocos_individuais_admissao)}
+    cache[key] = package
+    return package
+
+
 def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
+    pacote = buscar_pacote_admissao(empresa, rodada, email_lider)
+    if pacote and tipo_relatorio in pacote["reports"]:
+        return pacote["reports"][tipo_relatorio]
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
@@ -528,6 +575,9 @@ def buscar_json_supabase(tipo_relatorio, empresa, rodada, email_lider):
     return None
 
 def buscar_json_microambiente(tipo_relatorio, empresa, rodada, email_lider):
+    pacote = buscar_pacote_admissao(empresa, rodada, email_lider)
+    if pacote and tipo_relatorio in pacote["reports"]:
+        return pacote["reports"][tipo_relatorio]
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
@@ -2066,6 +2116,9 @@ def leadertrack_cache_key(empresa, codrodada, email_lider, equipe_tipo, gap_id, 
         str(semana_inicio or ""),
         str(semana_fim or ""),
     ]
+    pacote = buscar_pacote_admissao(empresa, codrodada, email_lider)
+    if pacote:
+        parts.extend([ADMISSION_VERSION, pacote["fingerprint"]])
     return "|".join(parts)
 
 
@@ -2320,6 +2373,16 @@ def _normalizar_chave_amostra(value):
 
 
 def avaliar_amostra_leadertrack(*relatorios):
+    verified = [r["amostra"] for r in relatorios if isinstance(r, dict)
+                and isinstance(r.get("amostra"), dict)
+                and r["amostra"].get("criterio_elegibilidade") == ADMISSION_VERSION]
+    if verified:
+        insufficient = any(s["insuficiente"] for s in verified)
+        return {"insuficiente": insufficient, "criterio_elegibilidade": ADMISSION_VERSION,
+                "respostas_equipe": None, "elegiveis_media": None, "menos_de_3_meses": None,
+                "amostras_por_relatorio": verified,
+                "criterio": "Minimo de 3 respostas elegiveis por modulo; 90 dias de admissao na data da resposta.",
+                "orientacao": "Amostras e exclusoes discriminadas em cada grafico. Medias insuficientes nao sao exibidas."}
     textos = []
     campos = {}
 
@@ -5094,3 +5157,4 @@ def teste_ia_leadertrack_get():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
