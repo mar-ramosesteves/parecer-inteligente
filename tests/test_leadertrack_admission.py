@@ -1,9 +1,9 @@
 import unittest
 import os
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from leadertrack_admission import (
     MICRO_FORM_KEYS, admission_enabled, answers, build_individual_reports, sample_fingerprint,
-    select_sample, temporal_status,
+    select_sample, temporal_status, fetch_admission_rows,
 )
 
 
@@ -15,6 +15,22 @@ def row(i, admitted="2020-01-01", responded="2026-07-20", kind="LIDER_2", module
 
 
 class AdmissionTests(unittest.TestCase):
+    def test_admission_query_uses_server_credential_not_legacy_key(self):
+        response = Mock()
+        response.json.return_value = [{**row(1), "holding": "LEVEN"}]
+        get = Mock(return_value=response)
+        with patch.dict(os.environ, {"SUPABASE_SERVICE_ROLE_KEY": "test-server-only"}):
+            fetch_admission_rows("https://test.invalid", {"apikey": "legacy"}, "umi", "avleven0726", "test", get=get)
+        self.assertEqual("test-server-only", get.call_args.kwargs["headers"]["apikey"])
+        self.assertEqual("Bearer test-server-only", get.call_args.kwargs["headers"]["Authorization"])
+
+    def test_admission_query_fails_closed_without_server_credential(self):
+        get = Mock()
+        with patch.dict(os.environ, {"SUPABASE_SERVICE_ROLE_KEY": ""}):
+            with self.assertRaisesRegex(ValueError, "credencial de servidor"):
+                fetch_admission_rows("https://test.invalid", {}, "umi", "avleven0726", "test", get=get)
+        get.assert_not_called()
+
     def test_coordinated_activation_and_rollback(self):
         with patch.dict(os.environ, {'LEADERTRACK_ADMISSION_ROUNDS': ''}):
             self.assertFalse(admission_enabled('avleven0726'))
