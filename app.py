@@ -14,6 +14,8 @@ import requests
 from openpyxl import load_workbook
 from openai import APITimeoutError, OpenAI
 from leadertrack_devolutivas import (
+    DIAGNOSTIC_REFERENCE_VERSION,
+    validate_diagnostic_reference,
     archetype_summary,
     build_diagnostic_prompt,
     build_empty_devolutiva,
@@ -3788,6 +3790,7 @@ def gerar_devolutiva_leadertrack():
                     arquetipos=arquetipos,
                     gap=gap,
                     indicadores_disponiveis=indicadores_disponiveis,
+                    baixa_referencia_threshold=baixa_referencia_threshold,
                 )
                 resposta_diagnostico = gerar_resposta_ia_leadertrack(
                     pergunta=prompt_diagnostico,
@@ -3807,6 +3810,7 @@ def gerar_devolutiva_leadertrack():
                     guia_microambiente=guia_microambiente,
                 )
                 diagnostico = parse_json_response(resposta_diagnostico)
+                validate_diagnostic_reference(diagnostico, gap, baixa_referencia_threshold)
 
                 semanas = []
                 revisoes = []
@@ -3819,6 +3823,7 @@ def gerar_devolutiva_leadertrack():
                         start_week=inicio,
                         end_week=fim,
                         indicadores_disponiveis=indicadores_disponiveis,
+                        baixa_referencia_threshold=baixa_referencia_threshold,
                     )
                     resposta_semanal = gerar_resposta_ia_leadertrack(
                         pergunta=prompt_semanal,
@@ -4444,6 +4449,7 @@ def gerar_pdi_leadertrack_afirmacao():
         contexto = dados.get("contexto", "")
         equipe_tipo = str(dados.get("equipeTipo") or dados.get("tipoEquipe") or "direta").strip().lower()
         etapa = str(dados.get("etapa") or "diagnostico").strip().lower()
+        baixa_referencia_threshold = float(dados.get("baixaReferenciaThreshold") or dados.get("baixa_referencia_threshold") or 70)
         indicadores_disponiveis = dados.get("indicadoresOperacionaisDisponiveis", [])
         usar_cache = bool_param(dados.get("usarCache"), True)
         gravar_cache = bool_param(dados.get("gravarCache"), True)
@@ -4475,6 +4481,8 @@ def gerar_pdi_leadertrack_afirmacao():
 
         def cache_id_regra_atencao(cache_id):
             cache_id = str(cache_id or "").strip()
+            if cache_id and etapa == "diagnostico":
+                return f"{cache_id}__{DIAGNOSTIC_REFERENCE_VERSION}_t{baixa_referencia_threshold:g}"
             return f"{cache_id}__atencao_br_v1" if cache_id and usa_regra_baixa_referencia else cache_id
 
         grupo_id_previo = str(
@@ -4608,6 +4616,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 arquetipos=arquetipos,
                 gap=gap,
                 indicadores_disponiveis=indicadores_disponiveis,
+                baixa_referencia_threshold=baixa_referencia_threshold,
             )
             prompt_base_semanal = (
                 "Voce e o LeaderTrackbot. Use exclusivamente o CONTEXTO_JSON enviado pelo usuario. "
@@ -4628,6 +4637,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 or not resultado["diagnostico_tecnico"].get("sintese_executiva")
             ):
                 raise ValueError("A IA retornou um diagnostico incompleto. Tente gerar novamente; esta resposta nao foi salva.")
+            validate_diagnostic_reference(resultado, gap, baixa_referencia_threshold)
             payload = {
                 "status": "ok",
                 "etapa": etapa,
@@ -4797,6 +4807,7 @@ def gerar_pdi_leadertrack_afirmacao():
                 start_week=inicio,
                 end_week=fim,
                 indicadores_disponiveis=indicadores_disponiveis,
+                baixa_referencia_threshold=baixa_referencia_threshold,
             )
             prompt_base_semanal = (
                 "Voce e o LeaderTrackbot. Use exclusivamente o CONTEXTO_JSON enviado pelo usuario. "

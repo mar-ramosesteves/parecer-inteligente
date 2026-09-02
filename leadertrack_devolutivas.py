@@ -1,5 +1,7 @@
 import json
+import math
 import re
+import unicodedata
 from datetime import datetime
 
 
@@ -783,18 +785,83 @@ def low_reference_prompt_rules():
     )
 
 
-def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
+DIAGNOSTIC_REFERENCE_VERSION = "diag_ref_v2"
+
+
+def individual_reference_reading(gap, threshold=70):
+    real = parse_percent(gap.get("real_percentual"), None)
+    ideal = parse_percent(gap.get("ideal_percentual"), None)
+    valid = all(value is not None and math.isfinite(value) and 0 <= value <= 100 for value in (real, ideal))
+    return {
+        "real_percentual": real if valid else None,
+        "ideal_percentual": ideal if valid else None,
+        "limite_baixa_referencia": float(threshold),
+        "baixa_referencia": real < threshold and ideal < threshold if valid else None,
+        "fonte": "percepcao_da_equipe_sobre_esta_afirmacao",
+    }
+
+
+def individual_reference_prompt_rules(gap, threshold=70):
+    reading = individual_reference_reading(gap, threshold)
+    rules = (
+        "A leitura_quantitativa foi calculada pelo sistema para ESTA afirmacao e prevalece sobre "
+        "rotulos, flags e textos de diagnosticos anteriores. Nao transfira baixa referencia de outras "
+        "afirmacoes para esta nem atribua ao lider uma expectativa que foi medida somente na equipe. "
+    )
+    if reading["baixa_referencia"] is True:
+        return rules + low_reference_prompt_rules().replace("70%", f"{threshold:g}%")
+    if reading["baixa_referencia"] is None:
+        return rules + "Dados numericos insuficientes: nao conclua baixa referencia nem invente real ou ideal. "
+    return rules + (
+        f"Nesta afirmacao, real={reading['real_percentual']:g}% e ideal={reading['ideal_percentual']:g}%. "
+        f"A regra exige AMBOS abaixo de {threshold:g}%; portanto baixa_referencia=false. "
+        "Nao inclua no texto final baixa referencia, acomodacao, baixa ambicao ou descrenca na melhoria, "
+        "nem mesmo como hipotese. Nao sugira elevar um ideal que ja e alto. "
+        "Trate a distancia entre experiencia atual e expectativa desejada, com praticas observaveis "
+        "ligadas a esta afirmacao; sem distancia relevante, preserve o que funciona. "
+    )
+
+
+def validate_diagnostic_reference(diagnostic, gap, threshold=70):
+    if individual_reference_reading(gap, threshold)["baixa_referencia"] is True:
+        return
+
+    def texts(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from texts(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from texts(item)
+
+    # Check generated prose, not echoed source fields or schema keys.
+    sections = (diagnostic.get(key) for key in (
+        "diagnostico_tecnico", "indicadores_de_efetividade",
+        "cruzamento_arquetipos", "conducao_da_devolutiva",
+    ))
+    for section in sections:
+        for text in texts(section):
+            normalized = "".join(c for c in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(c))
+            normalized = re.sub(r"[_\s-]+", " ", normalized)
+            if any(term in normalized for term in ("baixa referencia", "acomodacao", "baixa ambicao", "descrenca")):
+                raise ValueError("A interpretacao da IA nao corresponde aos numeros desta afirmacao. O diagnostico nao foi salvo; tente gerar novamente.")
+
+
+def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis, baixa_referencia_threshold=70):
     payload = {
         "lider": leader,
         "arquetipos": arquetipos,
         "afirmacao_critica": gap,
+        "leitura_quantitativa": individual_reference_reading(gap, baixa_referencia_threshold),
         "indicadores_operacionais_disponiveis": indicadores_disponiveis,
         "saida_obrigatoria": diagnostic_schema(),
     }
     return (
         "Gere apenas o diagnostico tecnico para uma devolutiva individual LeaderTrack, sem plano semanal. "
         "Analise o gap, a dimensao/subdimensao de microambiente, os arquetipos dominantes, riscos de excesso e arquetipos a desenvolver. "
-        + low_reference_prompt_rules()
+        + individual_reference_prompt_rules(gap, baixa_referencia_threshold)
         + "Inclua impacto operacional esperado e indicadores reais que a empresa deveria acompanhar para avaliar efetividade. "
         "Nao invente valores nem metas. Se nao houver indicador operacional disponivel, sugira o que coletar como linha de base. "
         "Nao use saude emocional no relatorio individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
@@ -804,7 +871,7 @@ def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
     )
 
 
-def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_week, indicadores_disponiveis):
+def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_week, indicadores_disponiveis, baixa_referencia_threshold=70):
     diagnostic = diagnostic or {}
     diagnostico_tecnico = diagnostic.get("diagnostico_tecnico") or {}
     cruzamento = diagnostic.get("cruzamento_arquetipos") or {}
@@ -823,6 +890,7 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
         "arquetipos": arquetipos,
         "afirmacao_critica": gap,
         "diagnostico_tecnico": diagnostic_resumo,
+        "leitura_quantitativa": individual_reference_reading(gap, baixa_referencia_threshold),
         "indicadores_operacionais_disponiveis": indicadores_disponiveis,
         "semanas_a_gerar": [start_week, end_week],
         "saida_obrigatoria": (
@@ -852,7 +920,7 @@ def build_weekly_prompt(leader, arquetipos, gap, diagnostic, start_week, end_wee
             )
     return (
         f"Gere as semanas {start_week} a {end_week} de um PDI LeaderTrack, mas inclua somente semanas com intervencao nova e util. "
-        + low_reference_prompt_rules()
+        + individual_reference_prompt_rules(gap, baixa_referencia_threshold)
         + single_week_rules
         + "A rodada oficial e anual; estas semanas sao acompanhamento informal, sem nova rodada e sem novo inventario. "
         "Apresente logo no inicio a visao geral do plano, com duracao recomendada, investimento de tempo por semana e investimento estimado por mes. "
