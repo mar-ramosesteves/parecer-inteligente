@@ -12,7 +12,7 @@ import io
 import numpy as np
 import requests
 from openpyxl import load_workbook
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 from leadertrack_devolutivas import (
     archetype_summary,
     build_diagnostic_prompt,
@@ -212,12 +212,13 @@ def gerar_resposta_ia_leadertrack(
     return resposta.choices[0].message.content
 
 
-def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-mini", max_tokens=3500, timeout=25, temperature=0.2):
+def gerar_resposta_ia_leadertrack_enxuta(pergunta, prompt_base, model="gpt-4.1-mini", max_tokens=3500, timeout=25, temperature=0.2, max_retries=None):
     """
     Chamada reduzida para etapas que ja enviam o contexto estruturado no proprio prompt.
     Evita carregar graficos e relatorios inteiros quando a tela pede apenas uma semana integrada.
     """
-    resposta = openai_client.chat.completions.create(
+    client = openai_client if max_retries is None else openai_client.with_options(max_retries=max_retries)
+    resposta = client.chat.completions.create(
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -4617,8 +4618,16 @@ def gerar_pdi_leadertrack_afirmacao():
             resposta_ia = gerar_resposta_ia_leadertrack_enxuta(
                 pergunta=prompt,
                 prompt_base=prompt_base_semanal,
+                timeout=75,
+                max_retries=0,
             )
             resultado = parse_json_response(resposta_ia)
+            if (
+                not isinstance(resultado, dict)
+                or not isinstance(resultado.get("diagnostico_tecnico"), dict)
+                or not resultado["diagnostico_tecnico"].get("sintese_executiva")
+            ):
+                raise ValueError("A IA retornou um diagnostico incompleto. Tente gerar novamente; esta resposta nao foi salva.")
             payload = {
                 "status": "ok",
                 "etapa": etapa,
@@ -4844,6 +4853,10 @@ def gerar_pdi_leadertrack_afirmacao():
         response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
         return response, 200
 
+    except APITimeoutError:
+        response = jsonify({"erro": "A IA excedeu o tempo de resposta nesta etapa. Nenhum resultado novo foi salvo. Tente novamente em alguns instantes."})
+        response.headers["Access-Control-Allow-Origin"] = "https://gestor.thehrkey.tech"
+        return response, 504
     except Exception as e:
         print("Erro ao gerar PDI LeaderTrack por afirmacao:", e)
         response = jsonify({"erro": str(e)})

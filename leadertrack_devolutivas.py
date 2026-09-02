@@ -798,6 +798,8 @@ def build_diagnostic_prompt(leader, arquetipos, gap, indicadores_disponiveis):
         + "Inclua impacto operacional esperado e indicadores reais que a empresa deveria acompanhar para avaliar efetividade. "
         "Nao invente valores nem metas. Se nao houver indicador operacional disponivel, sugira o que coletar como linha de base. "
         "Nao use saude emocional no relatorio individual. Responda somente JSON valido no formato de saida_obrigatoria.\n\n"
+        "Mantenha todos os campos do esquema, com textos objetivos de uma ou duas frases e no maximo dois itens por lista. "
+        "Priorize as hipoteses e orientacoes mais relevantes para esta afirmacao, sem repetir o contexto nem gerar semanas.\n\n"
         f"CONTEXTO_JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
 
