@@ -167,15 +167,20 @@ def calcular_saude_emocional_dashboard(registros_arquetipos, registros_microambi
         categoria: round(valor, 1)
         for categoria, valor in medias_categorias.items()
     }
+    quantidade_por_dimensao = {
+        categoria: len(valores)
+        for categoria, valores in valores_por_categoria.items()
+    }
     validas = [valor for valor in medias_categorias.values() if valor > 0]
     score = round(mean(validas), 1) if validas else None
     return {
         "score_final": score,
         "classificacao": _classificacao(score),
         "dimensoes": categorias,
+        "quantidade_por_dimensao": quantidade_por_dimensao,
         "quantidade_afirmacoes_calculadas": len(rastreio),
         "respondentes_arquetipos": len(arq_equipe),
         "respondentes_microambiente": len(micro_equipe),
         "rastreio_afirmacoes": rastreio,
-        "versao_regra": "dashboard-leadertrack-saude-emocional-v1",
+        "versao_regra": "dashboard-leadertrack-saude-emocional-v2-matriz-redistribuida",
     }

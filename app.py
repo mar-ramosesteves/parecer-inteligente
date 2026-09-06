@@ -1321,12 +1321,19 @@ def consolidar_saude_emocional(registros_arq, registros_micro):
         label = "Regular"
     else:
         label = "Não adequado"
+    quantidade_por_dimensao = {}
+    for dimensao in mapa_saude_emocional().values():
+        dimensao_normalizada = str(dimensao or "").strip().replace("Equilíbrio Vida- Trabalho", "Equilíbrio Vida-Trabalho")
+        if dimensao_normalizada:
+            quantidade_por_dimensao[dimensao_normalizada] = quantidade_por_dimensao.get(dimensao_normalizada, 0) + 1
     return {
         "score_final": score,
         "label": label,
         "categorias": categorias,
+        "quantidade_por_dimensao": quantidade_por_dimensao,
         "n_respostas_arquetipos": len([r for r in registros_arq or [] if r.get("tipo") == "equipe"]),
         "n_respostas_microambiente": len([r for r in registros_micro or [] if r.get("tipo") == "equipe"]),
+        "versao_regra": "leadertrack-saude-emocional-v2-matriz-redistribuida",
     }
 
 
