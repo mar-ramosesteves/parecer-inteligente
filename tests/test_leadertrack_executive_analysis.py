@@ -30,6 +30,24 @@ class ExecutiveAnalysisTests(unittest.TestCase):
                 "quantidades": {"acima_10": 7, "acima_20": 2, "acima_35": 1},
                 "principais_sinais": [{"dimensao": "Nitidez", "gap_pp": 35, "faixa": "critico"}],
             },
+            "archetype_relative_signature": {
+                "escala_fixa": {"base": 100.0, "minimo_visual": 50.0, "maximo_visual": 150.0},
+                "arquetipos": [{
+                    "arquetipo": "Consultivo",
+                    "pontuacao_absoluta_media": 43.0,
+                    "indice_relativo_medio": 100.0,
+                    "lideres_acima_da_media": 4,
+                    "lideres_top1_relativo": 3,
+                }],
+            },
+            "archetype_microenvironment_correlations": {
+                "correlacoes": [{
+                    "arquetipo": "Cuidativo",
+                    "dimensao_microambiente": "Parceria",
+                    "r": 0.889,
+                    "n_lideres": 25,
+                }],
+            },
             "cuts": [{
                 "label": "sexo: feminino",
                 "sample": {"respondentes_arquetipos": 11, "respondentes_microambiente": 12},
@@ -68,6 +86,14 @@ class ExecutiveAnalysisTests(unittest.TestCase):
             package["recortes_elegiveis"][0]["microambiente_gaps_executivos"]["quantidades"]["acima_20"],
             2,
         )
+        self.assertEqual(
+            package["assinatura_arquetipica_relativa"]["escala_fixa"]["base"],
+            100.0,
+        )
+        self.assertEqual(
+            package["correlacoes_arquetipos_microambiente"]["correlacoes"][0]["arquetipo"],
+            "Cuidativo",
+        )
 
     def test_normalization_reapplies_canonical_cut_metrics(self):
         package = compact_snapshot_for_analysis(self.snapshot)
@@ -99,6 +125,8 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertIn("10 a 19,9 p.p. e monitoramento", prompt)
         self.assertIn("20 a 34,9 p.p.", prompt)
         self.assertIn("35 p.p. ou mais e critico", prompt)
+        self.assertIn("assinatura_arquetipica_relativa", prompt)
+        self.assertIn("correlacoes_arquetipos_microambiente", prompt)
 
     def test_small_cut_delta_overclaim_is_replaced_by_canonical_note(self):
         package = compact_snapshot_for_analysis(self.snapshot)
@@ -172,6 +200,8 @@ class ExecutiveAnalysisTests(unittest.TestCase):
         self.assertNotIn("Imperativo e Prescritivo", synthesis)
         self.assertIn("Resoluto (64,0%)", synthesis)
         self.assertTrue(any("Resoluto (64,0%)" in item for item in normalized["findings"]))
+        self.assertTrue(any("Assinatura relativa" in item for item in normalized["findings"]))
+        self.assertTrue(any("Conexões exploratórias" in item for item in normalized["findings"]))
 
     def test_summary_normalization_preserves_decimal_number(self):
         package = compact_snapshot_for_analysis(self.snapshot)

@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v9"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v10"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -223,6 +223,36 @@ def _canonical_findings(package):
             f"{gap_counts.get('acima_20', 0)} relevantes (>=20 p.p.) e "
             f"{gap_counts.get('acima_35', 0)} críticas (>=35 p.p.), em "
             f"{executive_gaps.get('total_afirmacoes', 0)} afirmações calculadas."
+        )
+    relative = package.get("assinatura_arquetipica_relativa") or {}
+    relative_items = relative.get("arquetipos") or []
+    if relative_items:
+        top_items = [
+            item for item in relative_items
+            if int(item.get("lideres_top1_relativo") or 0) > 0
+        ][:3]
+        if top_items:
+            findings.append(
+                "Assinatura relativa frente à cultura real do contexto: "
+                + ", ".join(
+                    f"{item.get('arquetipo')} ({item.get('lideres_top1_relativo')} líderes como maior desvio relativo)"
+                    for item in top_items
+                )
+                + "."
+            )
+    correlations = (
+        (package.get("correlacoes_arquetipos_microambiente") or {})
+        .get("correlacoes") or []
+    )
+    if correlations:
+        findings.append(
+            "Conexões exploratórias entre arquétipos e microambiente: "
+            + "; ".join(
+                f"{item.get('arquetipo')} x {item.get('dimensao_microambiente')} "
+                f"(r={_pt_number(item.get('r'), 2)}, n={item.get('n_lideres')})"
+                for item in correlations[:3]
+            )
+            + "."
         )
     pockets = []
     for cut in package.get("recortes_elegiveis") or []:
@@ -474,6 +504,10 @@ def compact_snapshot_for_analysis(snapshot):
         "amostra": snapshot.get("sample") or {},
         "saude_emocional": _health_summary(snapshot.get("health")),
         "leadertrack": _leadertrack_summary(snapshot.get("leadertrack")),
+        "assinatura_arquetipica_relativa": snapshot.get("archetype_relative_signature") or {},
+        "correlacoes_arquetipos_microambiente": (
+            snapshot.get("archetype_microenvironment_correlations") or {}
+        ),
         "microambiente_gaps_executivos": snapshot.get("microenvironment_gaps") or {},
         "recortes_elegiveis": cuts,
         "findings_quantitativos": snapshot.get("findings") or [],
@@ -548,6 +582,11 @@ def build_executive_analysis_prompt(package):
         "somente como divergencia de percepcao em pontos de atencao, findings ou perguntas, nunca em forcas. "
         "A ordem dos arquetipos predominantes tambem esta pronta em predominancias_da_equipe. Copie essa lista; "
         "nunca confunda maior delta frente aos lideres com maior predominancia na equipe. "
+        "Quando houver assinatura_arquetipica_relativa, trate-a como comparacao do lider ou grupo frente "
+        "a cultura real do proprio contexto, em escala fixa na qual 100 e a media do contexto. Ela serve "
+        "para diferenciar padroes internos e nao substitui o grafico absoluto canonico. Quando houver "
+        "correlacoes_arquetipos_microambiente, descreva-as apenas como conexoes exploratorias entre medias "
+        "por lider, nunca como causa, efeito, perfil ideal ou prova de competencia. "
         "Nao invente metas numericas, cadencias ou instrumentos que nao possam ser acompanhados. "
         "Responda somente JSON valido, com estas chaves exatas: "
         "resumo_executivo, findings, leitura_por_recortes, acoes_organizacionais, governanca, limites. "

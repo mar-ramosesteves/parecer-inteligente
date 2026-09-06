@@ -9,12 +9,19 @@ from hashlib import sha256
 import json
 
 
-SNAPSHOT_SCHEMA_VERSION = "leadertrack-executivo-v2"
+SNAPSHOT_SCHEMA_VERSION = "leadertrack-executivo-v3"
 RECORTE_FIELDS = ("sexo", "etnia", "departamento", "cargo")
 EXECUTIVE_GAP_RULE_VERSION = "microambiente-executivo-v1"
+ARCHETYPE_RELATIVE_RULE_VERSION = "arquetipos-assinatura-relativa-v1"
+ARCHETYPE_MICRO_CORRELATION_RULE_VERSION = "arquetipos-microambiente-correlacao-v1"
 EXECUTIVE_GAP_MONITORING_PP = 10.0
 EXECUTIVE_GAP_RELEVANT_PP = 20.0
 EXECUTIVE_GAP_CRITICAL_PP = 35.0
+RELATIVE_SCALE_BASE = 100.0
+RELATIVE_SCALE_MIN = 50.0
+RELATIVE_SCALE_MAX = 150.0
+CORRELATION_MIN_LEADERS = 10
+CORRELATION_MIN_ABS_R = 0.60
 
 
 def _text(value):
@@ -51,6 +58,33 @@ def _number(value):
         return float(str(value).replace("%", "").replace(",", ".").strip())
     except (TypeError, ValueError):
         return None
+
+
+def _mean(values):
+    numeric = [float(value) for value in values if value is not None]
+    if not numeric:
+        return None
+    return sum(numeric) / len(numeric)
+
+
+def _pearson(pairs):
+    clean = [
+        (float(x), float(y))
+        for x, y in (pairs or [])
+        if x is not None and y is not None
+    ]
+    n = len(clean)
+    if n < 2:
+        return None
+    mean_x = sum(x for x, _ in clean) / n
+    mean_y = sum(y for _, y in clean) / n
+    numerator = sum((x - mean_x) * (y - mean_y) for x, y in clean)
+    denom_x = sum((x - mean_x) ** 2 for x, _ in clean)
+    denom_y = sum((y - mean_y) ** 2 for _, y in clean)
+    denominator = (denom_x * denom_y) ** 0.5
+    if not denominator:
+        return None
+    return numerator / denominator
 
 
 def _executive_gap_band(gap_pp):
@@ -146,6 +180,164 @@ def build_executive_microenvironment_gap_summary(leadertrack, max_signals=12):
         "percentual_acima_10": round((above_10 / total) * 100, 1) if total else 0.0,
         "por_dimensao": dimensions,
         "principais_sinais": signals[:max_signals],
+    }
+
+
+def _leader_ids(*record_groups):
+    return sorted({
+        _text(row.get("email_lider")).lower()
+        for records in record_groups
+        for row in (records or [])
+        if _text(row.get("email_lider"))
+    })
+
+
+def _records_for_leader(records, leader_id):
+    target = _text(leader_id).lower()
+    return [
+        row for row in (records or [])
+        if _text(row.get("email_lider")).lower() == target
+    ]
+
+
+def _archetype_scores(leadertrack):
+    scores = ((leadertrack or {}).get("arquetipos") or {}).get("mediaEquipe") or {}
+    return {
+        str(name): _number(value)
+        for name, value in scores.items()
+        if str(name or "").strip() and _number(value) is not None
+    }
+
+
+def _micro_dimension_scores(leadertrack):
+    micro = ((leadertrack or {}).get("microambiente") or {}).get("media_dimensao")
+    scores = {}
+    for row in _rows(micro):
+        if not isinstance(row, dict):
+            continue
+        dimension = _text(row.get("DIMENSAO"))
+        value = _number(row.get("REAL_%"))
+        if dimension and value is not None:
+            scores[dimension] = value
+    return scores
+
+
+def _leader_scores(archetype_records, microenvironment_records, leadertrack_summarizer):
+    leaders = []
+    for leader_id in _leader_ids(archetype_records, microenvironment_records):
+        archetype_rows = _records_for_leader(archetype_records, leader_id)
+        micro_rows = _records_for_leader(microenvironment_records, leader_id)
+        summary = leadertrack_summarizer(archetype_rows, micro_rows)
+        archetypes = _archetype_scores(summary)
+        micro_dimensions = _micro_dimension_scores(summary)
+        if archetypes or micro_dimensions:
+            leaders.append({
+                "leader_id": leader_id,
+                "arquetipos": archetypes,
+                "microambiente_dimensoes": micro_dimensions,
+                "n_respostas_arquetipos": len(_team(archetype_rows)),
+                "n_respostas_microambiente": len(_team(micro_rows)),
+            })
+    return leaders
+
+
+def build_archetype_relative_signature(leadertrack, leader_scores):
+    """Calcula a assinatura relativa do contexto sem substituir o grafico absoluto."""
+    benchmark = _archetype_scores(leadertrack)
+    relative_sums = {name: [] for name in benchmark}
+    top_counts = {}
+
+    for leader in leader_scores or []:
+        relative = {}
+        for name, base in benchmark.items():
+            value = (leader.get("arquetipos") or {}).get(name)
+            if value is None or not base:
+                continue
+            index = (float(value) / float(base)) * RELATIVE_SCALE_BASE
+            relative[name] = round(index, 1)
+            relative_sums[name].append(index)
+        if relative:
+            top = max(relative.items(), key=lambda item: item[1])[0]
+            top_counts[top] = top_counts.get(top, 0) + 1
+
+    archetypes = []
+    for name, base in benchmark.items():
+        values = relative_sums.get(name) or []
+        archetypes.append({
+            "arquetipo": name,
+            "pontuacao_absoluta_media": round(float(base), 2),
+            "indice_relativo_medio": round(_mean(values), 1) if values else None,
+            "lideres_acima_da_media": sum(1 for value in values if value > RELATIVE_SCALE_BASE),
+            "lideres_top1_relativo": top_counts.get(name, 0),
+        })
+    archetypes.sort(
+        key=lambda item: (
+            -(item.get("lideres_top1_relativo") or 0),
+            -(item.get("pontuacao_absoluta_media") or 0),
+            item.get("arquetipo") or "",
+        )
+    )
+    return {
+        "versao_regra": ARCHETYPE_RELATIVE_RULE_VERSION,
+        "base_calculo": "media da equipe por lider comparada a media do contexto",
+        "escala_fixa": {
+            "base": RELATIVE_SCALE_BASE,
+            "minimo_visual": RELATIVE_SCALE_MIN,
+            "maximo_visual": RELATIVE_SCALE_MAX,
+        },
+        "benchmark_contexto": benchmark,
+        "arquetipos": archetypes,
+        "distribuicao_top1_relativo": top_counts,
+        "n_lideres_calculados": len([leader for leader in leader_scores or [] if leader.get("arquetipos")]),
+    }
+
+
+def build_archetype_microenvironment_correlations(leader_scores, max_items=8):
+    """Relaciona estilos percebidos e microambiente sem inferir causalidade."""
+    leaders = [
+        leader for leader in (leader_scores or [])
+        if leader.get("arquetipos") and leader.get("microambiente_dimensoes")
+    ]
+    archetypes = sorted({
+        name for leader in leaders for name in (leader.get("arquetipos") or {})
+    })
+    dimensions = sorted({
+        name for leader in leaders for name in (leader.get("microambiente_dimensoes") or {})
+    })
+    correlations = []
+    for archetype in archetypes:
+        for dimension in dimensions:
+            pairs = [
+                (
+                    (leader.get("arquetipos") or {}).get(archetype),
+                    (leader.get("microambiente_dimensoes") or {}).get(dimension),
+                )
+                for leader in leaders
+            ]
+            pairs = [(x, y) for x, y in pairs if x is not None and y is not None]
+            coefficient = _pearson(pairs)
+            if coefficient is None or len(pairs) < CORRELATION_MIN_LEADERS:
+                continue
+            if abs(coefficient) < CORRELATION_MIN_ABS_R:
+                continue
+            correlations.append({
+                "arquetipo": archetype,
+                "dimensao_microambiente": dimension,
+                "r": round(coefficient, 3),
+                "n_lideres": len(pairs),
+                "leitura": "associacao positiva" if coefficient > 0 else "associacao negativa",
+            })
+    correlations.sort(key=lambda item: (-abs(item["r"]), item["arquetipo"], item["dimensao_microambiente"]))
+    return {
+        "versao_regra": ARCHETYPE_MICRO_CORRELATION_RULE_VERSION,
+        "base_calculo": "correlacao de Pearson entre medias por lider",
+        "limiares": {
+            "minimo_lideres": CORRELATION_MIN_LEADERS,
+            "minimo_abs_r": CORRELATION_MIN_ABS_R,
+        },
+        "n_lideres_calculados": len(leaders),
+        "correlacoes": correlations[:max_items],
+        "limite_interpretacao": "associacao estatistica exploratoria, sem causalidade automatica",
     }
 
 
@@ -305,6 +497,8 @@ def build_scope_snapshot(
         "source_hash": source_hash(archetype_rows, microenvironment_rows),
         "health": None,
         "leadertrack": None,
+        "archetype_relative_signature": None,
+        "archetype_microenvironment_correlations": None,
         "microenvironment_gaps": None,
         "cuts": [],
         "findings": [],
@@ -315,6 +509,18 @@ def build_scope_snapshot(
     general_health = health_calculator(archetype_records, microenvironment_records)
     package["health"] = general_health
     package["leadertrack"] = leadertrack_summarizer(archetype_records, microenvironment_records)
+    leader_scores = _leader_scores(
+        archetype_records,
+        microenvironment_records,
+        leadertrack_summarizer,
+    )
+    package["archetype_relative_signature"] = build_archetype_relative_signature(
+        package["leadertrack"],
+        leader_scores,
+    )
+    package["archetype_microenvironment_correlations"] = (
+        build_archetype_microenvironment_correlations(leader_scores)
+    )
     package["microenvironment_gaps"] = build_executive_microenvironment_gap_summary(
         package["leadertrack"]
     )

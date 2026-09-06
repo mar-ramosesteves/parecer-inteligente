@@ -1,6 +1,8 @@
 import unittest
 
 from leadertrack_executive_snapshots import (
+    build_archetype_microenvironment_correlations,
+    build_archetype_relative_signature,
     build_executive_microenvironment_gap_summary,
     build_scope_snapshot,
     group_source_rows_by_company,
@@ -20,6 +22,29 @@ def summarizer(archetypes, microenvironment):
         "auto_lideres": len([row for row in archetypes if row.get("tipo") == "autoavaliacao"]),
         "auto_micro_lideres": len([row for row in microenvironment if row.get("tipo") == "autoavaliacao"]),
         "equipe": len([row for row in microenvironment if row.get("tipo") == "equipe"]),
+    }
+
+
+def rich_summarizer(archetypes, microenvironment):
+    archetype_values = [row.get("arq") for row in archetypes if row.get("tipo") == "equipe"]
+    micro_values = [row.get("micro") for row in microenvironment if row.get("tipo") == "equipe"]
+    arq_mean = sum(archetype_values) / len(archetype_values) if archetype_values else None
+    micro_mean = sum(micro_values) / len(micro_values) if micro_values else None
+    return {
+        "arquetipos": {
+            "mediaEquipe": {
+                "Resoluto": arq_mean,
+                "Cuidativo": 100 - arq_mean if arq_mean is not None else None,
+            } if arq_mean is not None else {},
+        },
+        "microambiente": {
+            "media_dimensao": {
+                "dados": [{
+                    "DIMENSAO": "Nitidez",
+                    "REAL_%": micro_mean,
+                }]
+            } if micro_mean is not None else {"dados": []},
+        },
     }
 
 
@@ -154,6 +179,79 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(summary["quantidades"]["acima_35"], 1)
         self.assertEqual(summary["principais_sinais"][0]["faixa"], "critico")
         self.assertEqual(summary["principais_sinais"][-1]["faixa"], "monitoramento")
+
+    def test_archetype_relative_signature_uses_context_as_base_100(self):
+        leadertrack = {
+            "arquetipos": {
+                "mediaEquipe": {"Resoluto": 60, "Cuidativo": 40}
+            }
+        }
+        leaders = [
+            {"arquetipos": {"Resoluto": 72, "Cuidativo": 36}},
+            {"arquetipos": {"Resoluto": 48, "Cuidativo": 44}},
+        ]
+        signature = build_archetype_relative_signature(leadertrack, leaders)
+        self.assertEqual(signature["escala_fixa"]["base"], 100.0)
+        resoluto = next(item for item in signature["arquetipos"] if item["arquetipo"] == "Resoluto")
+        self.assertEqual(resoluto["indice_relativo_medio"], 100.0)
+        self.assertEqual(resoluto["lideres_acima_da_media"], 1)
+
+    def test_archetype_microenvironment_correlations_need_minimum_sample(self):
+        small = [
+            {
+                "arquetipos": {"Resoluto": value},
+                "microambiente_dimensoes": {"Nitidez": value},
+            }
+            for value in range(9)
+        ]
+        self.assertEqual(
+            build_archetype_microenvironment_correlations(small)["correlacoes"],
+            [],
+        )
+
+        enough = [
+            {
+                "arquetipos": {"Resoluto": value},
+                "microambiente_dimensoes": {"Nitidez": value},
+            }
+            for value in range(10)
+        ]
+        correlations = build_archetype_microenvironment_correlations(enough)["correlacoes"]
+        self.assertEqual(correlations[0]["arquetipo"], "Resoluto")
+        self.assertEqual(correlations[0]["dimensao_microambiente"], "Nitidez")
+        self.assertEqual(correlations[0]["r"], 1.0)
+
+    def test_scope_snapshot_includes_parallel_executive_layers(self):
+        archetypes = []
+        microenvironment = []
+        for index in range(10):
+            archetypes.append({
+                "tipo": "equipe",
+                "email_lider": f"lider{index}@example.com",
+                "arq": 40 + index,
+            })
+            microenvironment.append({
+                "tipo": "equipe",
+                "email_lider": f"lider{index}@example.com",
+                "micro": 40 + index,
+            })
+        snapshot = build_scope_snapshot(
+            scope={"tipo": "empresa", "empresa": "empresa_a", "codrodada": "r1"},
+            archetype_records=archetypes,
+            microenvironment_records=microenvironment,
+            archetype_rows=[{"id": 1, "empresa": "empresa_a"}],
+            microenvironment_rows=[{"id": 2, "empresa": "empresa_a"}],
+            health_calculator=health_calculator,
+            leadertrack_summarizer=rich_summarizer,
+            minimum_sample=5,
+            include_cuts=False,
+        )
+        self.assertEqual(snapshot["archetype_relative_signature"]["escala_fixa"]["base"], 100.0)
+        resoluto = next(
+            item for item in snapshot["archetype_microenvironment_correlations"]["correlacoes"]
+            if item["arquetipo"] == "Resoluto"
+        )
+        self.assertEqual(resoluto["r"], 1.0)
 
 
 if __name__ == "__main__":
