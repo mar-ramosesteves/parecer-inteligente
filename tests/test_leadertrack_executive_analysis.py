@@ -172,6 +172,26 @@ class ExecutiveAnalysisTests(unittest.TestCase):
             normalized["acoes_organizacionais"][0]["justificativa"].lower(),
         )
 
+    def test_prohibited_leadership_style_term_is_sanitized(self):
+        package = compact_snapshot_for_analysis(self.snapshot)
+        analysis = {
+            "resumo_executivo": {
+                "sintese": "Calibrar estilos de liderança com as equipes.",
+                "pontos_de_atencao": ["Evitar leitura de estilo de liderança como rótulo."],
+            },
+            "acoes_organizacionais": [{
+                "titulo": "Dialogo sobre Estilos de Liderança",
+                "justificativa": "Explorar estilos de lideranca percebidos.",
+            }],
+        }
+        normalized = normalize_executive_analysis(analysis, package)
+        serialized = str(normalized).lower()
+        self.assertNotIn("estilos de liderança", serialized)
+        self.assertNotIn("estilos de lideranca", serialized)
+        self.assertNotIn("estilo de liderança", serialized)
+        self.assertNotIn("estilo de lideranca", serialized)
+        self.assertIn("arquétipos de gestão", serialized)
+
     def test_demographic_action_is_removed_when_all_health_deltas_are_small(self):
         package = compact_snapshot_for_analysis(self.snapshot)
         analysis = {

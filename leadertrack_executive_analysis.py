@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 
-EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v10"
+EXECUTIVE_ANALYSIS_VERSION = "leadertrack-executive-analysis-v11"
 ALLOWED_OWNERS = {
     "RH",
     "Diretoria",
@@ -99,6 +99,14 @@ def _sanitize_executive_text(value, no_large_health_deltas=False):
     if not isinstance(value, str):
         return value
     replacements = {
+        "estilos de liderança": "arquétipos de gestão",
+        "Estilos de Liderança": "Arquétipos de Gestão",
+        "estilos de lideranca": "arquétipos de gestão",
+        "Estilos de Lideranca": "Arquétipos de Gestão",
+        "estilo de liderança": "padrão de atuação gerencial",
+        "Estilo de Liderança": "Padrão de Atuação Gerencial",
+        "estilo de lideranca": "padrão de atuação gerencial",
+        "Estilo de Lideranca": "Padrão de Atuação Gerencial",
         "gaps elevados": "gaps observados",
         "gap elevado": "gap observado",
         "gaps mais elevados": "maiores gaps observados",
@@ -538,6 +546,9 @@ def build_executive_analysis_prompt(package):
         "na autoavaliacao. "
         "Nao recalcule nenhum numero. Toda forca, ponto de atencao, finding e justificativa de acao "
         "deve indicar a evidencia numerica ou comparativa exata que a sustenta. "
+        "VOCABULARIO PROIBIDO: nunca escreva 'estilos de lideranca' nem 'estilo de lideranca' "
+        "em qualquer grafia, com ou sem acento. Use 'arquetipos de gestao', 'assinatura arquetipica' "
+        "ou 'padroes de atuacao gerencial'. "
         "REGRAS CONCEITUAIS OBRIGATORIAS: (1) Arquetipos sao perfis de estilo, nao indicadores de "
         "qualidade. Percentual baixo nao e deficiencia, gap ou problema; percentual alto nao e, por si, "
         "forca. Nao recomende elevar, equilibrar ou desenvolver um arquetipo apenas por seu percentual. "

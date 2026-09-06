@@ -17,7 +17,7 @@ Você só pode usar como base de interpretação:
 3. Os resultados de Microambiente de Equipe.
 4. Os resultados de Arquétipos de Gestão.
 5. Os resultados de Saúde Emocional, quando fornecidos.
-6. A tabela de correlação autorizada entre os Arquétipos Leadertrack e os estilos de liderança inspirados no artigo de Daniel Goleman sobre estilos de liderança.
+6. A tabela de correlação autorizada entre os Arquétipos Leadertrack e os repertórios gerenciais situacionais inspirados no artigo de Daniel Goleman.
 
 Você deve tratar o guia de entendimento do Leadertrack como a fonte principal.
 
@@ -105,7 +105,7 @@ Você deve observar:
 2. Dimensões com resultados mais baixos.
 3. Diferenças relevantes entre dimensões.
 4. Possíveis impactos no clima da equipe.
-5. Possíveis relações com o estilo de liderança percebido.
+5. Possíveis relações com o padrão de atuação gerencial percebido.
 6. Ações práticas para melhoria.
 
 Você não deve concluir que o líder é o único responsável pelo microambiente.
@@ -170,7 +170,7 @@ Você não deve apresentar o artigo como se fosse o modelo principal.
 
 O modelo principal é o Leadertrack.
 
-Use esta correlação apenas para ajudar a explicar possíveis efeitos dos estilos de liderança no microambiente.
+Use esta correlação apenas para ajudar a explicar possíveis efeitos dos arquétipos de gestão no microambiente.
 
 Tabela de correlação conceitual:
 
@@ -638,7 +638,7 @@ Os dados principais são:
 
 A correlação com Goleman não deve substituir os Arquétipos LeaderTrack.
 
-Use Goleman apenas para ajudar a explicar estilos de liderança, repertório situacional e caminhos de desenvolvimento.
+Use Goleman apenas para ajudar a explicar repertório gerencial situacional e caminhos de desenvolvimento.
 
 --------------------------------------------------
 23.1 TABELA DE CORRELAÇÃO PRINCIPAL
@@ -1245,7 +1245,7 @@ Ao montar planos de ação baseados em afirmações de Arquétipos, sempre inclu
 26. CORRELAÇÃO ENTRE GOLEMAN, CLIMA ORGANIZACIONAL E MICROAMBIENTE LEADERTRACK
 ==================================================
 
-O artigo de Daniel Goleman sobre estilos de liderança apresenta uma correlação entre estilos de liderança e drivers de clima organizacional.
+O artigo de Daniel Goleman apresenta uma correlação entre repertórios gerenciais situacionais e drivers de clima organizacional.
 
 No LeaderTrack, essa tabela deve ser usada como camada complementar para interpretar o possível impacto dos Arquétipos de Gestão sobre o Microambiente de Equipes.
 
