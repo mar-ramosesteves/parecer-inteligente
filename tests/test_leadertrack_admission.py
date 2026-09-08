@@ -23,6 +23,23 @@ class AdmissionTests(unittest.TestCase):
             fetch_admission_rows("https://test.invalid", {"apikey": "legacy"}, "umi", "avleven0726", "test", get=get)
         self.assertEqual("test-server-only", get.call_args.kwargs["headers"]["apikey"])
         self.assertEqual("Bearer test-server-only", get.call_args.kwargs["headers"]["Authorization"])
+        self.assertNotIn("empresa", get.call_args.kwargs["params"])
+
+    def test_individual_sample_uses_leader_email_across_units(self):
+        response = Mock()
+        response.json.return_value = [
+            {**row(1), "holding": "LEVEN", "empresa": "adm"},
+            {**row(2), "holding": "LEVEN", "empresa": "umi"},
+            {**row(3), "holding": "LEVEN", "empresa": "ump"},
+        ]
+        get = Mock(return_value=response)
+        with patch.dict(os.environ, {"SUPABASE_SERVICE_ROLE_KEY": "test-server-only"}):
+            rows = fetch_admission_rows("https://test.invalid", {}, "adm", "avleven0726", "test", get=get)
+        self.assertEqual(1, get.call_count)
+        self.assertNotIn("empresa", get.call_args.kwargs["params"])
+        self.assertEqual(3, len(rows))
+        self.assertTrue(all(r["_leadertrack_leader_wide_sample"] for r in rows))
+        self.assertIn("independentemente da unidade", select_sample(rows, "microambiente")[2]["escopo_amostra"])
 
     def test_admission_query_fails_closed_without_server_credential(self):
         get = Mock()
